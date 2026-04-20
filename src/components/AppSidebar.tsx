@@ -9,9 +9,9 @@ import {
   MessagesSquare,
   UsersRound,
   ExternalLink,
-  Bot,
+  LayoutDashboard,
 } from "lucide-react";
-import { NavLink } from "@/components/NavLink";
+import { NavLink } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -27,8 +27,12 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
+import vibeyAvatar from "@/assets/vibey-avatar.png";
+import { cn } from "@/lib/utils";
 
 const chatItem = { title: "Talk to Vibey", url: "/", icon: MessageCircle };
+const dashboardItem = { title: "Vibey Control", url: "/dashboard", icon: LayoutDashboard };
 
 const agentItems = [
   { title: "Soul", url: "/soul", icon: Sparkles },
@@ -45,18 +49,29 @@ const socialItems = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const isMobile = useIsMobile();
   const isActive = (path: string) =>
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
+
+  const handleNav = () => {
+    if (isMobile) setOpenMobile(false);
+  };
+
+  const linkClass = (active: boolean) =>
+    cn(
+      "flex items-center gap-2 w-full",
+      active && "bg-sidebar-accent text-primary font-medium"
+    );
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-            <Bot className="w-4 h-4 text-primary" />
+          <div className="w-8 h-8 rounded-lg overflow-hidden bg-primary/10 shrink-0 ring-1 ring-primary/20">
+            <img src={vibeyAvatar} alt="Vibey" className="w-full h-full object-cover" />
           </div>
           {!collapsed && (
             <span className="font-mono text-sm font-bold tracking-widest uppercase text-foreground">
@@ -69,15 +84,23 @@ export function AppSidebar() {
       <SidebarSeparator />
 
       <SidebarContent>
-        {/* Chat */}
+        {/* Chat + Dashboard */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={isActive("/")}>
-                  <NavLink to="/" end activeClassName="bg-sidebar-accent text-primary font-medium">
+                  <NavLink to="/" end onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
                     <chatItem.icon className="h-4 w-4" />
                     {!collapsed && <span>{chatItem.title}</span>}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={isActive("/dashboard")}>
+                  <NavLink to="/dashboard" onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
+                    <dashboardItem.icon className="h-4 w-4" />
+                    {!collapsed && <span>{dashboardItem.title}</span>}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -95,7 +118,7 @@ export function AppSidebar() {
               {agentItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} activeClassName="bg-sidebar-accent text-primary font-medium">
+                    <NavLink to={item.url} onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
@@ -116,7 +139,7 @@ export function AppSidebar() {
               {socialItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} activeClassName="bg-sidebar-accent text-primary font-medium">
+                    <NavLink to={item.url} onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
