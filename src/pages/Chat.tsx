@@ -32,7 +32,7 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3rem)]">
+    <div className="flex flex-col h-full">
       {/* Messages */}
       <div className="flex-1 overflow-auto p-6 space-y-4">
         {messages.length === 0 ? (
