@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Bot, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import vibeyAvatar from "@/assets/vibey-avatar.png";
 
 interface Message {
   id: string;
@@ -36,8 +37,8 @@ export default function Chat() {
       <div className="flex-1 overflow-auto p-6 space-y-4">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Bot className="w-8 h-8 text-primary" />
+            <div className="w-20 h-20 rounded-2xl overflow-hidden ring-1 ring-primary/20">
+              <img src={vibeyAvatar} alt="Vibey" className="w-full h-full object-cover" />
             </div>
             <div>
               <h2 className="text-xl font-semibold">Talk to Vibey</h2>
@@ -55,8 +56,8 @@ export default function Chat() {
               className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               {msg.role === "assistant" && (
-                <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0 mt-1">
-                  <Bot className="w-3.5 h-3.5 text-primary" />
+                <div className="w-7 h-7 rounded-lg overflow-hidden ring-1 ring-primary/20 shrink-0 mt-1">
+                  <img src={vibeyAvatar} alt="Vibey" className="w-full h-full object-cover" />
                 </div>
               )}
               <div

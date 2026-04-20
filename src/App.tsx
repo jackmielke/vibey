@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import AdminLayout from "@/components/AdminLayout";
 import Chat from "@/pages/Chat";
+import Dashboard from "@/pages/Dashboard";
 import Soul from "@/pages/Soul";
 import Identity from "@/pages/Identity";
 import Memory from "@/pages/Memory";
@@ -26,6 +27,7 @@ const App = () => (
         <Routes>
           <Route element={<AdminLayout />}>
             <Route index element={<Chat />} />
+            <Route path="dashboard" element={<Dashboard />} />
             <Route path="soul" element={<Soul />} />
             <Route path="identity" element={<Identity />} />
             <Route path="memory" element={<Memory />} />
