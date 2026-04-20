@@ -43,8 +43,9 @@ export default function AdminLayout() {
     if (isControlRoute) navigate("/");
   };
 
-  // On mobile, control panel uses a Sheet. On desktop, it's an inline side column.
+  // On mobile, control panel uses a Sheet. On tablet/desktop, it's an inline side column.
   const showInlineControl = !isMobile && controlOpen;
+  // Tailwind `lg` = 1024px, but useIsMobile flips at 768px — use md+ classes so the panel shows on tablets too.
   // The <Outlet /> only renders for non-control routes (i.e. chat / not-found edge cases).
   // For control routes we render Dashboard/Outlet inside the side panel instead.
 
@@ -76,15 +77,15 @@ export default function AdminLayout() {
             <main
               className={cn(
                 "flex-1 min-w-0 overflow-auto",
-                showInlineControl && "lg:border-r lg:border-border"
+                showInlineControl && "md:border-r md:border-border"
               )}
             >
               {isChatRoute || isControlRoute ? <Chat /> : <Outlet />}
             </main>
 
-            {/* Desktop inline control panel */}
+            {/* Tablet/desktop inline control panel */}
             {showInlineControl && (
-              <aside className="hidden lg:flex flex-col w-[480px] xl:w-[560px] shrink-0 overflow-hidden bg-background animate-slide-in-right">
+              <aside className="hidden md:flex flex-col w-[420px] lg:w-[480px] xl:w-[560px] shrink-0 overflow-hidden bg-background animate-slide-in-right border-l border-border">
                 <div className="h-10 flex items-center justify-between px-4 border-b border-border shrink-0">
                   <span className="text-label">Vibey Control</span>
                   <Button
