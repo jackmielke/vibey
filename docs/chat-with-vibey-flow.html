@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Vibey — chat-with-vibey flow</title>
+<style>
+  body { margin: 0; padding: 32px; background: #0f0f10; color: #eee; font-family: -apple-system, system-ui, sans-serif; }
+  h1 { font-weight: 500; font-size: 18px; color: #bbb; margin: 0 0 24px; }
+  .mermaid { background: #fff; border-radius: 12px; padding: 24px; }
+</style>
+</head>
+<body>
+<h1>chat-with-vibey — request flow</h1>
+<div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Client as Admin UI / future Telegram, X, Robot
+    participant Edge as chat-with-vibey (Supabase edge fn)
+    participant DB as Vibe Supabase (shared DB)
+    participant OR as OpenRouter (claude-sonnet-4.5)
+
+    Client->>Edge: POST /chat-with-vibey { messages: [...] }
+    Edge->>Edge: validate OPENROUTER_API_KEY + messages
+
+    Edge->>DB: SELECT system_prompt, model, temperature, max_tokens FROM agents WHERE id = VIBEY_AGENT_ID
+    DB-->>Edge: Vibey's soul config
+
+    Edge->>OR: POST /chat/completions (stream=true) [system_prompt, ...messages]
+    OR-->>Edge: SSE stream
+
+    Edge->>Edge: tee() the stream into two copies
+
+    par stream to client
+        Edge-->>Client: SSE assistant tokens (live)
+    and log in background
+        Edge->>Edge: accumulate assistantText + usage tokens
+        Edge->>DB: INSERT INTO agent_chat_logs (agent_id, community_id, user_message, agent_response, tokens_used)
+    end
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'default', sequence: { mirrorActors: false, useMaxWidth: true } });
+</script>
+</body>
+</html>

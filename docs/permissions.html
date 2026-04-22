@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Vibey — permission model</title>
+<style>
+  body { margin: 0; padding: 32px; background: #0f0f10; color: #eee; font-family: -apple-system, system-ui, sans-serif; max-width: 1100px; margin: 0 auto; }
+  h1 { font-weight: 500; font-size: 20px; color: #fff; margin: 0 0 8px; }
+  h2 { font-weight: 500; font-size: 14px; color: #888; margin: 32px 0 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  p.lede { color: #aaa; margin: 0 0 24px; }
+  .mermaid { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+<h1>Vibey — permission model</h1>
+<p class="lede">Three tiers. Postgres RLS enforces it. Vibey only sees what the asker can see.</p>
+
+<h2>Flow — how a request gets filtered</h2>
+<div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Asker as Asker<br/>(site visitor / member / admin)
+    participant Edge as chat-with-vibey
+    participant DB as Supabase + RLS
+    participant LLM as Claude via OpenRouter
+
+    Asker->>Edge: message + JWT (or none)
+    Edge->>DB: query context WITH asker's JWT
+    Note over DB: RLS policies filter every row<br/>by tier: public / member / admin
+    DB-->>Edge: only rows the asker may see
+    Edge->>LLM: system prompt + filtered context + message
+    LLM-->>Edge: reply (can only reference what was loaded)
+    Edge-->>Asker: streamed reply
+    Edge->>DB: log to agent_chat_logs (service role, admin-only)
+</div>
+
+<h2>Tiers — who sees what</h2>
+<div class="mermaid">
+flowchart TB
+    subgraph Public["🌍 PUBLIC — anyone on the internet"]
+        P1["communities · events · blog_posts<br/>sponsors · residencies<br/>gallery_photos (public rows)<br/>projects (public rows)"]
+    end
+
+    subgraph Member["👥 MEMBER — Telegram handle linked to users row"]
+        M1["+ users (bios, handles)<br/>+ community_members (roster)<br/>+ vibey_relationships (own)<br/>+ memories (own + shared)<br/>+ notes · preferences · embeddings (own)<br/>+ event_attendees · likes · favorites<br/>+ vibecoin_pickups (own balance)"]
+    end
+
+    subgraph Admin["🔑 ADMIN — Jack, Noah, Mariella"]
+        A1["+ agents (system_prompt edit)<br/>+ agent_chat_logs · messages · sessions<br/>+ telegram_bots · bot_tokens · api_keys<br/>+ magic_link · profile_claim<br/>+ outreach_logs · custom_tools<br/>+ orders · partners · applications<br/>+ user_roles · product_roadmap"]
+    end
+
+    Public --> Member --> Admin
+</div>
+
+<h2>The approval pattern for admin-tier writes</h2>
+<div class="mermaid">
+flowchart LR
+    V["Vibey wants to post<br/>(X account / group chat / proactive DM)"]
+    Q[["Approval queue"]]
+    J{Jack / Noah / Mariella<br/>approves?}
+    S["Posted to surface"]
+    D["Discarded"]
+
+    V --> Q --> J
+    J -->|yes| S
+    J -->|no| D
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'default', flowchart: { useMaxWidth: true }, sequence: { useMaxWidth: true } });
+</script>
+</body>
+</html>
