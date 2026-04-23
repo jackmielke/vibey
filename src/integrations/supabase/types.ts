@@ -21,6 +21,7 @@ export type Database = {
           community_id: string
           created_at: string | null
           id: string
+          session_key: string | null
           telegram_chat_id: number | null
           telegram_user_id: number | null
           telegram_username: string | null
@@ -33,6 +34,7 @@ export type Database = {
           community_id: string
           created_at?: string | null
           id?: string
+          session_key?: string | null
           telegram_chat_id?: number | null
           telegram_user_id?: number | null
           telegram_username?: string | null
@@ -45,6 +47,7 @@ export type Database = {
           community_id?: string
           created_at?: string | null
           id?: string
+          session_key?: string | null
           telegram_chat_id?: number | null
           telegram_user_id?: number | null
           telegram_username?: string | null
