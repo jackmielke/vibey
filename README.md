@@ -1,4 +1,4 @@
-# Vibey
+# Vibey - Community AI Assistant
 
 > the resident AI of the Vibe community. think of it like a team member who happens to have perfect memory, knows everyone, never sleeps, and (eventually) lives in a robot body.
 
