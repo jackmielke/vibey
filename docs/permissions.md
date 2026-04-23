@@ -18,7 +18,6 @@ Rough cut based on the current 50 tables. Comments mark things that need per-row
 - `communities` (public metadata only)
 - `events` (published events)
 - `blog_posts` (published)
-- `sponsors`
 - `residencies` (public-facing info)
 - `gallery_photos` — **row-level**: photos marked public
 - `projects` — **row-level**: projects marked public
@@ -59,6 +58,7 @@ Rough cut based on the current 50 tables. Comments mark things that need per-row
 - `product_roadmap`
 - `applications`
 - `community_workflows`
+- `sponsors` (internal budgeting / relationships — admin-only for now)
 - `game_leaderboard`, `player_positions`, `world_objects` (VR infra — admin until we open it up)
 
 ## How Vibey actually enforces this

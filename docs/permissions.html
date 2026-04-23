@@ -38,7 +38,7 @@ sequenceDiagram
 <div class="mermaid">
 flowchart TB
     subgraph Public["🌍 PUBLIC — anyone on the internet"]
-        P1["communities · events · blog_posts<br/>sponsors · residencies<br/>gallery_photos (public rows)<br/>projects (public rows)"]
+        P1["communities · events · blog_posts<br/>residencies<br/>gallery_photos (public rows)<br/>projects (public rows)"]
     end
 
     subgraph Member["👥 MEMBER — Telegram handle linked to users row"]
@@ -46,7 +46,7 @@ flowchart TB
     end
 
     subgraph Admin["🔑 ADMIN — Jack, Noah, Mariella"]
-        A1["+ agents (system_prompt edit)<br/>+ agent_chat_logs · messages · sessions<br/>+ telegram_bots · bot_tokens · api_keys<br/>+ magic_link · profile_claim<br/>+ outreach_logs · custom_tools<br/>+ orders · partners · applications<br/>+ user_roles · product_roadmap"]
+        A1["+ agents (system_prompt edit)<br/>+ agent_chat_logs · messages · sessions<br/>+ telegram_bots · bot_tokens · api_keys<br/>+ magic_link · profile_claim<br/>+ outreach_logs · custom_tools<br/>+ sponsors · orders · partners · applications<br/>+ user_roles · product_roadmap"]
     end
 
     Public --> Member --> Admin
