@@ -7,10 +7,18 @@ import { useVibeyAgent } from "@/hooks/useVibeyAgent";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 
+interface GalleryImage {
+  id: string;
+  url: string;
+  title: string | null;
+  description: string | null;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  images?: GalleryImage[];
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-with-vibey`;
@@ -22,25 +30,20 @@ export default function Chat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Sticky-bottom: only auto-scroll if the user is already near the bottom.
-  // Scrolling up to re-read older messages shouldn't yank them back down.
   const stickToBottomRef = useRef(true);
 
   const handleScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
-    // Within 80px of the bottom counts as "at the bottom"
     stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
   };
 
-  // Seed with the agent's intro message once it loads.
   useEffect(() => {
     if (agent && messages.length === 0 && agent.intro_message) {
       setMessages([{ id: "intro", role: "assistant", content: agent.intro_message }]);
     }
   }, [agent, messages.length]);
 
-  // Auto-scroll on new content (instant, not smooth, so streaming tokens keep up).
-  // Only when the user is already stuck to the bottom.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !stickToBottomRef.current) return;
@@ -56,12 +59,8 @@ export default function Chat() {
     setMessages((prev) => [...prev, userMsg, { id: assistantId, role: "assistant", content: "" }]);
     setInput("");
     setIsStreaming(true);
-    // Sending a new message = user intent to follow the conversation.
-    // Snap back to the bottom even if they'd scrolled up.
     stickToBottomRef.current = true;
 
-    // Build the payload from the conversation so far (excluding the empty assistant placeholder).
-    // Cap to the last 20 messages (~10 turns) so context/cost stay predictable as conversations grow.
     const HISTORY_CAP = 20;
     const payloadMessages = [...messages, userMsg]
       .slice(-HISTORY_CAP)
@@ -86,7 +85,6 @@ export default function Chat() {
         } else {
           toast.error("Vibey couldn't reply", { description: errText || `HTTP ${resp.status}` });
         }
-        // Remove the empty assistant placeholder
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
         setIsStreaming(false);
         return;
@@ -96,6 +94,10 @@ export default function Chat() {
       const decoder = new TextDecoder();
       let buffer = "";
       let done = false;
+      // Track which SSE event the next "data:" line belongs to. OpenRouter
+      // chunks are unnamed (default "message"); our edge function appends a
+      // single "event: images" envelope at the very end.
+      let pendingEvent: string | null = null;
 
       while (!done) {
         const { value, done: streamDone } = await reader.read();
@@ -107,10 +109,37 @@ export default function Chat() {
           let line = buffer.slice(0, nl);
           buffer = buffer.slice(nl + 1);
           if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
 
+          // Blank line = end of one SSE event.
+          if (line === "") {
+            pendingEvent = null;
+            continue;
+          }
+          if (line.startsWith(":")) continue;
+
+          if (line.startsWith("event: ")) {
+            pendingEvent = line.slice(7).trim();
+            continue;
+          }
+
+          if (!line.startsWith("data: ")) continue;
           const payload = line.slice(6).trim();
+
+          // Custom event: gallery image attachments
+          if (pendingEvent === "images") {
+            try {
+              const imgs: GalleryImage[] = JSON.parse(payload);
+              if (Array.isArray(imgs) && imgs.length > 0) {
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === assistantId ? { ...m, images: imgs } : m))
+                );
+              }
+            } catch {
+              // ignore malformed image payloads
+            }
+            continue;
+          }
+
           if (payload === "[DONE]") {
             done = true;
             break;
@@ -173,17 +202,56 @@ export default function Chat() {
                   <img src={agent?.avatar_url || vibeyAvatar} alt="Vibey" className="w-full h-full object-cover" />
                 </div>
               )}
-              <div
-                className={`max-w-[70%] rounded-lg px-4 py-2.5 text-sm whitespace-pre-wrap ${
-                  msg.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-card border border-border"
-                }`}
-              >
-                {msg.content || (
-                  <span className="inline-flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="w-3 h-3 animate-spin" /> thinking…
-                  </span>
+              <div className={`max-w-[70%] flex flex-col gap-2 ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                <div
+                  className={`rounded-lg px-4 py-2.5 text-sm whitespace-pre-wrap ${
+                    msg.role === "user"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card border border-border"
+                  }`}
+                >
+                  {msg.content || (
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="w-3 h-3 animate-spin" /> thinking…
+                    </span>
+                  )}
+                </div>
+
+                {/* Gallery image cards (assistant-only) */}
+                {msg.role === "assistant" && msg.images && msg.images.length > 0 && (
+                  <div
+                    className={`grid gap-2 w-full ${
+                      msg.images.length === 1
+                        ? "grid-cols-1"
+                        : msg.images.length === 2
+                        ? "grid-cols-2"
+                        : "grid-cols-3"
+                    }`}
+                  >
+                    {msg.images.map((img) => (
+                      <a
+                        key={img.id}
+                        href={img.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group block rounded-lg overflow-hidden border border-border bg-card hover:border-primary/50 transition-colors"
+                      >
+                        <div className="aspect-square overflow-hidden bg-muted">
+                          <img
+                            src={img.url}
+                            alt={img.title || "Gallery photo"}
+                            loading="lazy"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        </div>
+                        {img.title && (
+                          <div className="p-2 text-xs text-muted-foreground truncate">
+                            {img.title}
+                          </div>
+                        )}
+                      </a>
+                    ))}
+                  </div>
                 )}
               </div>
             </motion.div>

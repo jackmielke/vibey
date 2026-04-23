@@ -2,6 +2,9 @@
 // - Loads the global Vibey agent row to get system_prompt + model + sampling params.
 // - Forwards conversation history to OpenRouter (OpenAI-compatible API).
 // - Streams SSE back to the client untouched.
+// - Hybrid image search: keyword pre-filter on gallery_photos, then Claude picks
+//   the best 1-3 matches. Chosen images are sent to the client as a custom SSE
+//   event ("event: images") AFTER the assistant text stream completes.
 // - On completion, persists the user/assistant pair to agent_chat_logs.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -17,19 +20,146 @@ const corsHeaders = {
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
-// Optional surface-aware context so every interface (website, telegram, x, robot)
-// can hit this same endpoint without reinventing wheels. Backward compatible:
-// if omitted, we treat the caller as anonymous web.
 type CallerContext = {
   surface?: "web" | "telegram" | "x" | "robot" | string;
-  external_id?: string; // telegram user id, x handle, etc.
-  external_handle?: string; // display name / username when available
+  external_id?: string;
+  external_handle?: string;
+};
+
+type GalleryPhoto = {
+  id: string;
+  image_url: string;
+  title: string | null;
+  description: string | null;
+  tags: string[] | null;
+  residency_name: string | null;
 };
 
 function buildSessionKey(ctx: CallerContext | undefined): string {
   const surface = ctx?.surface || "web";
   const id = ctx?.external_id || "anon";
   return `${surface}:${id}`;
+}
+
+// Pull keyword candidates from gallery_photos using ILIKE on title/description/
+// residency_name + array overlap on tags. Cheap and good enough as a pre-filter.
+async function fetchCandidatePhotos(
+  supabase: ReturnType<typeof createClient>,
+  query: string
+): Promise<GalleryPhoto[]> {
+  const tokens = query
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length >= 3)
+    .slice(0, 6);
+
+  if (tokens.length === 0) return [];
+
+  // Build an OR filter: title.ilike.%t%,description.ilike.%t%,residency_name.ilike.%t%
+  // for each token, plus tags array overlap.
+  const orParts: string[] = [];
+  for (const t of tokens) {
+    const safe = t.replace(/[%,()]/g, "");
+    orParts.push(`title.ilike.%${safe}%`);
+    orParts.push(`description.ilike.%${safe}%`);
+    orParts.push(`residency_name.ilike.%${safe}%`);
+  }
+
+  const { data, error } = await supabase
+    .from("gallery_photos")
+    .select("id, image_url, title, description, tags, residency_name")
+    .eq("is_visible", true)
+    .or(orParts.join(","))
+    .limit(20);
+
+  if (error) {
+    console.error("gallery keyword search failed:", error.message);
+    return [];
+  }
+
+  // Also try tag overlap as a separate query (Supabase doesn't mix .or with .overlaps cleanly)
+  const { data: tagData } = await supabase
+    .from("gallery_photos")
+    .select("id, image_url, title, description, tags, residency_name")
+    .eq("is_visible", true)
+    .overlaps("tags", tokens)
+    .limit(20);
+
+  const merged = new Map<string, GalleryPhoto>();
+  for (const row of [...(data ?? []), ...(tagData ?? [])]) {
+    merged.set((row as GalleryPhoto).id, row as GalleryPhoto);
+  }
+  return Array.from(merged.values()).slice(0, 20);
+}
+
+// Ask Claude (cheap call, non-streaming) to pick 0-3 best matching photo IDs.
+// Returns the picked photos in display order, or [] if none are a good fit.
+async function pickPhotosWithLLM(
+  apiKey: string,
+  model: string,
+  userQuery: string,
+  candidates: GalleryPhoto[]
+): Promise<GalleryPhoto[]> {
+  if (candidates.length === 0) return [];
+
+  const compact = candidates.map((p) => ({
+    id: p.id,
+    title: p.title,
+    description: p.description?.slice(0, 200) ?? null,
+    tags: p.tags,
+    residency: p.residency_name,
+  }));
+
+  const system =
+    "You are an image curator. Given a user's request and a list of candidate photos (with titles, descriptions, tags), return ONLY a JSON object {\"ids\": [\"uuid\", ...]} with the 1-3 best matches in order of relevance. If NONE clearly match the user's request, return {\"ids\": []}. Never invent IDs. Never include explanation.";
+
+  const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://community-vibes-ai.lovable.app",
+      "X-Title": "Vibey image picker",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0,
+      max_tokens: 200,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: system },
+        {
+          role: "user",
+          content: `User asked: "${userQuery}"\n\nCandidates:\n${JSON.stringify(compact)}`,
+        },
+      ],
+    }),
+  });
+
+  if (!resp.ok) {
+    console.error("photo picker LLM failed:", resp.status, await resp.text());
+    return [];
+  }
+
+  try {
+    const json = await resp.json();
+    const raw = json?.choices?.[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw);
+    const ids: string[] = Array.isArray(parsed?.ids) ? parsed.ids.slice(0, 3) : [];
+    const byId = new Map(candidates.map((p) => [p.id, p]));
+    return ids.map((id) => byId.get(id)).filter(Boolean) as GalleryPhoto[];
+  } catch (e) {
+    console.error("photo picker parse failed:", e);
+    return [];
+  }
+}
+
+// Heuristic: only run image search when the user's message smells image-y.
+function looksImageRequest(text: string): boolean {
+  return /\b(photo|photos|picture|pictures|image|images|show|see|gallery|look|visual|pic|pics)\b/i.test(
+    text
+  );
 }
 
 Deno.serve(async (req) => {
@@ -79,6 +209,20 @@ Deno.serve(async (req) => {
 
     const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
 
+    // Kick off image search in parallel with the chat call. We won't block the
+    // text stream on it — we'll append the result as a final SSE event.
+    const imageSearchPromise: Promise<GalleryPhoto[]> = looksImageRequest(lastUserMessage)
+      ? (async () => {
+          const candidates = await fetchCandidatePhotos(supabase, lastUserMessage);
+          if (candidates.length === 0) return [];
+          return pickPhotosWithLLM(OPENROUTER_API_KEY, agent.model, lastUserMessage, candidates);
+        })()
+      : Promise.resolve([]);
+
+    // Augment system prompt with a tiny note so Vibey knows images may follow.
+    const systemPrompt =
+      `${agent.system_prompt}\n\nNote: when the user asks to see photos/images, the app will attach matching gallery images below your reply automatically. Just speak naturally about them — do NOT paste image URLs or markdown image syntax.`;
+
     const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -93,7 +237,7 @@ Deno.serve(async (req) => {
         max_tokens: agent.max_tokens ?? 2048,
         stream: true,
         messages: [
-          { role: "system", content: agent.system_prompt },
+          { role: "system", content: systemPrompt },
           ...messages,
         ],
       }),
@@ -108,13 +252,49 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Tee the stream: pipe one copy to the client, accumulate the other for logging.
-    const [clientStream, logStream] = orResponse.body.tee();
+    // Tee the OpenRouter stream: one copy passes through to the client (after
+    // we wrap it so we can append the images event), the other accumulates for logging.
+    const [orForClient, orForLog] = orResponse.body.tee();
+
+    // Build a wrapped stream: pipe OR bytes through, then append `event: images\ndata: ...\n\n`.
+    const encoder = new TextEncoder();
+    const wrapped = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const reader = orForClient.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            controller.enqueue(value);
+          }
+          // After OR finishes streaming, await the image search and emit it.
+          let picked: GalleryPhoto[] = [];
+          try {
+            picked = await imageSearchPromise;
+          } catch (e) {
+            console.error("image search failed:", e);
+          }
+          const payload = JSON.stringify(
+            picked.map((p) => ({
+              id: p.id,
+              url: p.image_url,
+              title: p.title,
+              description: p.description,
+            }))
+          );
+          controller.enqueue(encoder.encode(`event: images\ndata: ${payload}\n\n`));
+        } catch (e) {
+          console.error("stream wrap error:", e);
+        } finally {
+          controller.close();
+        }
+      },
+    });
 
     // Background: read logStream, accumulate full assistant text, persist to agent_chat_logs.
     (async () => {
       try {
-        const reader = logStream.getReader();
+        const reader = orForLog.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
         let assistantText = "";
@@ -160,7 +340,7 @@ Deno.serve(async (req) => {
       }
     })();
 
-    return new Response(clientStream, {
+    return new Response(wrapped, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {
