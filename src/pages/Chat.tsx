@@ -44,8 +44,12 @@ export default function Chat() {
     setInput("");
     setIsStreaming(true);
 
-    // Build the payload from the conversation so far (excluding the empty assistant placeholder)
-    const payloadMessages = [...messages, userMsg].map(({ role, content }) => ({ role, content }));
+    // Build the payload from the conversation so far (excluding the empty assistant placeholder).
+    // Cap to the last 20 messages (~10 turns) so context/cost stay predictable as conversations grow.
+    const HISTORY_CAP = 20;
+    const payloadMessages = [...messages, userMsg]
+      .slice(-HISTORY_CAP)
+      .map(({ role, content }) => ({ role, content }));
 
     try {
       const resp = await fetch(CHAT_URL, {

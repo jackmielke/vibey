@@ -11,6 +11,8 @@
 </head>
 <body>
 <h1>chat-with-vibey — request flow</h1>
+
+<h2 style="color:#bbb; font-weight:500; font-size:14px; margin:24px 0 12px; text-transform:uppercase; letter-spacing:0.5px;">Request flow</h2>
 <div class="mermaid">
 sequenceDiagram
     autonumber
@@ -36,6 +38,56 @@ sequenceDiagram
         Edge->>Edge: accumulate assistantText + usage tokens
         Edge->>DB: INSERT INTO agent_chat_logs (agent_id, community_id, user_message, agent_response, tokens_used)
     end
+</div>
+
+<h2 style="color:#bbb; font-weight:500; font-size:14px; margin:32px 0 12px; text-transform:uppercase; letter-spacing:0.5px;">What the LLM sees (context composition)</h2>
+<div class="mermaid">
+flowchart LR
+    subgraph DB_in["From DB (agents row)"]
+        SP["system_prompt<br/>IDENTITY.md + SOUL.md<br/>~4,000 chars"]
+    end
+
+    subgraph Client_in["From client payload"]
+        H["messages[] (full history)<br/>role: user / assistant<br/>NO CAP right now"]
+        L["latest user message<br/>(last element of messages[])"]
+    end
+
+    subgraph Future["Future — not implemented yet"]
+        R["relationship row<br/>for the asker"]
+        M["relevant memories<br/>(RAG over memories table)"]
+        C["live community context<br/>(events today, recent msgs)"]
+    end
+
+    SP --> ARR["messages array sent to OpenRouter"]
+    H --> ARR
+    L --> ARR
+    R -.future.-> ARR
+    M -.future.-> ARR
+    C -.future.-> ARR
+
+    ARR --> LLM["Claude Sonnet 4.5<br/>via OpenRouter"]
+    LLM --> REPLY["streamed reply"]
+
+    style Future fill:#faf,stroke-dasharray: 5 5
+</div>
+
+<h2 style="color:#bbb; font-weight:500; font-size:14px; margin:32px 0 12px; text-transform:uppercase; letter-spacing:0.5px;">Interface-agnostic architecture (target)</h2>
+<div class="mermaid">
+flowchart TB
+    W["Website Chat.tsx"]
+    T["Telegram<br/>telegram-webhook fn"]
+    X["X account<br/>x-webhook fn"]
+    R["Reachy robot<br/>voice adapter"]
+
+    W --> CORE
+    T --> CORE
+    X --> CORE
+    R --> CORE
+
+    CORE["chat-with-vibey<br/>(shared core)<br/>loads soul, calls OpenRouter"]
+
+    CORE --> DB["Supabase + RLS"]
+    CORE --> OR["OpenRouter"]
 </div>
 <script type="module">
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';

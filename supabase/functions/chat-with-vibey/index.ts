@@ -17,6 +17,21 @@ const corsHeaders = {
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
+// Optional surface-aware context so every interface (website, telegram, x, robot)
+// can hit this same endpoint without reinventing wheels. Backward compatible:
+// if omitted, we treat the caller as anonymous web.
+type CallerContext = {
+  surface?: "web" | "telegram" | "x" | "robot" | string;
+  external_id?: string; // telegram user id, x handle, etc.
+  external_handle?: string; // display name / username when available
+};
+
+function buildSessionKey(ctx: CallerContext | undefined): string {
+  const surface = ctx?.surface || "web";
+  const id = ctx?.external_id || "anon";
+  return `${surface}:${id}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,6 +52,10 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const messages: ChatMessage[] = Array.isArray(body?.messages) ? body.messages : [];
+    const context: CallerContext | undefined = body?.context && typeof body.context === "object"
+      ? body.context
+      : undefined;
+    const sessionKey = buildSessionKey(context);
     if (messages.length === 0) {
       return new Response(JSON.stringify({ error: "messages is required" }), {
         status: 400,
@@ -133,6 +152,7 @@ Deno.serve(async (req) => {
             user_message: lastUserMessage,
             agent_response: assistantText,
             tokens_used: totalTokens || null,
+            session_key: sessionKey,
           });
         }
       } catch (e) {
