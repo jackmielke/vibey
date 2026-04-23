@@ -21,6 +21,16 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Sticky-bottom: only auto-scroll if the user is already near the bottom.
+  // Scrolling up to re-read older messages shouldn't yank them back down.
+  const stickToBottomRef = useRef(true);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Within 80px of the bottom counts as "at the bottom"
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
 
   // Seed with the agent's intro message once it loads.
   useEffect(() => {
@@ -29,9 +39,12 @@ export default function Chat() {
     }
   }, [agent, messages.length]);
 
-  // Auto-scroll on new content
+  // Auto-scroll on new content (instant, not smooth, so streaming tokens keep up).
+  // Only when the user is already stuck to the bottom.
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    const el = scrollRef.current;
+    if (!el || !stickToBottomRef.current) return;
+    el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   const handleSend = async () => {
@@ -43,6 +56,9 @@ export default function Chat() {
     setMessages((prev) => [...prev, userMsg, { id: assistantId, role: "assistant", content: "" }]);
     setInput("");
     setIsStreaming(true);
+    // Sending a new message = user intent to follow the conversation.
+    // Snap back to the bottom even if they'd scrolled up.
+    stickToBottomRef.current = true;
 
     // Build the payload from the conversation so far (excluding the empty assistant placeholder).
     // Cap to the last 20 messages (~10 turns) so context/cost stay predictable as conversations grow.
@@ -131,7 +147,7 @@ export default function Chat() {
   return (
     <div className="flex flex-col h-full">
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-auto p-6 space-y-4">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-auto p-6 space-y-4">
         {showEmptyState ? (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
             <div className="w-20 h-20 rounded-2xl overflow-hidden ring-1 ring-primary/20">
