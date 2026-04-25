@@ -319,54 +319,6 @@ export type Database = {
           },
         ]
       }
-      app_access_tokens: {
-        Row: {
-          app_id: string
-          created_at: string | null
-          expires_at: string
-          id: string
-          revoked_at: string | null
-          scopes: Database["public"]["Enums"]["api_scope"][]
-          token_hash: string
-          user_id: string
-        }
-        Insert: {
-          app_id: string
-          created_at?: string | null
-          expires_at: string
-          id?: string
-          revoked_at?: string | null
-          scopes: Database["public"]["Enums"]["api_scope"][]
-          token_hash: string
-          user_id: string
-        }
-        Update: {
-          app_id?: string
-          created_at?: string | null
-          expires_at?: string
-          id?: string
-          revoked_at?: string | null
-          scopes?: Database["public"]["Enums"]["api_scope"][]
-          token_hash?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "app_access_tokens_app_id_fkey"
-            columns: ["app_id"]
-            isOneToOne: false
-            referencedRelation: "registered_apps"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "app_access_tokens_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       applications: {
         Row: {
           accept_invitation: boolean | null
@@ -693,81 +645,6 @@ export type Database = {
           },
         ]
       }
-      bot_videos: {
-        Row: {
-          community_id: string
-          completed_at: string | null
-          created_at: string
-          created_by: string | null
-          duration: number | null
-          error_message: string | null
-          generation_metadata: Json | null
-          id: string
-          model: string
-          prompt: string
-          resolution: string | null
-          source_image_url: string | null
-          status: string
-          thumbnail_url: string | null
-          updated_at: string
-          video_type: string
-          video_url: string | null
-        }
-        Insert: {
-          community_id: string
-          completed_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          duration?: number | null
-          error_message?: string | null
-          generation_metadata?: Json | null
-          id?: string
-          model?: string
-          prompt: string
-          resolution?: string | null
-          source_image_url?: string | null
-          status?: string
-          thumbnail_url?: string | null
-          updated_at?: string
-          video_type?: string
-          video_url?: string | null
-        }
-        Update: {
-          community_id?: string
-          completed_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          duration?: number | null
-          error_message?: string | null
-          generation_metadata?: Json | null
-          id?: string
-          model?: string
-          prompt?: string
-          resolution?: string | null
-          source_image_url?: string | null
-          status?: string
-          thumbnail_url?: string | null
-          updated_at?: string
-          video_type?: string
-          video_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bot_videos_community_id_fkey"
-            columns: ["community_id"]
-            isOneToOne: false
-            referencedRelation: "communities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bot_videos_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       characters: {
         Row: {
           community_id: string | null
@@ -966,50 +843,6 @@ export type Database = {
         }
         Relationships: []
       }
-      community_join_requests: {
-        Row: {
-          community_id: string
-          created_at: string
-          id: string
-          message: string | null
-          reviewed_at: string | null
-          reviewed_by: string | null
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          community_id: string
-          created_at?: string
-          id?: string
-          message?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          community_id?: string
-          created_at?: string
-          id?: string
-          message?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "community_join_requests_community_id_fkey"
-            columns: ["community_id"]
-            isOneToOne: false
-            referencedRelation: "communities"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       community_members: {
         Row: {
           community_id: string
@@ -1130,6 +963,281 @@ export type Database = {
           id?: string
           message?: string
           name?: string
+        }
+        Relationships: []
+      }
+      crm_activities: {
+        Row: {
+          body: string | null
+          campaign_id: string | null
+          contact_id: string
+          created_at: string
+          created_by: string | null
+          direction: string | null
+          from_email: string | null
+          id: string
+          metadata: Json
+          occurred_at: string
+          subject: string | null
+          to_email: string | null
+          type: string
+        }
+        Insert: {
+          body?: string | null
+          campaign_id?: string | null
+          contact_id: string
+          created_at?: string
+          created_by?: string | null
+          direction?: string | null
+          from_email?: string | null
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          subject?: string | null
+          to_email?: string | null
+          type: string
+        }
+        Update: {
+          body?: string | null
+          campaign_id?: string | null
+          contact_id?: string
+          created_at?: string
+          created_by?: string | null
+          direction?: string | null
+          from_email?: string | null
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          subject?: string | null
+          to_email?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_activities_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "crm_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_admin_telegram: {
+        Row: {
+          created_at: string
+          id: string
+          notify_stale_replies: boolean
+          telegram_chat_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notify_stale_replies?: boolean
+          telegram_chat_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notify_stale_replies?: boolean
+          telegram_chat_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      crm_campaigns: {
+        Row: {
+          color: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      crm_contact_campaigns: {
+        Row: {
+          added_at: string
+          campaign_id: string
+          contact_id: string
+        }
+        Insert: {
+          added_at?: string
+          campaign_id: string
+          contact_id: string
+        }
+        Update: {
+          added_at?: string
+          campaign_id?: string
+          contact_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_contact_campaigns_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "crm_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_contact_campaigns_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_contacts: {
+        Row: {
+          company: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          email_normalized: string | null
+          full_name: string
+          id: string
+          last_activity_at: string | null
+          linkedin_url: string | null
+          location: string | null
+          needs_reply_since: string | null
+          notes: string | null
+          owner_user_id: string | null
+          phone: string | null
+          primary_campaign_id: string | null
+          source: string | null
+          status: string
+          tags: string[]
+          title: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          email_normalized?: string | null
+          full_name: string
+          id?: string
+          last_activity_at?: string | null
+          linkedin_url?: string | null
+          location?: string | null
+          needs_reply_since?: string | null
+          notes?: string | null
+          owner_user_id?: string | null
+          phone?: string | null
+          primary_campaign_id?: string | null
+          source?: string | null
+          status?: string
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          email_normalized?: string | null
+          full_name?: string
+          id?: string
+          last_activity_at?: string | null
+          linkedin_url?: string | null
+          location?: string | null
+          needs_reply_since?: string | null
+          notes?: string | null
+          owner_user_id?: string | null
+          phone?: string | null
+          primary_campaign_id?: string | null
+          source?: string | null
+          status?: string
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_contacts_primary_campaign_id_fkey"
+            columns: ["primary_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "crm_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_email_accounts: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          domain: string | null
+          email_address: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          provider: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          domain?: string | null
+          email_address: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          provider?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          domain?: string | null
+          email_address?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          provider?: string | null
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1282,45 +1390,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      embedding_batch_progress: {
-        Row: {
-          batch_size: number | null
-          completed_at: string | null
-          error_message: string | null
-          failed_embeddings: number | null
-          id: string
-          processed_users: number | null
-          started_at: string | null
-          status: string | null
-          successful_embeddings: number | null
-          total_users: number
-        }
-        Insert: {
-          batch_size?: number | null
-          completed_at?: string | null
-          error_message?: string | null
-          failed_embeddings?: number | null
-          id?: string
-          processed_users?: number | null
-          started_at?: string | null
-          status?: string | null
-          successful_embeddings?: number | null
-          total_users: number
-        }
-        Update: {
-          batch_size?: number | null
-          completed_at?: string | null
-          error_message?: string | null
-          failed_embeddings?: number | null
-          id?: string
-          processed_users?: number | null
-          started_at?: string | null
-          status?: string | null
-          successful_embeddings?: number | null
-          total_users?: number
-        }
-        Relationships: []
       }
       event_attendees: {
         Row: {
@@ -1516,27 +1585,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      game_leaderboard: {
-        Row: {
-          created_at: string
-          id: string
-          player_name: string
-          score: number
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          player_name: string
-          score?: number
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          player_name?: string
-          score?: number
-        }
-        Relationships: []
       }
       magic_link_tokens: {
         Row: {
@@ -1800,110 +1848,6 @@ export type Database = {
         }
         Relationships: []
       }
-      outreach_logs: {
-        Row: {
-          ai_prompt: string | null
-          chat_session_id: string
-          community_id: string
-          created_at: string
-          error_message: string | null
-          id: string
-          message_sent: string
-          metadata: Json | null
-          success: boolean | null
-          telegram_chat_id: number
-          trigger_type: string
-        }
-        Insert: {
-          ai_prompt?: string | null
-          chat_session_id: string
-          community_id: string
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          message_sent: string
-          metadata?: Json | null
-          success?: boolean | null
-          telegram_chat_id: number
-          trigger_type: string
-        }
-        Update: {
-          ai_prompt?: string | null
-          chat_session_id?: string
-          community_id?: string
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          message_sent?: string
-          metadata?: Json | null
-          success?: boolean | null
-          telegram_chat_id?: number
-          trigger_type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "outreach_logs_chat_session_id_fkey"
-            columns: ["chat_session_id"]
-            isOneToOne: false
-            referencedRelation: "telegram_chat_sessions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "outreach_logs_community_id_fkey"
-            columns: ["community_id"]
-            isOneToOne: false
-            referencedRelation: "communities"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      partner_deliverables: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          description: string | null
-          display_order: number | null
-          due_date: string | null
-          id: string
-          partner_id: string
-          status: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          description?: string | null
-          display_order?: number | null
-          due_date?: string | null
-          id?: string
-          partner_id: string
-          status?: string
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          description?: string | null
-          display_order?: number | null
-          due_date?: string | null
-          id?: string
-          partner_id?: string
-          status?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "partner_deliverables_partner_id_fkey"
-            columns: ["partner_id"]
-            isOneToOne: false
-            referencedRelation: "partners"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       partners: {
         Row: {
           amount_paid: number | null
@@ -2125,42 +2069,6 @@ export type Database = {
           },
         ]
       }
-      project_likes: {
-        Row: {
-          created_at: string
-          id: string
-          project_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          project_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          project_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_likes_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_likes_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       projects: {
         Row: {
           community_id: string
@@ -2223,39 +2131,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      push_subscriptions: {
-        Row: {
-          auth: string
-          created_at: string
-          endpoint: string
-          id: string
-          p256dh: string
-          updated_at: string
-          user_agent: string | null
-          user_id: string
-        }
-        Insert: {
-          auth: string
-          created_at?: string
-          endpoint: string
-          id?: string
-          p256dh: string
-          updated_at?: string
-          user_agent?: string | null
-          user_id: string
-        }
-        Update: {
-          auth?: string
-          created_at?: string
-          endpoint?: string
-          id?: string
-          p256dh?: string
-          updated_at?: string
-          user_agent?: string | null
-          user_id?: string
-        }
-        Relationships: []
       }
       registered_apps: {
         Row: {
