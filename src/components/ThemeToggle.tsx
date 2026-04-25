@@ -1,27 +1,51 @@
-import { Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /**
- * Light/dark mode switcher.
- *
- * Single button that flips between the two themes — no system option for
- * simplicity. Crossfades the icon so it doesn't feel jarring.
+ * Three-state theme picker (Light / System / Dark) for the sidebar footer.
+ * Matches the small inline pattern used in apps like Claude.
  */
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
-  const isDark = theme === "dark";
+
+  const options = [
+    { value: "light", icon: Sun, label: "Light" },
+    { value: "system", icon: Monitor, label: "System (follow OS)" },
+    { value: "dark", icon: Moon, label: "Dark" },
+  ] as const;
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-8 w-8"
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+    <div
+      className={cn(
+        "inline-flex items-center gap-0.5 rounded-md border border-sidebar-border bg-sidebar-accent/40 p-0.5",
+        className
+      )}
+      role="group"
+      aria-label="Theme"
     >
-      <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-    </Button>
+      {options.map((opt) => {
+        const Icon = opt.icon;
+        const active = (theme ?? "system") === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => setTheme(opt.value)}
+            aria-label={opt.label}
+            aria-pressed={active}
+            title={opt.label}
+            className={cn(
+              "flex h-6 w-6 items-center justify-center rounded transition-colors",
+              active
+                ? "bg-sidebar-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Icon className="h-3 w-3" />
+          </button>
+        );
+      })}
+    </div>
   );
 }

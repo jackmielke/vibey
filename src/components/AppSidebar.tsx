@@ -30,6 +30,7 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const chatItem = { title: "Talk to Vibey", url: "/", icon: MessageCircle };
 const dashboardItem = { title: "Vibey Control", url: "/dashboard", icon: LayoutDashboard };
@@ -153,13 +154,16 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-4">
         {!collapsed && (
-          <a
-            href="#"
-            className="text-label flex items-center gap-2 hover:text-foreground transition-colors"
-          >
-            <ExternalLink className="h-3 w-3" />
-            View Site
-          </a>
+          <div className="flex flex-col gap-3">
+            <ThemeToggle />
+            <a
+              href="#"
+              className="text-label flex items-center gap-2 hover:text-foreground transition-colors"
+            >
+              <ExternalLink className="h-3 w-3" />
+              View Site
+            </a>
+          </div>
         )}
       </SidebarFooter>
     </Sidebar>

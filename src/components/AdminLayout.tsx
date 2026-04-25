@@ -5,7 +5,6 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Chat from "@/pages/Chat";
 import Dashboard from "@/pages/Dashboard";
@@ -58,8 +57,7 @@ export default function AdminLayout() {
           <header className="h-12 flex items-center border-b border-border px-4 gap-3 shrink-0">
             <SidebarTrigger />
             <span className="text-label">Vibey</span>
-            <div className="ml-auto flex items-center gap-2">
-              <ThemeToggle />
+            <div className="ml-auto">
               <Button
                 onClick={toggleControl}
                 size="sm"
