@@ -43,8 +43,9 @@ function buildSessionKey(ctx: CallerContext | undefined): string {
 
 // Pull keyword candidates from gallery_photos using ILIKE on title/description/
 // residency_name + array overlap on tags. Cheap and good enough as a pre-filter.
+// deno-lint-ignore no-explicit-any
 async function fetchCandidatePhotos(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   query: string
 ): Promise<GalleryPhoto[]> {
   const tokens = query
