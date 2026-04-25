@@ -2405,6 +2405,39 @@ export type Database = {
           },
         ]
       }
+      telegram_group_settings: {
+        Row: {
+          added_at: string
+          bot_username: string
+          chat_id: number
+          chat_title: string | null
+          disabled_at: string | null
+          enabled: boolean
+          enabled_at: string | null
+          enabled_by: string | null
+        }
+        Insert: {
+          added_at?: string
+          bot_username?: string
+          chat_id: number
+          chat_title?: string | null
+          disabled_at?: string | null
+          enabled?: boolean
+          enabled_at?: string | null
+          enabled_by?: string | null
+        }
+        Update: {
+          added_at?: string
+          bot_username?: string
+          chat_id?: number
+          chat_title?: string | null
+          disabled_at?: string | null
+          enabled?: boolean
+          enabled_at?: string | null
+          enabled_by?: string | null
+        }
+        Relationships: []
+      }
       user_embeddings: {
         Row: {
           bio_embedding: string | null

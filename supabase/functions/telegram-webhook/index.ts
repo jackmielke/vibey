@@ -101,8 +101,9 @@ function isVibeyCommand(text: string | undefined, command: string): boolean {
 
 // ── History hydration ─────────────────────────────────────────────────────────
 
+// deno-lint-ignore no-explicit-any
 async function loadHistory(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   sessionKey: string,
   limit = 10
 ): Promise<Array<{ role: "user" | "assistant"; content: string }>> {
@@ -116,10 +117,12 @@ async function loadHistory(
   if (error || !data) return [];
 
   // Reverse so oldest is first, then flatten into user/assistant pairs
-  return data.reverse().flatMap((row) => [
-    { role: "user" as const, content: row.user_message },
-    { role: "assistant" as const, content: row.agent_response },
-  ]);
+  return (data as Array<{ user_message: string; agent_response: string }>)
+    .reverse()
+    .flatMap((row) => [
+      { role: "user" as const, content: row.user_message },
+      { role: "assistant" as const, content: row.agent_response },
+    ]);
 }
 
 // ── OpenRouter call ───────────────────────────────────────────────────────────
