@@ -22,7 +22,6 @@ export function GroupsSection() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // @ts-expect-error - telegram_group_settings not yet in generated types
       const { data, error } = await supabase
         .from("telegram_group_settings")
         .select("chat_id, chat_title, enabled, enabled_at, enabled_by, added_at")
@@ -52,7 +51,6 @@ export function GroupsSection() {
       ? { enabled: true, enabled_at: new Date().toISOString(), enabled_by: "admin-ui", disabled_at: null }
       : { enabled: false, disabled_at: new Date().toISOString() };
 
-    // @ts-expect-error - table not yet in generated types
     const { error } = await supabase
       .from("telegram_group_settings")
       .update(patch)
