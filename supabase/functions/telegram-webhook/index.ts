@@ -1,21 +1,26 @@
-// Edge function: Telegram webhook for Vibey.
-// - Receives updates from Telegram (private DMs only in v1).
-// - Loads Vibey's soul + config from the agents row (single source of truth).
-// - Calls OpenRouter non-streaming (Telegram wants one reply, not a stream).
-// - Sends the reply back via Telegram sendMessage API.
-// - Logs the exchange to agent_chat_logs with session_key=telegram:<chat_id>.
+// Edge function: Telegram webhook for Vibey — v2
 //
-// v1 scope (deliberately minimal):
-// - Private chats only. Groups and channels are ignored silently.
-// - No history hydration yet — Vibey replies from the single incoming message
-//   plus the system prompt. Per-user memory comes later.
-// - No secret-token header check. Add TELEGRAM_WEBHOOK_SECRET validation
-//   in v2 as hardening.
+// Behaviour by chat type:
+//   private   → always respond (same as v1)
+//   group / supergroup →
+//     - Vibey joins silently (no response by default)
+//     - Upserts the group into telegram_group_settings on first contact
+//     - "/vibey on"  → enables the group, Vibey introduces itself
+//     - "/vibey off" → disables the group, Vibey says goodbye
+//     - While disabled: log the message, return silently
+//     - While enabled: respond ONLY when @mentioned or when replying to Vibey
+//
+// History: last 10 exchanges from agent_chat_logs are hydrated as context.
+//
+// TODO (v3): webhook secret-token validation header.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
 const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
+const BOT_USERNAME = "vibey_ai_bot"; // without @
+
+// ── Telegram types ────────────────────────────────────────────────────────────
 
 type TelegramUser = {
   id: number;
@@ -38,6 +43,8 @@ type TelegramMessage = {
   chat: TelegramChat;
   date: number;
   text?: string;
+  reply_to_message?: TelegramMessage;
+  entities?: Array<{ type: string; offset: number; length: number }>;
 };
 
 type TelegramUpdate = {
@@ -45,6 +52,8 @@ type TelegramUpdate = {
   message?: TelegramMessage;
   edited_message?: TelegramMessage;
 };
+
+// ── Telegram API helper ───────────────────────────────────────────────────────
 
 async function tg(token: string, method: string, body: unknown) {
   const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
@@ -59,12 +68,107 @@ async function tg(token: string, method: string, body: unknown) {
   return res;
 }
 
-Deno.serve(async (req) => {
-  // Always return 200 quickly so Telegram doesn't retry. We do the work inside.
-  // If anything throws we still 200 — retries would double-reply and feel weird.
-  if (req.method !== "POST") {
-    return new Response("ok", { status: 200 });
+// ── Mention detection ─────────────────────────────────────────────────────────
+
+function isMentioned(msg: TelegramMessage): boolean {
+  if (!msg.text) return false;
+  // Check for @botusername in message text (case-insensitive)
+  if (msg.text.toLowerCase().includes(`@${BOT_USERNAME.toLowerCase()}`)) return true;
+  // Check entities for mention type
+  if (msg.entities) {
+    for (const entity of msg.entities) {
+      if (entity.type === "mention") {
+        const mention = msg.text.slice(entity.offset, entity.offset + entity.length);
+        if (mention.toLowerCase() === `@${BOT_USERNAME.toLowerCase()}`) return true;
+      }
+    }
   }
+  return false;
+}
+
+function isReplyToBot(msg: TelegramMessage): boolean {
+  return !!msg.reply_to_message?.from?.is_bot &&
+    msg.reply_to_message?.from?.username?.toLowerCase() === BOT_USERNAME.toLowerCase();
+}
+
+function isVibeyCommand(text: string | undefined, command: string): boolean {
+  if (!text) return false;
+  const lower = text.trim().toLowerCase();
+  // Match "/vibey on", "/vibey on@vibey_ai_bot", etc.
+  return lower === `/vibey ${command}` ||
+    lower.startsWith(`/vibey ${command}@`);
+}
+
+// ── History hydration ─────────────────────────────────────────────────────────
+
+async function loadHistory(
+  supabase: ReturnType<typeof createClient>,
+  sessionKey: string,
+  limit = 10
+): Promise<Array<{ role: "user" | "assistant"; content: string }>> {
+  const { data, error } = await supabase
+    .from("agent_chat_logs")
+    .select("user_message, agent_response")
+    .eq("session_key", sessionKey)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error || !data) return [];
+
+  // Reverse so oldest is first, then flatten into user/assistant pairs
+  return data.reverse().flatMap((row) => [
+    { role: "user" as const, content: row.user_message },
+    { role: "assistant" as const, content: row.agent_response },
+  ]);
+}
+
+// ── OpenRouter call ───────────────────────────────────────────────────────────
+
+async function callOpenRouter(
+  apiKey: string,
+  model: string,
+  temperature: number,
+  maxTokens: number,
+  systemPrompt: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+  userText: string
+): Promise<string> {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://t.me/vibey_ai_bot",
+      "X-Title": "Vibey (Telegram)",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: temperature ?? 0.7,
+      max_tokens: maxTokens ?? 2048,
+      stream: false,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...history,
+        { role: "user", content: userText },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    console.error("OpenRouter error", response.status, errText);
+    return "";
+  }
+
+  const json = await response.json();
+  return json?.choices?.[0]?.message?.content?.trim() ?? "";
+}
+
+// ── Main handler ──────────────────────────────────────────────────────────────
+
+Deno.serve(async (req) => {
+  // Always 200 — Telegram retries on non-200, which causes double replies.
+  if (req.method !== "POST") return new Response("ok", { status: 200 });
 
   const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
   const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
@@ -73,7 +177,7 @@ Deno.serve(async (req) => {
 
   if (!TELEGRAM_BOT_TOKEN || !OPENROUTER_API_KEY) {
     console.error("Missing TELEGRAM_BOT_TOKEN or OPENROUTER_API_KEY");
-    return new Response("missing secrets", { status: 200 });
+    return new Response("ok", { status: 200 });
   }
 
   let update: TelegramUpdate;
@@ -84,32 +188,151 @@ Deno.serve(async (req) => {
   }
 
   const msg = update.message ?? update.edited_message;
-  if (!msg || !msg.text) {
-    return new Response("ok", { status: 200 });
-  }
-
-  // v1: private chats only. Silently ignore groups/channels for now.
-  if (msg.chat.type !== "private") {
-    return new Response("ok", { status: 200 });
-  }
+  if (!msg || !msg.text) return new Response("ok", { status: 200 });
 
   const chatId = msg.chat.id;
+  const chatType = msg.chat.type;
   const userId = msg.from?.id ?? chatId;
   const username = msg.from?.username ?? msg.from?.first_name ?? "unknown";
   const userText = msg.text.trim();
-
-  // Typing indicator while we think — gives the chat a "real" feel.
-  await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", {
-    chat_id: chatId,
-    action: "typing",
-  });
+  const isGroup = chatType === "group" || chatType === "supergroup";
+  const sessionKey = `telegram:${chatId}`;
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  // Load Vibey's soul + config.
+  // ── Group chat: opt-in logic ──────────────────────────────────────────────
+
+  if (isGroup) {
+    // Upsert group record (silent — just tracks that Vibey is in this chat).
+    await supabase.from("telegram_group_settings").upsert(
+      {
+        chat_id: chatId,
+        chat_title: msg.chat.title ?? null,
+        bot_username: BOT_USERNAME,
+        added_at: new Date().toISOString(),
+      },
+      { onConflict: "chat_id", ignoreDuplicates: true }
+    );
+
+    // Handle "/vibey on" — enable this group.
+    if (isVibeyCommand(userText, "on")) {
+      await supabase.from("telegram_group_settings").update({
+        enabled: true,
+        enabled_at: new Date().toISOString(),
+        enabled_by: username,
+        disabled_at: null,
+      }).eq("chat_id", chatId);
+
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: "hey everyone 👋 vibey here. i'll be hanging out in this chat now — just @ me when you want to chat.",
+        reply_to_message_id: msg.message_id,
+      });
+      return new Response("ok", { status: 200 });
+    }
+
+    // Handle "/vibey off" — disable this group.
+    if (isVibeyCommand(userText, "off")) {
+      await supabase.from("telegram_group_settings").update({
+        enabled: false,
+        disabled_at: new Date().toISOString(),
+      }).eq("chat_id", chatId);
+
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: "going quiet. ping me with /vibey on whenever you want me back 🌀",
+        reply_to_message_id: msg.message_id,
+      });
+      return new Response("ok", { status: 200 });
+    }
+
+    // Check if this group is enabled.
+    const { data: groupSettings } = await supabase
+      .from("telegram_group_settings")
+      .select("enabled")
+      .eq("chat_id", chatId)
+      .maybeSingle();
+
+    const enabled = groupSettings?.enabled ?? false;
+
+    // Not enabled and not a command — log silently and bail.
+    if (!enabled) {
+      console.log(`Group ${chatId} not enabled — silent mode`);
+      return new Response("ok", { status: 200 });
+    }
+
+    // Enabled: only respond to @mentions or replies to Vibey.
+    if (!isMentioned(msg) && !isReplyToBot(msg)) {
+      return new Response("ok", { status: 200 });
+    }
+
+    // Strip the @mention from the text so the model doesn't see it as part of the message.
+    const cleanText = userText
+      .replace(new RegExp(`@${BOT_USERNAME}`, "gi"), "")
+      .trim();
+
+    // Typing indicator.
+    await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
+
+    // Load agent config.
+    const { data: agent, error: agentError } = await supabase
+      .from("agents")
+      .select("system_prompt, model, temperature, max_tokens")
+      .eq("id", VIBEY_AGENT_ID)
+      .maybeSingle();
+
+    if (agentError || !agent) {
+      console.error("Vibey agent not found", agentError);
+      return new Response("ok", { status: 200 });
+    }
+
+    // Hydrate history for this group session.
+    const history = await loadHistory(supabase, sessionKey);
+
+    const reply = await callOpenRouter(
+      OPENROUTER_API_KEY,
+      agent.model,
+      agent.temperature,
+      agent.max_tokens,
+      agent.system_prompt,
+      history,
+      cleanText || userText
+    );
+
+    if (!reply) return new Response("ok", { status: 200 });
+
+    const body = reply.length > 4000 ? reply.slice(0, 3997) + "..." : reply;
+
+    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+      chat_id: chatId,
+      text: body,
+      reply_to_message_id: msg.message_id, // thread the reply
+    });
+
+    // Log the exchange.
+    supabase.from("agent_chat_logs").insert({
+      agent_id: VIBEY_AGENT_ID,
+      community_id: VIBEY_COMMUNITY_ID,
+      user_message: userText,
+      agent_response: body,
+      session_key: sessionKey,
+      telegram_chat_id: chatId,
+      telegram_user_id: userId,
+      telegram_username: username,
+    }).then(({ error }: { error: unknown }) => {
+      if (error) console.error("Failed to log group chat:", error);
+    });
+
+    return new Response("ok", { status: 200 });
+  }
+
+  // ── Private chat: always respond ─────────────────────────────────────────
+
+  await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
+
   const { data: agent, error: agentError } = await supabase
     .from("agents")
-    .select("system_prompt, model, temperature, max_tokens, name")
+    .select("system_prompt, model, temperature, max_tokens")
     .eq("id", VIBEY_AGENT_ID)
     .maybeSingle();
 
@@ -122,71 +345,36 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200 });
   }
 
-  // Call OpenRouter non-streaming. Telegram wants one message, not a stream.
-  const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://t.me/vibey_ai_bot",
-      "X-Title": "Vibey (Telegram)",
-    },
-    body: JSON.stringify({
-      model: agent.model,
-      temperature: agent.temperature ?? 0.7,
-      max_tokens: agent.max_tokens ?? 2048,
-      stream: false,
-      messages: [
-        { role: "system", content: agent.system_prompt },
-        { role: "user", content: userText },
-      ],
-    }),
-  });
+  const history = await loadHistory(supabase, sessionKey);
 
-  if (!orResponse.ok) {
-    const errText = await orResponse.text().catch(() => "");
-    console.error("OpenRouter error", orResponse.status, errText);
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-      chat_id: chatId,
-      text: "my brain's having a moment. try again?",
-    });
-    return new Response("ok", { status: 200 });
-  }
+  const reply = await callOpenRouter(
+    OPENROUTER_API_KEY,
+    agent.model,
+    agent.temperature,
+    agent.max_tokens,
+    agent.system_prompt,
+    history,
+    userText
+  );
 
-  const orJson = await orResponse.json();
-  const reply: string = orJson?.choices?.[0]?.message?.content?.trim() ?? "";
-  const tokensUsed: number | null = orJson?.usage?.total_tokens ?? null;
+  if (!reply) return new Response("ok", { status: 200 });
 
-  if (!reply) {
-    console.error("Empty reply from OpenRouter", orJson);
-    return new Response("ok", { status: 200 });
-  }
-
-  // Send the reply. Telegram messages cap at 4096 chars; soul tells Vibey to
-  // keep it short anyway, but truncate defensively.
   const body = reply.length > 4000 ? reply.slice(0, 3997) + "..." : reply;
-  await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-    chat_id: chatId,
-    text: body,
-  });
 
-  // Log (fire-and-forget is fine — we already replied).
-  supabase
-    .from("agent_chat_logs")
-    .insert({
-      agent_id: VIBEY_AGENT_ID,
-      community_id: VIBEY_COMMUNITY_ID,
-      user_message: userText,
-      agent_response: body,
-      tokens_used: tokensUsed,
-      session_key: `telegram:${chatId}`,
-      telegram_chat_id: chatId,
-      telegram_user_id: userId,
-      telegram_username: username,
-    })
-    .then(({ error }: { error: unknown }) => {
-      if (error) console.error("Failed to log telegram chat:", error);
-    });
+  await tg(TELEGRAM_BOT_TOKEN, "sendMessage", { chat_id: chatId, text: body });
+
+  supabase.from("agent_chat_logs").insert({
+    agent_id: VIBEY_AGENT_ID,
+    community_id: VIBEY_COMMUNITY_ID,
+    user_message: userText,
+    agent_response: body,
+    session_key: sessionKey,
+    telegram_chat_id: chatId,
+    telegram_user_id: userId,
+    telegram_username: username,
+  }).then(({ error }: { error: unknown }) => {
+    if (error) console.error("Failed to log private chat:", error);
+  });
 
   return new Response("ok", { status: 200 });
 });
