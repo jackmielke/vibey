@@ -225,28 +225,37 @@ Deno.serve(async (req) => {
         })()
       : Promise.resolve([]);
 
-    // Augment system prompt with a tiny note so Vibey knows images may follow.
-    const systemPrompt =
+    // Augment system prompt with: image-handling note + recent community memories.
+    const memories = await loadRecentMemories(supabase);
+    const baseSystemPrompt =
       `${agent.system_prompt}\n\nNote: when the user asks to see photos/images, the app will attach matching gallery images below your reply automatically. Just speak naturally about them — do NOT paste image URLs or markdown image syntax.`;
+    const systemPrompt = buildSystemPromptWithMemories(baseSystemPrompt, memories);
 
-    const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://community-vibes-ai.lovable.app",
-        "X-Title": "Vibey",
+    // Split incoming messages into prior history + the current user turn so the
+    // agent loop can run tool iterations before streaming the final reply.
+    const lastUserIdx = (() => {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === "user") return i;
+      }
+      return -1;
+    })();
+    const history = lastUserIdx >= 0 ? messages.slice(0, lastUserIdx) : messages;
+    const userText = lastUserIdx >= 0 ? messages[lastUserIdx].content : "";
+
+    const orResponse = await runAgentLoopStreaming({
+      supabase,
+      apiKey: OPENROUTER_API_KEY,
+      model: agent.model,
+      temperature: agent.temperature ?? 0.7,
+      maxTokens: agent.max_tokens ?? 2048,
+      systemPrompt,
+      history,
+      userText,
+      toolMetadata: {
+        source: context?.surface ?? "web",
+        external_id: context?.external_id ?? null,
+        external_handle: context?.external_handle ?? null,
       },
-      body: JSON.stringify({
-        model: agent.model,
-        temperature: agent.temperature ?? 0.7,
-        max_tokens: agent.max_tokens ?? 2048,
-        stream: true,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-      }),
     });
 
     if (!orResponse.ok || !orResponse.body) {
