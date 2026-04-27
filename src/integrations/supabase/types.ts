@@ -1391,6 +1391,42 @@ export type Database = {
           },
         ]
       }
+      daily_recaps: {
+        Row: {
+          brief: string
+          community_id: string
+          created_at: string
+          delivered_to: string | null
+          delivery_status: string | null
+          id: string
+          source_message_count: number
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          brief: string
+          community_id: string
+          created_at?: string
+          delivered_to?: string | null
+          delivery_status?: string | null
+          id?: string
+          source_message_count?: number
+          window_end: string
+          window_start: string
+        }
+        Update: {
+          brief?: string
+          community_id?: string
+          created_at?: string
+          delivered_to?: string | null
+          delivery_status?: string | null
+          id?: string
+          source_message_count?: number
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       event_attendees: {
         Row: {
           attended: boolean | null

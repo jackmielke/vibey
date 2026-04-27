@@ -68,6 +68,37 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "web_search",
+      description:
+        "Search the live web (via Brave Search) for current information. Use when the user asks about recent events, news, prices, dates, or anything you can't answer from memory or the community context. Returns up to 5 result snippets with URLs. Follow up with fetch_url if you need full content from a specific page.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "The search query, written as you'd type it into Google." },
+          count: { type: "integer", description: "How many results to return (1-10). Default 5.", minimum: 1, maximum: 10 },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "fetch_url",
+      description:
+        "Fetch the readable text content of a specific web page. Use when you have a URL (from web_search results or the user) and need the actual page content to answer accurately. Strips HTML and returns up to ~6000 characters of clean text. Do NOT use for social media or paywalled content — won't work well there.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "The full URL to fetch, including https://." },
+        },
+        required: ["url"],
+      },
+    },
+  },
 ];
 
 // ── Memory store ─────────────────────────────────────────────────────────────
@@ -120,6 +151,95 @@ async function saveMemory(
   return { ok: true, id: data.id };
 }
 
+// ── Web tools ────────────────────────────────────────────────────────────────
+
+async function webSearch(args: { query: string; count?: number }): Promise<string> {
+  const query = (args?.query ?? "").trim();
+  if (!query) return JSON.stringify({ ok: false, error: "query is required" });
+  const count = Math.max(1, Math.min(10, Number(args?.count) || 5));
+
+  const apiKey = Deno.env.get("BRAVE_SEARCH_API_KEY");
+  if (!apiKey) return JSON.stringify({ ok: false, error: "BRAVE_SEARCH_API_KEY not configured" });
+
+  try {
+    const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${count}`;
+    const resp = await fetch(url, {
+      headers: {
+        "Accept": "application/json",
+        "X-Subscription-Token": apiKey,
+      },
+    });
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => "");
+      return JSON.stringify({ ok: false, error: `Brave ${resp.status}: ${txt.slice(0, 200)}` });
+    }
+    const json = await resp.json();
+    // deno-lint-ignore no-explicit-any
+    const results = (json?.web?.results ?? []).slice(0, count).map((r: any) => ({
+      title: r.title,
+      url: r.url,
+      description: r.description,
+      age: r.age,
+    }));
+    return JSON.stringify({ ok: true, query, results });
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+}
+
+async function fetchUrl(args: { url: string }): Promise<string> {
+  const url = (args?.url ?? "").trim();
+  if (!url || !/^https?:\/\//i.test(url)) {
+    return JSON.stringify({ ok: false, error: "valid http(s) url required" });
+  }
+
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; VibeyBot/1.0; +https://community-vibes-ai.lovable.app)",
+        "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9",
+      },
+      redirect: "follow",
+    });
+    if (!resp.ok) {
+      return JSON.stringify({ ok: false, error: `HTTP ${resp.status}`, url });
+    }
+    const contentType = resp.headers.get("content-type") || "";
+    const raw = await resp.text();
+
+    let text: string;
+    if (contentType.includes("html")) {
+      // Strip scripts/styles, then tags, collapse whitespace.
+      text = raw
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, " ")
+        .trim();
+    } else {
+      text = raw.trim();
+    }
+
+    const truncated = text.length > 6000;
+    return JSON.stringify({
+      ok: true,
+      url,
+      content: text.slice(0, 6000),
+      truncated,
+      original_length: text.length,
+    });
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+}
+
 // ── Tool dispatch ────────────────────────────────────────────────────────────
 
 async function executeToolCall(
@@ -143,6 +263,10 @@ async function executeToolCall(
       );
       return JSON.stringify(result);
     }
+    case "web_search":
+      return await webSearch(parsed as { query: string; count?: number });
+    case "fetch_url":
+      return await fetchUrl(parsed as { url: string });
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
@@ -167,7 +291,7 @@ export function buildSystemPromptWithMemories(
   const toolsBlock = `
 ## Tools available
 
-You have access to one tool:
+You have access to these tools:
 
 - **save_memory(content, tags?)** — store a durable fact about the community for future conversations.
   Call it ONLY when the user shares something genuinely worth remembering long-term:
@@ -175,9 +299,18 @@ You have access to one tool:
   Do NOT save: small talk, jokes, ephemeral state, or things already in memory.
   Tags should be 1-4 short lowercase keywords.
 
-You can call save_memory zero, one, or multiple times before replying. After all tool
-calls finish, give the user your normal natural-language reply — do not mention the
-tool by name unless they ask.
+- **web_search(query, count?)** — search the live web (Brave) for current info.
+  Use for recent events, news, prices, dates, public facts you can't answer from memory.
+  Returns titles + URLs + snippets. Follow up with fetch_url if you need full content.
+
+- **fetch_url(url)** — fetch the readable text of a specific web page.
+  Use after web_search, or when the user gives you a URL. Returns up to ~6000 chars of clean text.
+  Don't use for social media or paywalled sites — won't work well.
+
+You can call any tool zero, one, or multiple times before replying. After all tool
+calls finish, give the user your normal natural-language reply — don't mention tools
+by name unless they ask. When citing web info, mention the source naturally
+("According to nytimes.com…").
 
 ## Recent community memories (top ${memories.length})
 
