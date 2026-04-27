@@ -26,6 +26,48 @@ export default function AdminLayout() {
   // Control panel open state — driven by route so sidebar links still work.
   const [controlOpen, setControlOpen] = useState(isControlRoute);
 
+  // Resizable Vibey Control panel width (desktop/tablet only).
+  const MIN_W = 320;
+  const MAX_W = 1200;
+  const DEFAULT_W = 520;
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return DEFAULT_W;
+    const saved = Number(window.localStorage.getItem("vibey-control-width"));
+    return Number.isFinite(saved) && saved >= MIN_W && saved <= MAX_W ? saved : DEFAULT_W;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
+  useEffect(() => {
+    if (!isResizing) return;
+    const onMove = (e: MouseEvent) => {
+      // Panel is anchored to the right edge — width = distance from cursor to right edge.
+      const next = Math.min(MAX_W, Math.max(MIN_W, window.innerWidth - e.clientX));
+      setPanelWidth(next);
+    };
+    const onUp = () => {
+      setIsResizing(false);
+      try {
+        window.localStorage.setItem("vibey-control-width", String(panelWidth));
+      } catch {}
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing, panelWidth]);
+
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+
   useEffect(() => {
     if (isControlRoute) setControlOpen(true);
   }, [location.pathname, isControlRoute]);
