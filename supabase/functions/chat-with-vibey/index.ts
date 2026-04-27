@@ -8,6 +8,11 @@
 // - On completion, persists the user/assistant pair to agent_chat_logs.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  buildSystemPromptWithMemories,
+  loadRecentMemories,
+  runAgentLoopStreaming,
+} from "../_shared/vibey-agent.ts";
 
 const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
 const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
