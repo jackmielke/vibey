@@ -1,6 +1,7 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import { LayoutDashboard, X } from "lucide-react";
+import { LayoutDashboard, LogOut, X } from "lucide-react";
+import { signOut } from "@/hooks/useAuth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,7 @@ export default function AdminLayout() {
             <div className="h-12 flex items-center px-4 gap-3">
               <SidebarTrigger />
               <span className="text-label">Vibey</span>
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-2">
                 <Button
                   onClick={toggleControl}
                   size="sm"
@@ -81,6 +82,16 @@ export default function AdminLayout() {
                   <span className="font-mono text-xs uppercase tracking-wider">
                     Vibey Control
                   </span>
+                </Button>
+                <Button
+                  onClick={() => signOut()}
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>

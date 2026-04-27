@@ -5,6 +5,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import AdminLayout from "@/components/AdminLayout";
+import RequireAdmin from "@/components/RequireAdmin";
+import Login from "@/pages/Login";
 import Chat from "@/pages/Chat";
 import Dashboard from "@/pages/Dashboard";
 import Soul from "@/pages/Soul";
@@ -27,7 +29,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route element={<AdminLayout />}>
+          <Route path="/login" element={<Login />} />
+          <Route element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
             <Route index element={<Chat />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="soul" element={<Soul />} />
