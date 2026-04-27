@@ -123,10 +123,12 @@ export default function AdminLayout() {
         {/* Mobile control panel as a sheet */}
         <Sheet open={isMobile && controlOpen} onOpenChange={(o) => !o && closeControl()}>
           <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
-            <div className="h-12 flex items-center px-4 border-b border-border shrink-0">
-              <span className="text-label">Vibey Control</span>
+            <div className="pt-safe border-b border-border shrink-0">
+              <div className="h-12 flex items-center px-4">
+                <span className="text-label">Vibey Control</span>
+              </div>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto pb-safe">
               {isControlRoute ? <Outlet /> : <Dashboard />}
             </div>
           </SheetContent>
