@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 import { SoulSection } from "@/components/sections/SoulSection";
 import { IdentitySection } from "@/components/sections/IdentitySection";
@@ -31,19 +32,25 @@ interface Section {
   component: React.ComponentType;
 }
 
+// Reordered: the things you actually look at most often go up top.
 const sections: Section[] = [
+  { key: "conversations", title: "Conversations", description: "Conversation history with members.", icon: MessagesSquare, component: ConversationsSection },
+  { key: "memory", title: "Memory", description: "Stored memories and knowledge.", icon: Brain, component: MemorySection },
   { key: "soul", title: "Soul", description: "Core personality, values, and behavioral guidelines.", icon: Sparkles, component: SoulSection },
   { key: "identity", title: "Identity", description: "Name, avatar, and intro message.", icon: User, component: IdentitySection },
-  { key: "memory", title: "Memory", description: "Stored memories and knowledge.", icon: Brain, component: MemorySection },
   { key: "media", title: "Media Library", description: "Images, videos, and other assets.", icon: ImageIcon, component: MediaSection },
   { key: "interfaces", title: "Interfaces", description: "Communication channels and integrations.", icon: Settings2, component: InterfacesSection },
-  { key: "relationships", title: "Relationships", description: "Vibey's relationships with community members.", icon: Users, component: RelationshipsSection },
-  { key: "conversations", title: "Conversations", description: "Conversation history with members.", icon: MessagesSquare, component: ConversationsSection },
   { key: "groups", title: "Group Chats", description: "Vibey's presence in group conversations.", icon: UsersRound, component: GroupsSection },
+  { key: "relationships", title: "Relationships", description: "Vibey's relationships with community members.", icon: Users, component: RelationshipsSection },
 ];
 
 export default function Dashboard() {
-  const [open, setOpen] = useState<Set<string>>(new Set(["soul"]));
+  const isMobile = useIsMobile();
+  // On mobile (incl. PWA): expand the two panels you care about most.
+  // On desktop: keep the lighter "Soul only" default so it isn't a wall of content.
+  const [open, setOpen] = useState<Set<string>>(
+    () => new Set(isMobile ? ["conversations", "memory"] : ["soul"])
+  );
 
   const toggle = (key: string) => {
     setOpen((prev) => {
