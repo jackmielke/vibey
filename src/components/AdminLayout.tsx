@@ -100,17 +100,19 @@ export default function AdminLayout() {
             {/* Tablet/desktop inline control panel */}
             {showInlineControl && (
               <aside className="hidden md:flex flex-col w-[420px] lg:w-[480px] xl:w-[560px] shrink-0 overflow-hidden bg-background animate-slide-in-right border-l border-border">
-                <div className="h-10 flex items-center justify-between px-4 border-b border-border shrink-0">
-                  <span className="text-label">Vibey Control</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={closeControl}
-                    aria-label="Close Vibey Control"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                <div className="pt-safe border-b border-border shrink-0">
+                  <div className="h-10 flex items-center justify-between px-4">
+                    <span className="text-label">Vibey Control</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={closeControl}
+                      aria-label="Close Vibey Control"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex-1 overflow-auto">
                   {isControlRoute ? <Outlet /> : <Dashboard />}
@@ -124,7 +126,7 @@ export default function AdminLayout() {
         <Sheet open={isMobile && controlOpen} onOpenChange={(o) => !o && closeControl()}>
           <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
             <div className="pt-safe border-b border-border shrink-0">
-              <div className="h-12 flex items-center px-4">
+              <div className="h-12 flex items-center px-4 pr-12">
                 <span className="text-label">Vibey Control</span>
               </div>
             </div>
