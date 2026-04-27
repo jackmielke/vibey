@@ -63,24 +63,26 @@ export default function AdminLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-safe-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-12 flex items-center border-b border-border px-4 gap-3 shrink-0">
-            <SidebarTrigger />
-            <span className="text-label">Vibey</span>
-            <div className="ml-auto">
-              <Button
-                onClick={toggleControl}
-                size="sm"
-                variant={controlOpen ? "default" : "outline"}
-                className="h-8 gap-1.5"
-              >
-                <LayoutDashboard className="h-3.5 w-3.5" />
-                <span className="font-mono text-xs uppercase tracking-wider">
-                  Vibey Control
-                </span>
-              </Button>
+          <header className="pt-safe shrink-0 border-b border-border">
+            <div className="h-12 flex items-center px-4 gap-3">
+              <SidebarTrigger />
+              <span className="text-label">Vibey</span>
+              <div className="ml-auto">
+                <Button
+                  onClick={toggleControl}
+                  size="sm"
+                  variant={controlOpen ? "default" : "outline"}
+                  className="h-8 gap-1.5"
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  <span className="font-mono text-xs uppercase tracking-wider">
+                    Vibey Control
+                  </span>
+                </Button>
+              </div>
             </div>
           </header>
 
