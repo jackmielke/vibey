@@ -291,7 +291,7 @@ export function buildSystemPromptWithMemories(
   const toolsBlock = `
 ## Tools available
 
-You have access to one tool:
+You have access to these tools:
 
 - **save_memory(content, tags?)** — store a durable fact about the community for future conversations.
   Call it ONLY when the user shares something genuinely worth remembering long-term:
@@ -299,9 +299,18 @@ You have access to one tool:
   Do NOT save: small talk, jokes, ephemeral state, or things already in memory.
   Tags should be 1-4 short lowercase keywords.
 
-You can call save_memory zero, one, or multiple times before replying. After all tool
-calls finish, give the user your normal natural-language reply — do not mention the
-tool by name unless they ask.
+- **web_search(query, count?)** — search the live web (Brave) for current info.
+  Use for recent events, news, prices, dates, public facts you can't answer from memory.
+  Returns titles + URLs + snippets. Follow up with fetch_url if you need full content.
+
+- **fetch_url(url)** — fetch the readable text of a specific web page.
+  Use after web_search, or when the user gives you a URL. Returns up to ~6000 chars of clean text.
+  Don't use for social media or paywalled sites — won't work well.
+
+You can call any tool zero, one, or multiple times before replying. After all tool
+calls finish, give the user your normal natural-language reply — don't mention tools
+by name unless they ask. When citing web info, mention the source naturally
+("According to nytimes.com…").
 
 ## Recent community memories (top ${memories.length})
 
