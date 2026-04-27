@@ -15,6 +15,11 @@
 // TODO (v3): webhook secret-token validation header.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  buildSystemPromptWithMemories,
+  loadRecentMemories,
+  runAgentLoop,
+} from "../_shared/vibey-agent.ts";
 
 const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
 const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
@@ -125,47 +130,7 @@ async function loadHistory(
     ]);
 }
 
-// ── OpenRouter call ───────────────────────────────────────────────────────────
-
-async function callOpenRouter(
-  apiKey: string,
-  model: string,
-  temperature: number,
-  maxTokens: number,
-  systemPrompt: string,
-  history: Array<{ role: "user" | "assistant"; content: string }>,
-  userText: string
-): Promise<string> {
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://t.me/vibey_ai_bot",
-      "X-Title": "Vibey (Telegram)",
-    },
-    body: JSON.stringify({
-      model,
-      temperature: temperature ?? 0.7,
-      max_tokens: maxTokens ?? 2048,
-      stream: false,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...history,
-        { role: "user", content: userText },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    console.error("OpenRouter error", response.status, errText);
-    return "";
-  }
-
-  const json = await response.json();
-  return json?.choices?.[0]?.message?.content?.trim() ?? "";
-}
+// (OpenRouter is called via runAgentLoop in _shared/vibey-agent.ts)
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
@@ -289,18 +254,32 @@ Deno.serve(async (req) => {
       return new Response("ok", { status: 200 });
     }
 
-    // Hydrate history for this group session.
-    const history = await loadHistory(supabase, sessionKey);
+    // Hydrate history for this group session + load community memories.
+    const [history, memories] = await Promise.all([
+      loadHistory(supabase, sessionKey),
+      loadRecentMemories(supabase),
+    ]);
+    const systemPrompt = buildSystemPromptWithMemories(agent.system_prompt, memories);
 
-    const reply = await callOpenRouter(
-      OPENROUTER_API_KEY,
-      agent.model,
-      agent.temperature,
-      agent.max_tokens,
-      agent.system_prompt,
+    const reply = await runAgentLoop({
+      supabase,
+      apiKey: OPENROUTER_API_KEY,
+      model: agent.model,
+      temperature: agent.temperature ?? 0.7,
+      maxTokens: agent.max_tokens ?? 2048,
+      systemPrompt,
       history,
-      cleanText || userText
-    );
+      userText: cleanText || userText,
+      toolMetadata: {
+        source: "telegram_group",
+        chat_id: chatId,
+        chat_title: chat.title ?? null,
+        telegram_user_id: userId,
+        telegram_username: username,
+      },
+      referer: "https://t.me/vibey_ai_bot",
+      title: "Vibey (Telegram)",
+    });
 
     if (!reply) return new Response("ok", { status: 200 });
 
@@ -348,17 +327,30 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200 });
   }
 
-  const history = await loadHistory(supabase, sessionKey);
+  const [history, memories] = await Promise.all([
+    loadHistory(supabase, sessionKey),
+    loadRecentMemories(supabase),
+  ]);
+  const systemPrompt = buildSystemPromptWithMemories(agent.system_prompt, memories);
 
-  const reply = await callOpenRouter(
-    OPENROUTER_API_KEY,
-    agent.model,
-    agent.temperature,
-    agent.max_tokens,
-    agent.system_prompt,
+  const reply = await runAgentLoop({
+    supabase,
+    apiKey: OPENROUTER_API_KEY,
+    model: agent.model,
+    temperature: agent.temperature ?? 0.7,
+    maxTokens: agent.max_tokens ?? 2048,
+    systemPrompt,
     history,
-    userText
-  );
+    userText,
+    toolMetadata: {
+      source: "telegram_dm",
+      chat_id: chatId,
+      telegram_user_id: userId,
+      telegram_username: username,
+    },
+    referer: "https://t.me/vibey_ai_bot",
+    title: "Vibey (Telegram)",
+  });
 
   if (!reply) return new Response("ok", { status: 200 });
 
