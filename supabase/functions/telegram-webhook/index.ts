@@ -130,47 +130,7 @@ async function loadHistory(
     ]);
 }
 
-// ── OpenRouter call ───────────────────────────────────────────────────────────
-
-async function callOpenRouter(
-  apiKey: string,
-  model: string,
-  temperature: number,
-  maxTokens: number,
-  systemPrompt: string,
-  history: Array<{ role: "user" | "assistant"; content: string }>,
-  userText: string
-): Promise<string> {
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://t.me/vibey_ai_bot",
-      "X-Title": "Vibey (Telegram)",
-    },
-    body: JSON.stringify({
-      model,
-      temperature: temperature ?? 0.7,
-      max_tokens: maxTokens ?? 2048,
-      stream: false,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...history,
-        { role: "user", content: userText },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    console.error("OpenRouter error", response.status, errText);
-    return "";
-  }
-
-  const json = await response.json();
-  return json?.choices?.[0]?.message?.content?.trim() ?? "";
-}
+// (OpenRouter is called via runAgentLoop in _shared/vibey-agent.ts)
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
