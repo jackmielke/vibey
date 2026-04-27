@@ -1,11 +1,12 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LayoutDashboard, X } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsStandalone } from "@/hooks/use-pwa";
 import Chat from "@/pages/Chat";
 import Dashboard from "@/pages/Dashboard";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const isStandalone = useIsStandalone();
 
   // Routes that render inside the Vibey Control panel (vs. their own full page).
   const controlRoutes = ["/dashboard", "/soul", "/identity", "/memory", "/media", "/interfaces", "/relationships", "/conversations", "/groups"];
