@@ -327,17 +327,30 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200 });
   }
 
-  const history = await loadHistory(supabase, sessionKey);
+  const [history, memories] = await Promise.all([
+    loadHistory(supabase, sessionKey),
+    loadRecentMemories(supabase),
+  ]);
+  const systemPrompt = buildSystemPromptWithMemories(agent.system_prompt, memories);
 
-  const reply = await callOpenRouter(
-    OPENROUTER_API_KEY,
-    agent.model,
-    agent.temperature,
-    agent.max_tokens,
-    agent.system_prompt,
+  const reply = await runAgentLoop({
+    supabase,
+    apiKey: OPENROUTER_API_KEY,
+    model: agent.model,
+    temperature: agent.temperature ?? 0.7,
+    maxTokens: agent.max_tokens ?? 2048,
+    systemPrompt,
     history,
-    userText
-  );
+    userText,
+    toolMetadata: {
+      source: "telegram_dm",
+      chat_id: chatId,
+      telegram_user_id: userId,
+      telegram_username: username,
+    },
+    referer: "https://t.me/vibey_ai_bot",
+    title: "Vibey (Telegram)",
+  });
 
   if (!reply) return new Response("ok", { status: 200 });
 
