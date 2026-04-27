@@ -112,4 +112,15 @@
   .glow-accent {
     box-shadow: 0 0 20px hsl(var(--primary) / 0.15);
   }
+
+  /* iOS PWA safe-area helpers (status bar / home indicator) */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .min-h-safe-screen {
+    min-height: 100svh;
+  }
 }

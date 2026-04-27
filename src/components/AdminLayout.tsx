@@ -1,11 +1,12 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LayoutDashboard, X } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsStandalone } from "@/hooks/use-pwa";
 import Chat from "@/pages/Chat";
 import Dashboard from "@/pages/Dashboard";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const isStandalone = useIsStandalone();
 
   // Routes that render inside the Vibey Control panel (vs. their own full page).
   const controlRoutes = ["/dashboard", "/soul", "/identity", "/memory", "/media", "/interfaces", "/relationships", "/conversations", "/groups"];
@@ -26,6 +28,16 @@ export default function AdminLayout() {
   useEffect(() => {
     if (isControlRoute) setControlOpen(true);
   }, [location.pathname, isControlRoute]);
+
+  // PWA: when launched as an installed app on mobile, land on Vibey Control instead of chat.
+  const didAutoLand = useRef(false);
+  useEffect(() => {
+    if (didAutoLand.current) return;
+    if (isStandalone && isMobile && location.pathname === "/") {
+      didAutoLand.current = true;
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isStandalone, isMobile, location.pathname, navigate]);
 
   const toggleControl = () => {
     if (controlOpen) {
@@ -51,24 +63,26 @@ export default function AdminLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-safe-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-12 flex items-center border-b border-border px-4 gap-3 shrink-0">
-            <SidebarTrigger />
-            <span className="text-label">Vibey</span>
-            <div className="ml-auto">
-              <Button
-                onClick={toggleControl}
-                size="sm"
-                variant={controlOpen ? "default" : "outline"}
-                className="h-8 gap-1.5"
-              >
-                <LayoutDashboard className="h-3.5 w-3.5" />
-                <span className="font-mono text-xs uppercase tracking-wider">
-                  Vibey Control
-                </span>
-              </Button>
+          <header className="pt-safe shrink-0 border-b border-border">
+            <div className="h-12 flex items-center px-4 gap-3">
+              <SidebarTrigger />
+              <span className="text-label">Vibey</span>
+              <div className="ml-auto">
+                <Button
+                  onClick={toggleControl}
+                  size="sm"
+                  variant={controlOpen ? "default" : "outline"}
+                  className="h-8 gap-1.5"
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  <span className="font-mono text-xs uppercase tracking-wider">
+                    Vibey Control
+                  </span>
+                </Button>
+              </div>
             </div>
           </header>
 
@@ -109,10 +123,12 @@ export default function AdminLayout() {
         {/* Mobile control panel as a sheet */}
         <Sheet open={isMobile && controlOpen} onOpenChange={(o) => !o && closeControl()}>
           <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
-            <div className="h-12 flex items-center px-4 border-b border-border shrink-0">
-              <span className="text-label">Vibey Control</span>
+            <div className="pt-safe border-b border-border shrink-0">
+              <div className="h-12 flex items-center px-4">
+                <span className="text-label">Vibey Control</span>
+              </div>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto pb-safe">
               {isControlRoute ? <Outlet /> : <Dashboard />}
             </div>
           </SheetContent>
