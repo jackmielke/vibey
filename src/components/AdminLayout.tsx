@@ -29,6 +29,16 @@ export default function AdminLayout() {
     if (isControlRoute) setControlOpen(true);
   }, [location.pathname, isControlRoute]);
 
+  // PWA: when launched as an installed app on mobile, land on Vibey Control instead of chat.
+  const didAutoLand = useRef(false);
+  useEffect(() => {
+    if (didAutoLand.current) return;
+    if (isStandalone && isMobile && location.pathname === "/") {
+      didAutoLand.current = true;
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isStandalone, isMobile, location.pathname, navigate]);
+
   const toggleControl = () => {
     if (controlOpen) {
       setControlOpen(false);
