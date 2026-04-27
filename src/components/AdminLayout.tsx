@@ -152,7 +152,22 @@ export default function AdminLayout() {
 
             {/* Tablet/desktop inline control panel */}
             {showInlineControl && (
-              <aside className="hidden md:flex flex-col w-[420px] lg:w-[480px] xl:w-[560px] shrink-0 overflow-hidden bg-background animate-slide-in-right border-l border-border">
+              <aside
+                className="hidden md:flex flex-col shrink-0 overflow-hidden bg-background animate-slide-in-right border-l border-border relative"
+                style={{ width: `${panelWidth}px` }}
+              >
+                {/* Drag handle */}
+                <div
+                  onMouseDown={startResize}
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize Vibey Control"
+                  className={cn(
+                    "absolute left-0 top-0 bottom-0 w-1.5 -translate-x-1/2 cursor-col-resize z-10 group",
+                    "hover:bg-primary/40 transition-colors",
+                    isResizing && "bg-primary/60"
+                  )}
+                />
                 <div className="pt-safe border-b border-border shrink-0">
                   <div className="h-10 flex items-center justify-between px-4">
                     <span className="text-label">Vibey Control</span>
