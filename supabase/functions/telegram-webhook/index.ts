@@ -82,6 +82,62 @@ async function tg(token: string, method: string, body: unknown) {
   return res;
 }
 
+// ── Voice transcription via OpenAI Whisper ────────────────────────────────────
+
+async function transcribeVoice(
+  botToken: string,
+  openaiKey: string,
+  fileId: string
+): Promise<string | null> {
+  try {
+    const fileResp = await fetch(
+      `https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`
+    );
+    const fileJson = await fileResp.json();
+    const filePath = fileJson?.result?.file_path;
+    if (!filePath) {
+      console.error("getFile returned no file_path", fileJson);
+      return null;
+    }
+
+    const audioResp = await fetch(
+      `https://api.telegram.org/file/bot${botToken}/${filePath}`
+    );
+    if (!audioResp.ok) {
+      console.error("audio download failed", audioResp.status);
+      return null;
+    }
+    const audioBlob = await audioResp.blob();
+
+    const form = new FormData();
+    const filename = filePath.split("/").pop() || "voice.oga";
+    form.append("file", audioBlob, filename);
+    form.append("model", "whisper-1");
+
+    const whisperResp = await fetch(
+      "https://api.openai.com/v1/audio/transcriptions",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${openaiKey}` },
+        body: form,
+      }
+    );
+
+    if (!whisperResp.ok) {
+      const errText = await whisperResp.text().catch(() => "");
+      console.error("whisper failed", whisperResp.status, errText);
+      return null;
+    }
+
+    const json = await whisperResp.json();
+    const text = (json?.text ?? "").trim();
+    return text || null;
+  } catch (e) {
+    console.error("transcribeVoice threw:", e);
+    return null;
+  }
+}
+
 // ── Mention detection ─────────────────────────────────────────────────────────
 
 function isMentioned(msg: TelegramMessage): boolean {
