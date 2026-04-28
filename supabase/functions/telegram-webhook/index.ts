@@ -42,12 +42,21 @@ type TelegramChat = {
   username?: string;
 };
 
+type TelegramVoice = {
+  file_id: string;
+  duration: number;
+  mime_type?: string;
+  file_size?: number;
+};
+
 type TelegramMessage = {
   message_id: number;
   from?: TelegramUser;
   chat: TelegramChat;
   date: number;
   text?: string;
+  voice?: TelegramVoice;
+  audio?: TelegramVoice;
   reply_to_message?: TelegramMessage;
   entities?: Array<{ type: string; offset: number; length: number }>;
 };
