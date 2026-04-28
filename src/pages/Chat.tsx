@@ -277,11 +277,27 @@ export default function Chat() {
             className="flex-1 bg-card border-border"
             disabled={isStreaming}
           />
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            onClick={() => setVoiceOpen(true)}
+            disabled={isStreaming}
+            title="Talk to Vibey"
+          >
+            <AudioLines className="h-4 w-4" />
+          </Button>
           <Button type="submit" size="icon" disabled={!input.trim() || isStreaming}>
             {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </form>
       </div>
+
+      <VoiceMode
+        open={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        agentName={agent?.name ?? "Vibey"}
+      />
     </div>
   );
 }
