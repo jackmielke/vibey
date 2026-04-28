@@ -17,6 +17,7 @@ import Interfaces from "@/pages/Interfaces";
 import Relationships from "@/pages/Relationships";
 import Conversations from "@/pages/Conversations";
 import Groups from "@/pages/Groups";
+import TelegramMini from "@/pages/TelegramMini";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/mini" element={<TelegramMini />} />
           <Route element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
             <Route index element={<Chat />} />
             <Route path="dashboard" element={<Dashboard />} />
