@@ -10,6 +10,7 @@ import {
   UsersRound,
   ExternalLink,
   LayoutDashboard,
+  Zap,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useLocation } from "react-router-dom";
@@ -47,6 +48,7 @@ const socialItems = [
   { title: "Relationships", url: "/relationships", icon: Users },
   { title: "Conversations", url: "/conversations", icon: MessagesSquare },
   { title: "Group Chats", url: "/groups", icon: UsersRound },
+  { title: "Automations", url: "/automations", icon: Zap },
 ];
 
 export function AppSidebar() {

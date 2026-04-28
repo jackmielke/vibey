@@ -18,6 +18,7 @@ import Relationships from "@/pages/Relationships";
 import Conversations from "@/pages/Conversations";
 import Groups from "@/pages/Groups";
 import TelegramMini from "@/pages/TelegramMini";
+import Automations from "@/pages/Automations";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="relationships" element={<Relationships />} />
             <Route path="conversations" element={<Conversations />} />
             <Route path="groups" element={<Groups />} />
+            <Route path="automations" element={<Automations />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
