@@ -118,15 +118,48 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Parse body (all optional).
-    let body: { hours?: number; deliver_to?: string | number; dry_run?: boolean } = {};
+    let body: {
+      hours?: number;
+      deliver_to?: string | number;
+      dry_run?: boolean;
+      automation_id?: string;
+    } = {};
     try {
       body = await req.json();
     } catch {
       // No body / invalid JSON — use defaults.
     }
-    const hours = Math.max(1, Math.min(72, Number(body.hours) || 24));
-    const deliverTo = body.deliver_to ? String(body.deliver_to) : DEFAULT_DELIVER_TO;
+
+    // If an automation_id is supplied, pull config + recipients from DB.
+    let recipients: string[] = [];
+    let hours = Math.max(1, Math.min(72, Number(body.hours) || 24));
     const dryRun = body.dry_run === true;
+
+    if (body.automation_id) {
+      const { data: auto, error: autoErr } = await supabase
+        .from("automations")
+        .select("id, config")
+        .eq("id", body.automation_id)
+        .maybeSingle();
+      if (autoErr || !auto) throw new Error(`automation load: ${autoErr?.message ?? "not found"}`);
+      const cfgHours = Number((auto.config as Record<string, unknown> | null)?.hours);
+      if (Number.isFinite(cfgHours) && cfgHours > 0) hours = Math.max(1, Math.min(72, cfgHours));
+
+      const { data: recs, error: recErr } = await supabase
+        .from("automation_recipients")
+        .select("chat_id, enabled, channel")
+        .eq("automation_id", body.automation_id)
+        .eq("enabled", true)
+        .eq("channel", "telegram");
+      if (recErr) throw new Error(`recipients load: ${recErr.message}`);
+      recipients = (recs ?? []).map((r) => String(r.chat_id));
+    }
+
+    // Fallbacks for direct/manual invocation.
+    if (recipients.length === 0) {
+      recipients = [body.deliver_to ? String(body.deliver_to) : DEFAULT_DELIVER_TO];
+    }
+    const deliverTo = recipients[0]; // for legacy single-target persistence column
 
     const windowEnd = new Date();
     const windowStart = new Date(windowEnd.getTime() - hours * 3600 * 1000);
@@ -211,15 +244,39 @@ ${transcript}
         deliveryStatus = "failed";
         deliveryError = "TELEGRAM_BOT_TOKEN not configured";
       } else {
-        try {
-          await sendTelegram(TELEGRAM_BOT_TOKEN, deliverTo, fullMessage);
-          deliveryStatus = "sent";
-        } catch (e) {
+        const errors: string[] = [];
+        let okCount = 0;
+        for (const chat of recipients) {
+          try {
+            await sendTelegram(TELEGRAM_BOT_TOKEN, chat, fullMessage);
+            okCount++;
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            errors.push(`${chat}: ${msg}`);
+            console.error("Telegram delivery failed for", chat, msg);
+          }
+        }
+        if (okCount === recipients.length) deliveryStatus = "sent";
+        else if (okCount === 0) {
           deliveryStatus = "failed";
-          deliveryError = e instanceof Error ? e.message : String(e);
-          console.error("Telegram delivery failed:", deliveryError);
+          deliveryError = errors.join("; ");
+        } else {
+          deliveryStatus = "partial";
+          deliveryError = errors.join("; ");
         }
       }
+    }
+
+    // Update automation status if invoked via automation_id.
+    if (body.automation_id) {
+      await supabase
+        .from("automations")
+        .update({
+          last_run_at: new Date().toISOString(),
+          last_run_status: deliveryStatus,
+          last_run_error: deliveryError,
+        })
+        .eq("id", body.automation_id);
     }
 
     // Persist.
