@@ -460,6 +460,101 @@ export type Database = {
           },
         ]
       }
+      automation_recipients: {
+        Row: {
+          automation_id: string
+          channel: string
+          chat_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          label: string | null
+        }
+        Insert: {
+          automation_id: string
+          channel?: string
+          chat_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label?: string | null
+        }
+        Update: {
+          automation_id?: string
+          channel?: string
+          chat_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          label?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_recipients_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automations: {
+        Row: {
+          community_id: string
+          config: Json
+          created_at: string
+          description: string | null
+          edge_function: string
+          enabled: boolean
+          id: string
+          last_run_at: string | null
+          last_run_error: string | null
+          last_run_status: string | null
+          name: string
+          prompt: string | null
+          schedule_cron: string | null
+          schedule_label: string | null
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          community_id: string
+          config?: Json
+          created_at?: string
+          description?: string | null
+          edge_function: string
+          enabled?: boolean
+          id?: string
+          last_run_at?: string | null
+          last_run_error?: string | null
+          last_run_status?: string | null
+          name: string
+          prompt?: string | null
+          schedule_cron?: string | null
+          schedule_label?: string | null
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          community_id?: string
+          config?: Json
+          created_at?: string
+          description?: string | null
+          edge_function?: string
+          enabled?: boolean
+          id?: string
+          last_run_at?: string | null
+          last_run_error?: string | null
+          last_run_status?: string | null
+          name?: string
+          prompt?: string | null
+          schedule_cron?: string | null
+          schedule_label?: string | null
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       blog_posts: {
         Row: {
           author_name: string | null
