@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, AudioLines } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
+import { VoiceMode } from "@/components/VoiceMode";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 
@@ -28,6 +29,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Sticky-bottom: only auto-scroll if the user is already near the bottom.
   const stickToBottomRef = useRef(true);
@@ -275,11 +277,27 @@ export default function Chat() {
             className="flex-1 bg-card border-border"
             disabled={isStreaming}
           />
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            onClick={() => setVoiceOpen(true)}
+            disabled={isStreaming}
+            title="Talk to Vibey"
+          >
+            <AudioLines className="h-4 w-4" />
+          </Button>
           <Button type="submit" size="icon" disabled={!input.trim() || isStreaming}>
             {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </form>
       </div>
+
+      <VoiceMode
+        open={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        agentName={agent?.name ?? "Vibey"}
+      />
     </div>
   );
 }
