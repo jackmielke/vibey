@@ -221,15 +221,63 @@ Deno.serve(async (req) => {
   }
 
   const msg = update.message ?? update.edited_message;
-  if (!msg || !msg.text) return new Response("ok", { status: 200 });
+  if (!msg) return new Response("ok", { status: 200 });
 
   const chatId = msg.chat.id;
   const chatType = msg.chat.type;
   const userId = msg.from?.id ?? chatId;
   const username = msg.from?.username ?? msg.from?.first_name ?? "unknown";
-  const userText = msg.text.trim();
   const isGroup = chatType === "group" || chatType === "supergroup";
   const sessionKey = `telegram:${chatId}`;
+
+  // Resolve the user's text — either raw text, or transcribed voice/audio.
+  let userText = (msg.text ?? "").trim();
+  let wasVoice = false;
+
+  if (!userText && (msg.voice || msg.audio)) {
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      console.error("Voice received but OPENAI_API_KEY not configured");
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: "i can't transcribe voice notes yet — text me instead 🙏",
+      });
+      return new Response("ok", { status: 200 });
+    }
+
+    // Show "recording" feedback while we transcribe.
+    await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", {
+      chat_id: chatId,
+      action: "typing",
+    });
+
+    const fileId = (msg.voice ?? msg.audio)!.file_id;
+    const transcript = await transcribeVoice(TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, fileId);
+
+    if (!transcript) {
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: "couldn't catch that — mind sending it again or typing it out?",
+        reply_to_message_id: msg.message_id,
+      });
+      return new Response("ok", { status: 200 });
+    }
+
+    userText = transcript;
+    wasVoice = true;
+
+    // Echo back what we heard so the user can confirm.
+    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+      chat_id: chatId,
+      text: `🎙️ <i>${transcript.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!))}</i>`,
+      parse_mode: "HTML",
+      reply_to_message_id: msg.message_id,
+    });
+  }
+
+  // No text and no voice — nothing to do.
+  if (!userText) return new Response("ok", { status: 200 });
+
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
