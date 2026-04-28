@@ -244,15 +244,39 @@ ${transcript}
         deliveryStatus = "failed";
         deliveryError = "TELEGRAM_BOT_TOKEN not configured";
       } else {
-        try {
-          await sendTelegram(TELEGRAM_BOT_TOKEN, deliverTo, fullMessage);
-          deliveryStatus = "sent";
-        } catch (e) {
+        const errors: string[] = [];
+        let okCount = 0;
+        for (const chat of recipients) {
+          try {
+            await sendTelegram(TELEGRAM_BOT_TOKEN, chat, fullMessage);
+            okCount++;
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            errors.push(`${chat}: ${msg}`);
+            console.error("Telegram delivery failed for", chat, msg);
+          }
+        }
+        if (okCount === recipients.length) deliveryStatus = "sent";
+        else if (okCount === 0) {
           deliveryStatus = "failed";
-          deliveryError = e instanceof Error ? e.message : String(e);
-          console.error("Telegram delivery failed:", deliveryError);
+          deliveryError = errors.join("; ");
+        } else {
+          deliveryStatus = "partial";
+          deliveryError = errors.join("; ");
         }
       }
+    }
+
+    // Update automation status if invoked via automation_id.
+    if (body.automation_id) {
+      await supabase
+        .from("automations")
+        .update({
+          last_run_at: new Date().toISOString(),
+          last_run_status: deliveryStatus,
+          last_run_error: deliveryError,
+        })
+        .eq("id", body.automation_id);
     }
 
     // Persist.
