@@ -386,7 +386,7 @@ Deno.serve(async (req) => {
       toolMetadata: {
         source: "telegram_group",
         chat_id: chatId,
-        chat_title: chat.title ?? null,
+        chat_title: msg.chat.title ?? null,
         telegram_user_id: userId,
         telegram_username: username,
       },
