@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useConversation } from "@elevenlabs/react";
+import { useConversation, ConversationProvider } from "@elevenlabs/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mic, MicOff, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,15 @@ interface VoiceModeProps {
 
 type Transcript = { id: string; role: "user" | "agent"; text: string };
 
-export function VoiceMode({ open, onClose, agentName }: VoiceModeProps) {
+export function VoiceMode(props: VoiceModeProps) {
+  return (
+    <ConversationProvider>
+      <VoiceModeInner {...props} />
+    </ConversationProvider>
+  );
+}
+
+function VoiceModeInner({ open, onClose, agentName }: VoiceModeProps) {
   const [isStarting, setIsStarting] = useState(false);
   const [muted, setMuted] = useState(false);
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
