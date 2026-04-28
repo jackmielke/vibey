@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, AudioLines } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
+import { VoiceMode } from "@/components/VoiceMode";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 
