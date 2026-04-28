@@ -82,7 +82,6 @@ export default function TelegramMini() {
         if (!data?.token_hash || !data?.email) throw new Error("no token");
 
         const { error: verifyErr } = await supabase.auth.verifyOtp({
-          email: data.email,
           token_hash: data.token_hash,
           type: "magiclink",
         });
