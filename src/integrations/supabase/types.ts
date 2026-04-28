@@ -2953,6 +2953,126 @@ export type Database = {
           },
         ]
       }
+      x_mentions: {
+        Row: {
+          author_id: string | null
+          author_username: string | null
+          created_at_x: string | null
+          fetched_at: string
+          id: string
+          in_reply_to_tweet_id: string | null
+          replied_draft_id: string | null
+          seen: boolean
+          text: string
+          tweet_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_username?: string | null
+          created_at_x?: string | null
+          fetched_at?: string
+          id?: string
+          in_reply_to_tweet_id?: string | null
+          replied_draft_id?: string | null
+          seen?: boolean
+          text: string
+          tweet_id: string
+        }
+        Update: {
+          author_id?: string | null
+          author_username?: string | null
+          created_at_x?: string | null
+          fetched_at?: string
+          id?: string
+          in_reply_to_tweet_id?: string | null
+          replied_draft_id?: string | null
+          seen?: boolean
+          text?: string
+          tweet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "x_mentions_replied_draft_id_fkey"
+            columns: ["replied_draft_id"]
+            isOneToOne: false
+            referencedRelation: "x_post_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      x_post_drafts: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          automation_id: string | null
+          created_at: string
+          created_by: string | null
+          error: string | null
+          id: string
+          posted_at: string | null
+          posted_tweet_id: string | null
+          reply_to_tweet_id: string | null
+          source: string
+          status: string
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          automation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          posted_at?: string | null
+          posted_tweet_id?: string | null
+          reply_to_tweet_id?: string | null
+          source?: string
+          status?: string
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          automation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          posted_at?: string | null
+          posted_tweet_id?: string | null
+          reply_to_tweet_id?: string | null
+          source?: string
+          status?: string
+          text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "x_post_drafts_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "x_post_drafts_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "x_post_drafts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       conversations: {
