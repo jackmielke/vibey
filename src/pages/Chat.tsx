@@ -29,6 +29,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Sticky-bottom: only auto-scroll if the user is already near the bottom.
   const stickToBottomRef = useRef(true);
