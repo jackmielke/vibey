@@ -245,19 +245,23 @@ Deno.serve(async (req) => {
 
     const systemPrompt = `${agent.system_prompt}\n\nYou are now writing a DAILY BRIEF for Jack, the residency host, before his daily community call. Stay in your voice but be concise and useful. This is internal — Jack is the only reader.`;
 
-    const userPrompt = allLogs.length === 0
-      ? `It's quiet — no chats with you in the last ${hours}h for the Vibey community. Write a brief 2-3 sentence note acknowledging the quiet window and suggesting one thing Jack might bring to the call to spark conversation.`
-      : `Here are all the conversations you had with the community in the last ${hours} hours (${allLogs.length} exchanges, UTC times). Write Jack a pre-call brief in markdown. Structure:
+    const userPrompt = allLogs.length === 0 && granolaNotes.length === 0
+      ? `It's quiet — no chats with you and no Granola meeting notes in the last ${hours}h. Write a brief 2-3 sentence note acknowledging the quiet window and suggesting one thing Jack might bring to the call to spark conversation.`
+      : `Here's the last ${hours}h of context for the Vibey community: ${allLogs.length} chat exchanges with you and ${granolaNotes.length} Granola meeting notes. Write Jack a pre-call brief in markdown. Structure:
 
 **TL;DR** — 1-2 sentence vibe check.
-**Themes** — bullet list of 2-5 recurring topics or notable threads.
+**Themes** — bullet list of 2-5 recurring topics or notable threads (weave in meeting topics where relevant).
 **People** — anyone worth checking in with by name + why.
+**From meetings** — 1-3 highlights from Granola notes that Jack should remember (skip if no notes).
 **Suggested talking points** — 2-4 things Jack could raise on the call.
 
-Keep it under 400 words. Be specific (quote briefly when useful). No fluff.
+Keep it under 450 words. Be specific (quote briefly when useful). No fluff.
 
----
+--- CHAT TRANSCRIPT ---
 ${transcript}
+
+--- GRANOLA MEETING NOTES ---
+${granolaBlock}
 ---`;
 
     const brief = await callOpenRouter(
