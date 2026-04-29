@@ -177,6 +177,44 @@ Deno.serve(async (req) => {
     if (logsErr) throw new Error(`logs query: ${logsErr.message}`);
     const allLogs = (logs ?? []) as Log[];
 
+    // Pull Granola meeting notes from the same window (best-effort — never fail the recap).
+    let granolaNotes: Array<{ title?: string; created_at?: string; summary?: string }> = [];
+    let granolaError: string | null = null;
+    try {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      const GRANOLA_API_KEY = Deno.env.get("GRANOLA_API_KEY");
+      if (LOVABLE_API_KEY && GRANOLA_API_KEY) {
+        const url = `https://connector-gateway.lovable.dev/granola/v1/notes?limit=20&created_after=${encodeURIComponent(windowStart.toISOString())}`;
+        const gResp = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "X-Connection-Api-Key": GRANOLA_API_KEY,
+          },
+        });
+        if (!gResp.ok) {
+          granolaError = `Granola ${gResp.status}: ${(await gResp.text()).slice(0, 200)}`;
+        } else {
+          const gJson = await gResp.json();
+          granolaNotes = (gJson?.notes ?? []) as typeof granolaNotes;
+        }
+      } else {
+        granolaError = "Granola not configured";
+      }
+    } catch (e) {
+      granolaError = e instanceof Error ? e.message : String(e);
+    }
+    if (granolaError) console.warn("Granola fetch:", granolaError);
+
+    const granolaBlock = granolaNotes.length === 0
+      ? "(no Granola meeting notes in this window)"
+      : granolaNotes
+          .map((n) => {
+            const ts = n.created_at ? new Date(n.created_at).toISOString().slice(0, 16).replace("T", " ") : "?";
+            const summary = (n.summary ?? "").trim().slice(0, 800);
+            return `### ${n.title ?? "Untitled"} — ${ts} UTC\n${summary}`;
+          })
+          .join("\n\n");
+
     // Format conversation transcript for the prompt.
     let transcript: string;
     if (allLogs.length === 0) {
