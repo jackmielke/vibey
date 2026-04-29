@@ -177,6 +177,44 @@ Deno.serve(async (req) => {
     if (logsErr) throw new Error(`logs query: ${logsErr.message}`);
     const allLogs = (logs ?? []) as Log[];
 
+    // Pull Granola meeting notes from the same window (best-effort — never fail the recap).
+    let granolaNotes: Array<{ title?: string; created_at?: string; summary?: string }> = [];
+    let granolaError: string | null = null;
+    try {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      const GRANOLA_API_KEY = Deno.env.get("GRANOLA_API_KEY");
+      if (LOVABLE_API_KEY && GRANOLA_API_KEY) {
+        const url = `https://connector-gateway.lovable.dev/granola/v1/notes?limit=20&created_after=${encodeURIComponent(windowStart.toISOString())}`;
+        const gResp = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "X-Connection-Api-Key": GRANOLA_API_KEY,
+          },
+        });
+        if (!gResp.ok) {
+          granolaError = `Granola ${gResp.status}: ${(await gResp.text()).slice(0, 200)}`;
+        } else {
+          const gJson = await gResp.json();
+          granolaNotes = (gJson?.notes ?? []) as typeof granolaNotes;
+        }
+      } else {
+        granolaError = "Granola not configured";
+      }
+    } catch (e) {
+      granolaError = e instanceof Error ? e.message : String(e);
+    }
+    if (granolaError) console.warn("Granola fetch:", granolaError);
+
+    const granolaBlock = granolaNotes.length === 0
+      ? "(no Granola meeting notes in this window)"
+      : granolaNotes
+          .map((n) => {
+            const ts = n.created_at ? new Date(n.created_at).toISOString().slice(0, 16).replace("T", " ") : "?";
+            const summary = (n.summary ?? "").trim().slice(0, 800);
+            return `### ${n.title ?? "Untitled"} — ${ts} UTC\n${summary}`;
+          })
+          .join("\n\n");
+
     // Format conversation transcript for the prompt.
     let transcript: string;
     if (allLogs.length === 0) {
@@ -207,19 +245,23 @@ Deno.serve(async (req) => {
 
     const systemPrompt = `${agent.system_prompt}\n\nYou are now writing a DAILY BRIEF for Jack, the residency host, before his daily community call. Stay in your voice but be concise and useful. This is internal — Jack is the only reader.`;
 
-    const userPrompt = allLogs.length === 0
-      ? `It's quiet — no chats with you in the last ${hours}h for the Vibey community. Write a brief 2-3 sentence note acknowledging the quiet window and suggesting one thing Jack might bring to the call to spark conversation.`
-      : `Here are all the conversations you had with the community in the last ${hours} hours (${allLogs.length} exchanges, UTC times). Write Jack a pre-call brief in markdown. Structure:
+    const userPrompt = allLogs.length === 0 && granolaNotes.length === 0
+      ? `It's quiet — no chats with you and no Granola meeting notes in the last ${hours}h. Write a brief 2-3 sentence note acknowledging the quiet window and suggesting one thing Jack might bring to the call to spark conversation.`
+      : `Here's the last ${hours}h of context for the Vibey community: ${allLogs.length} chat exchanges with you and ${granolaNotes.length} Granola meeting notes. Write Jack a pre-call brief in markdown. Structure:
 
 **TL;DR** — 1-2 sentence vibe check.
-**Themes** — bullet list of 2-5 recurring topics or notable threads.
+**Themes** — bullet list of 2-5 recurring topics or notable threads (weave in meeting topics where relevant).
 **People** — anyone worth checking in with by name + why.
+**From meetings** — 1-3 highlights from Granola notes that Jack should remember (skip if no notes).
 **Suggested talking points** — 2-4 things Jack could raise on the call.
 
-Keep it under 400 words. Be specific (quote briefly when useful). No fluff.
+Keep it under 450 words. Be specific (quote briefly when useful). No fluff.
 
----
+--- CHAT TRANSCRIPT ---
 ${transcript}
+
+--- GRANOLA MEETING NOTES ---
+${granolaBlock}
 ---`;
 
     const brief = await callOpenRouter(
