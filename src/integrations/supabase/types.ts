@@ -2616,6 +2616,53 @@ export type Database = {
           },
         ]
       }
+      user_locations: {
+        Row: {
+          accuracy_m: number | null
+          created_at: string
+          expires_at: string | null
+          heading: number | null
+          id: string
+          lat: number | null
+          lng: number | null
+          sharing_mode: Database["public"]["Enums"]["location_sharing_mode"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accuracy_m?: number | null
+          created_at?: string
+          expires_at?: string | null
+          heading?: number | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          sharing_mode?: Database["public"]["Enums"]["location_sharing_mode"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accuracy_m?: number | null
+          created_at?: string
+          expires_at?: string | null
+          heading?: number | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          sharing_mode?: Database["public"]["Enums"]["location_sharing_mode"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_locations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_preferences: {
         Row: {
           app_order: Json
@@ -3202,6 +3249,10 @@ export type Database = {
           scopes: Database["public"]["Enums"]["api_scope"][]
         }[]
       }
+      viewer_shares_community_with_user: {
+        Args: { _other_user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       api_scope:
@@ -3211,6 +3262,7 @@ export type Database = {
         | "auth:login"
         | "auth:verify"
       app_role: "admin" | "moderator" | "member"
+      location_sharing_mode: "off" | "precise" | "approximate"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3346,6 +3398,7 @@ export const Constants = {
         "auth:verify",
       ],
       app_role: ["admin", "moderator", "member"],
+      location_sharing_mode: ["off", "precise", "approximate"],
     },
   },
 } as const
