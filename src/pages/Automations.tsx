@@ -7,9 +7,34 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Loader2, Play, Plus, Trash2, Clock, Zap } from "lucide-react";
+import { Loader2, Play, Plus, Trash2, Clock, Zap, Heart } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+
+const SCHEDULE_PRESETS: { value: string; cron: string; label: string }[] = [
+  { value: "daily-8am-pt", cron: "0 15 * * *", label: "Daily · 8:00 AM Pacific" },
+  { value: "daily-9am-pt", cron: "0 16 * * *", label: "Daily · 9:00 AM Pacific" },
+  { value: "daily-6pm-pt", cron: "0 1 * * *", label: "Daily · 6:00 PM Pacific" },
+  { value: "weekly-mon-9am-pt", cron: "0 16 * * 1", label: "Weekly · Mon 9:00 AM Pacific" },
+  { value: "hourly", cron: "0 * * * *", label: "Hourly" },
+  { value: "manual", cron: "", label: "Manual only (no schedule)" },
+];
+
+const RUNNER_OPTIONS: { value: string; label: string; hint: string }[] = [
+  { value: "vibey-prompt", label: "Run a prompt via Vibey", hint: "Generic — Vibey reads memories/tools and replies to your prompt." },
+  { value: "daily-recap", label: "Daily community recap", hint: "Reads last 24h of chat and writes a brief." },
+];
+
+function slugify(s: string) {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || `heartbeat-${Date.now()}`;
+}
 
 type Automation = {
   id: string;
