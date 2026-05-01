@@ -3198,6 +3198,13 @@ export type Database = {
           privacy_level: string
         }[]
       }
+      get_community_credentials: {
+        Args: { _community_id: string }
+        Returns: {
+          telegram_bot_token: string
+          webhook_api_key: string
+        }[]
+      }
       get_current_user_from_context: { Args: never; Returns: string }
       get_user_id_from_auth: { Args: { auth_user_id: string }; Returns: string }
       get_user_public_profile: {
