@@ -125,7 +125,7 @@ export default function Automations() {
   };
 
   return (
-    <PageShell title="Automations" description="Scheduled tasks Vibey runs on your behalf.">
+    <PageShell title="Scheduled Heartbeat" description="Recurring tasks Vibey runs on its own — daily check-ins, recaps, nudges.">
       {loading ? (
         <div className="flex items-center justify-center py-12 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading…
