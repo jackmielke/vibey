@@ -3,7 +3,7 @@ import { RelationshipsSection } from "@/components/sections/RelationshipsSection
 
 export default function Relationships() {
   return (
-    <PageShell title="Relationships" description="Browse Vibey's relationships with community members.">
+    <PageShell title="Preferences" description="What Vibey knows about each person — preferences, context, and relationship notes.">
       <RelationshipsSection />
     </PageShell>
   );
