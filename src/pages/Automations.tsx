@@ -7,9 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Loader2, Play, Plus, Trash2, Clock, Zap, Heart } from "lucide-react";
+import { Loader2, Play, Plus, Trash2, Clock, Zap, Heart, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
+import { nextCronRun } from "@/lib/cron";
+import { AutomationRunsPanel } from "@/components/AutomationRunsPanel";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
@@ -66,6 +68,7 @@ export default function Automations() {
   const [recipients, setRecipients] = useState<Record<string, Recipient[]>>({});
   const [loading, setLoading] = useState(true);
   const [runningId, setRunningId] = useState<string | null>(null);
+  const [historyTick, setHistoryTick] = useState<Record<string, number>>({});
   const [newRecip, setNewRecip] = useState<Record<string, { chat_id: string; label: string }>>({});
 
   // Create dialog state
