@@ -7,9 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Loader2, Play, Plus, Trash2, Clock, Zap, Heart } from "lucide-react";
+import { Loader2, Play, Plus, Trash2, Clock, Zap, Heart, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
+import { nextCronRun } from "@/lib/cron";
+import { AutomationRunsPanel } from "@/components/AutomationRunsPanel";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
@@ -66,6 +68,7 @@ export default function Automations() {
   const [recipients, setRecipients] = useState<Record<string, Recipient[]>>({});
   const [loading, setLoading] = useState(true);
   const [runningId, setRunningId] = useState<string | null>(null);
+  const [historyTick, setHistoryTick] = useState<Record<string, number>>({});
   const [newRecip, setNewRecip] = useState<Record<string, { chat_id: string; label: string }>>({});
 
   // Create dialog state
@@ -159,6 +162,7 @@ export default function Automations() {
         toast.error(`${a.name} failed`, { description: JSON.stringify(result?.result).slice(0, 200) });
       }
       await load();
+      setHistoryTick((p) => ({ ...p, [a.id]: (p[a.id] ?? 0) + 1 }));
     } catch (e) {
       toast.error("Run failed", { description: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -342,10 +346,20 @@ export default function Automations() {
                       )}
                     </div>
                     {a.description && <p className="text-sm text-muted-foreground">{a.description}</p>}
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono flex-wrap">
                       {a.schedule_label && (
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{a.schedule_label}</span>
                       )}
+                      {(() => {
+                        const next = a.enabled && a.schedule_cron ? nextCronRun(a.schedule_cron) : null;
+                        return next ? (
+                          <span className="flex items-center gap-1" title={format(next, "PPpp")}>
+                            <CalendarClock className="h-3 w-3" />next {formatDistanceToNow(next, { addSuffix: true })}
+                          </span>
+                        ) : a.schedule_cron && !a.enabled ? (
+                          <span className="flex items-center gap-1 opacity-60"><CalendarClock className="h-3 w-3" />paused</span>
+                        ) : null;
+                      })()}
                       {a.last_run_at && (
                         <span>last run {formatDistanceToNow(new Date(a.last_run_at), { addSuffix: true })}</span>
                       )}
@@ -413,6 +427,10 @@ export default function Automations() {
                       <Plus className="h-3.5 w-3.5" /> Add
                     </Button>
                   </div>
+                </div>
+
+                <div className="pt-3 border-t border-border">
+                  <AutomationRunsPanel automationId={a.id} refreshKey={historyTick[a.id] ?? 0} />
                 </div>
               </Card>
             );

@@ -59,24 +59,76 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Count enabled recipients for the run record.
+    const { count: recipientsCount } = await admin
+      .from("automation_recipients")
+      .select("id", { count: "exact", head: true })
+      .eq("automation_id", automationId)
+      .eq("enabled", true);
+
+    // Open a run record (status: running) so we have history even on crashes.
+    const startedAt = new Date();
+    const { data: runRow } = await admin
+      .from("automation_runs")
+      .insert({
+        automation_id: auto.id,
+        community_id: auto.community_id,
+        status: "running",
+        started_at: startedAt.toISOString(),
+        triggered_by: body.triggered_by === "schedule" ? "schedule" : "manual",
+        dry_run: dryRun,
+        recipients_count: recipientsCount ?? 0,
+      })
+      .select("id")
+      .single();
+
     // Invoke the target function with service role auth, passing automation_id.
     const targetUrl = `${SUPABASE_URL}/functions/v1/${auto.edge_function}`;
-    const resp = await fetch(targetUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${SERVICE_KEY}`,
-      },
-      body: JSON.stringify({ automation_id: automationId, dry_run: dryRun }),
-    });
+    let resp: Response;
+    let text = "";
+    let result: unknown = null;
+    let runError: string | null = null;
+    try {
+      resp = await fetch(targetUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SERVICE_KEY}`,
+        },
+        body: JSON.stringify({ automation_id: automationId, dry_run: dryRun }),
+      });
+      text = await resp.text();
+      try { result = JSON.parse(text); } catch { result = text; }
+      if (!resp.ok) runError = typeof result === "string" ? result.slice(0, 500) : JSON.stringify(result).slice(0, 500);
+    } catch (e) {
+      runError = e instanceof Error ? e.message : String(e);
+      resp = new Response(null, { status: 500 });
+    }
 
-    const text = await resp.text();
-    let result: unknown;
-    try { result = JSON.parse(text); } catch { result = text; }
+    const finishedAt = new Date();
+    const finalStatus = runError ? "failed" : (dryRun ? "dry_run" : "sent");
+
+    if (runRow?.id) {
+      await admin.from("automation_runs").update({
+        status: finalStatus,
+        finished_at: finishedAt.toISOString(),
+        duration_ms: finishedAt.getTime() - startedAt.getTime(),
+        http_status: resp.status,
+        error: runError,
+        result: result && typeof result === "object" ? result : { raw: result },
+      }).eq("id", runRow.id);
+    }
+
+    // Mirror summary onto the automation row for quick badges.
+    await admin.from("automations").update({
+      last_run_at: finishedAt.toISOString(),
+      last_run_status: finalStatus,
+      last_run_error: runError,
+    }).eq("id", auto.id);
 
     return new Response(
-      JSON.stringify({ ok: resp.ok, status: resp.status, automation: auto.name, result }),
-      { status: resp.ok ? 200 : 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ ok: !runError, status: resp.status, automation: auto.name, run_id: runRow?.id, result }),
+      { status: !runError ? 200 : 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     return new Response(

@@ -498,6 +498,62 @@ export type Database = {
           },
         ]
       }
+      automation_runs: {
+        Row: {
+          automation_id: string
+          community_id: string
+          dry_run: boolean
+          duration_ms: number | null
+          error: string | null
+          finished_at: string | null
+          http_status: number | null
+          id: string
+          recipients_count: number | null
+          result: Json | null
+          started_at: string
+          status: string
+          triggered_by: string
+        }
+        Insert: {
+          automation_id: string
+          community_id: string
+          dry_run?: boolean
+          duration_ms?: number | null
+          error?: string | null
+          finished_at?: string | null
+          http_status?: number | null
+          id?: string
+          recipients_count?: number | null
+          result?: Json | null
+          started_at?: string
+          status: string
+          triggered_by?: string
+        }
+        Update: {
+          automation_id?: string
+          community_id?: string
+          dry_run?: boolean
+          duration_ms?: number | null
+          error?: string | null
+          finished_at?: string | null
+          http_status?: number | null
+          id?: string
+          recipients_count?: number | null
+          result?: Json | null
+          started_at?: string
+          status?: string
+          triggered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_runs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automations: {
         Row: {
           community_id: string
