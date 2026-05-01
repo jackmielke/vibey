@@ -399,14 +399,14 @@ export default function Automations() {
                   <div className="flex gap-2 pt-1">
                     <Input
                       placeholder="Telegram chat ID"
-                      value={draft.chat_id}
-                      onChange={(e) => setNewRecip((p) => ({ ...p, [a.id]: { ...draft, chat_id: e.target.value } }))}
+                      value={recipDraft.chat_id}
+                      onChange={(e) => setNewRecip((p) => ({ ...p, [a.id]: { ...recipDraft, chat_id: e.target.value } }))}
                       className="font-mono text-xs h-8"
                     />
                     <Input
                       placeholder="Label (optional)"
-                      value={draft.label}
-                      onChange={(e) => setNewRecip((p) => ({ ...p, [a.id]: { ...draft, label: e.target.value } }))}
+                      value={recipDraft.label}
+                      onChange={(e) => setNewRecip((p) => ({ ...p, [a.id]: { ...recipDraft, label: e.target.value } }))}
                       className="text-xs h-8"
                     />
                     <Button size="sm" variant="outline" onClick={() => addRecipient(a.id)} className="gap-1 shrink-0">
