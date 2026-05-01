@@ -447,11 +447,16 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200 });
   }
 
-  const [history, memories] = await Promise.all([
+  const [history, memories, userPrefs] = await Promise.all([
     loadHistory(supabase, sessionKey),
     loadRecentMemories(supabase),
+    loadUserPreferences(supabase, { telegram_user_id: userId, telegram_username: msg.from?.username ?? null }),
   ]);
-  const systemPrompt = buildSystemPromptWithMemories(agent.system_prompt, memories);
+  const userContext = buildUserContextBlock(userPrefs, {
+    display_name: msg.from?.first_name ?? null,
+    telegram_username: msg.from?.username ?? null,
+  });
+  const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories)}\n\n${userContext}`;
 
   const reply = await runAgentLoop({
     supabase,
