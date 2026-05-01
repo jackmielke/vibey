@@ -11,6 +11,7 @@ import {
   ExternalLink,
   LayoutDashboard,
   Zap,
+  Wrench,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useLocation } from "react-router-dom";
@@ -40,6 +41,7 @@ const agentItems = [
   { title: "Soul", url: "/soul", icon: Sparkles },
   { title: "Identity", url: "/identity", icon: User },
   { title: "Memory", url: "/memory", icon: Brain },
+  { title: "Tools", url: "/tools", icon: Wrench },
   { title: "Media Library", url: "/media", icon: Image },
   { title: "Interfaces", url: "/interfaces", icon: Settings2 },
 ];
