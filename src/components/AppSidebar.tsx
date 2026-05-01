@@ -1,7 +1,6 @@
 import {
   MessageCircle,
   Sparkles,
-  User,
   Brain,
   Image,
   Settings2,
