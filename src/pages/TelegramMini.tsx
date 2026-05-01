@@ -1,20 +1,20 @@
-import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { Send, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, Brain, Tag } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
-import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-}
+const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-with-vibey`;
+type MemoryRow = {
+  id: string;
+  content: string | null;
+  tags: string[] | null;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+};
 
 declare global {
   interface Window {
@@ -34,17 +34,27 @@ declare global {
 
 type AuthState = "loading" | "ready" | "error";
 
+function memorySource(metadata: Record<string, unknown> | null): string | null {
+  if (!metadata) return null;
+  const username = metadata.telegram_username as string | undefined;
+  const source = metadata.source as string | undefined;
+  if (username) return `@${username}`;
+  if (source === "telegram_group") return "telegram group";
+  if (source === "telegram_dm") return "telegram dm";
+  if (source === "telegram_agent") return "telegram";
+  if (source === "web") return "web chat";
+  if (source === "admin_panel") return "admin";
+  return null;
+}
+
 export default function TelegramMini() {
   const { agent } = useVibeyAgent();
   const [authState, setAuthState] = useState<AuthState>("loading");
   const [authError, setAuthError] = useState<string | null>(null);
   const [tgName, setTgName] = useState<string | null>(null);
 
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const stickRef = useRef(true);
+  const [memories, setMemories] = useState<MemoryRow[]>([]);
+  const [memLoading, setMemLoading] = useState(true);
 
   // 1. Initialize Telegram WebApp + auth
   useEffect(() => {
@@ -67,7 +77,6 @@ export default function TelegramMini() {
 
     (async () => {
       try {
-        // Already signed in? Skip.
         const { data: sessionData } = await supabase.auth.getSession();
         if (sessionData.session) {
           setAuthState("ready");
@@ -97,104 +106,63 @@ export default function TelegramMini() {
     })();
   }, []);
 
-  // 2. Intro message when agent loads
+  // 2. Load memories + subscribe to realtime inserts/updates/deletes
   useEffect(() => {
-    if (agent && messages.length === 0 && agent.intro_message) {
-      setMessages([{ id: "intro", role: "assistant", content: agent.intro_message }]);
-    }
-  }, [agent, messages.length]);
+    if (authState !== "ready") return;
 
-  // 3. Sticky-bottom scroll
-  const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-  };
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+    let cancelled = false;
 
-  // 4. Send/stream
-  const handleSend = async () => {
-    const text = input.trim();
-    if (!text || isStreaming) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("memories")
+        .select("id, content, tags, created_at, metadata")
+        .eq("community_id", VIBEY_COMMUNITY_ID)
+        .order("created_at", { ascending: false })
+        .limit(100);
 
-    const userMsg: Message = { id: `u-${Date.now()}`, role: "user", content: text };
-    const assistantId = `a-${Date.now()}`;
-    setMessages((p) => [...p, userMsg, { id: assistantId, role: "assistant", content: "" }]);
-    setInput("");
-    setIsStreaming(true);
-    stickRef.current = true;
+      if (cancelled) return;
+      if (error) {
+        console.error("load memories failed", error.message);
+      } else {
+        setMemories((data ?? []) as MemoryRow[]);
+      }
+      setMemLoading(false);
+    })();
 
-    const payloadMessages = [...messages, userMsg]
-      .slice(-20)
-      .map(({ role, content }) => ({ role, content }));
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-      const resp = await fetch(CHAT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+    const channel = supabase
+      .channel("mini-memories")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "memories",
+          filter: `community_id=eq.${VIBEY_COMMUNITY_ID}`,
         },
-        body: JSON.stringify({ messages: payloadMessages }),
-      });
-
-      if (!resp.ok || !resp.body) {
-        toast.error("Vibey couldn't reply");
-        setMessages((p) => p.filter((m) => m.id !== assistantId));
-        return;
-      }
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let pendingEvent: string | null = null;
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        let nl: number;
-        while ((nl = buffer.indexOf("\n")) !== -1) {
-          let line = buffer.slice(0, nl);
-          buffer = buffer.slice(nl + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line === "") { pendingEvent = null; continue; }
-          if (line.startsWith(":")) continue;
-          if (line.startsWith("event: ")) { pendingEvent = line.slice(7).trim(); continue; }
-          if (!line.startsWith("data: ")) continue;
-          const payload = line.slice(6).trim();
-          if (pendingEvent === "images") continue;
-          if (payload === "[DONE]") return;
-          try {
-            const parsed = JSON.parse(payload);
-            const delta: string | undefined = parsed?.choices?.[0]?.delta?.content;
-            if (delta) {
-              setMessages((p) =>
-                p.map((m) => (m.id === assistantId ? { ...m, content: m.content + delta } : m)),
-              );
-            }
-          } catch {
-            buffer = line + "\n" + buffer;
-            break;
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            const row = payload.new as MemoryRow;
+            setMemories((prev) =>
+              prev.some((m) => m.id === row.id) ? prev : [row, ...prev],
+            );
+          } else if (payload.eventType === "UPDATE") {
+            const row = payload.new as MemoryRow;
+            setMemories((prev) =>
+              prev.map((m) => (m.id === row.id ? row : m)),
+            );
+          } else if (payload.eventType === "DELETE") {
+            const row = payload.old as MemoryRow;
+            setMemories((prev) => prev.filter((m) => m.id !== row.id));
           }
-        }
-      }
-    } catch (e) {
-      toast.error("Connection error", {
-        description: e instanceof Error ? e.message : "Unknown",
-      });
-      setMessages((p) => p.filter((m) => m.id !== assistantId));
-    } finally {
-      setIsStreaming(false);
-    }
-  };
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [authState]);
 
   // ===== Render =====
   if (authState === "loading") {
@@ -232,69 +200,77 @@ export default function TelegramMini() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold leading-tight truncate">
-            {agent?.name ?? "Vibey"}
+            {agent?.name ?? "Vibey"}'s memory
           </p>
           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            {tgName ? `hi, ${tgName}` : "telegram mini app"}
+            {memLoading
+              ? "loading…"
+              : `${memories.length} memories${tgName ? ` · hi, ${tgName}` : ""}`}
           </p>
         </div>
         <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
       </div>
 
-      {/* Messages */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-auto px-4 py-3 space-y-3"
-      >
-        {messages.map((msg) => (
-          <motion.div
-            key={msg.id}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
-                msg.role === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card border border-border"
-              }`}
-            >
-              {msg.content || (
-                <span className="inline-flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="w-3 h-3 animate-spin" /> thinking…
-                </span>
-              )}
+      {/* Stream */}
+      <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
+        {memLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : memories.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+              <Brain className="w-6 h-6 text-muted-foreground" />
             </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Input */}
-      <div className="p-3 border-t border-border">
-        <div className="flex items-center gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            placeholder="message vibey…"
-            disabled={isStreaming}
-            className="flex-1"
-          />
-          <Button
-            size="icon"
-            onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
-          >
-            {isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          </Button>
-        </div>
+            <p className="text-sm text-muted-foreground">no memories yet</p>
+            <p className="text-xs text-muted-foreground max-w-xs">
+              vibey will save things here as conversations happen.
+            </p>
+          </div>
+        ) : (
+          <AnimatePresence initial={false}>
+            {memories.map((m) => {
+              const source = memorySource(m.metadata);
+              return (
+                <motion.div
+                  key={m.id}
+                  layout
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="p-3 rounded-lg bg-card border border-border"
+                >
+                  <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                  <div className="flex items-center gap-3 mt-2 flex-wrap">
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      {formatDistanceToNow(new Date(m.created_at), {
+                        addSuffix: true,
+                      })}
+                    </span>
+                    {source && (
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        via {source}
+                      </span>
+                    )}
+                    {m.tags && m.tags.length > 0 && (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Tag className="w-3 h-3 text-muted-foreground" />
+                        {m.tags.map((t) => (
+                          <span
+                            key={t}
+                            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        )}
       </div>
     </div>
   );
