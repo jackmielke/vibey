@@ -36,18 +36,15 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 const chatItem = { title: "Talk to Vibey", url: "/", icon: MessageCircle };
 const dashboardItem = { title: "Vibey Control", url: "/dashboard", icon: LayoutDashboard };
 
-const agentItems = [
+const navItems = [
   { title: "Soul", url: "/soul", icon: Sparkles },
   { title: "Memory", url: "/memory", icon: Brain },
   { title: "Tools", url: "/tools", icon: Wrench },
+  { title: "Preferences", url: "/relationships", icon: Users },
   { title: "Scheduled Heartbeat", url: "/automations", icon: Heart },
+  { title: "Interface Config", url: "/interfaces", icon: Settings2 },
+  { title: "Chat History", url: "/conversations", icon: MessagesSquare },
   { title: "Media Library", url: "/media", icon: Image },
-  { title: "Interfaces", url: "/interfaces", icon: Settings2 },
-];
-
-const socialItems = [
-  { title: "Relationships", url: "/relationships", icon: Users },
-  { title: "Conversations", url: "/conversations", icon: MessagesSquare },
   { title: "Group Chats", url: "/groups", icon: UsersRound },
 ];
 
@@ -113,33 +110,11 @@ export function AppSidebar() {
 
         <SidebarSeparator />
 
-        {/* Agent */}
+        {/* All sections — flat */}
         <SidebarGroup>
-          <SidebarGroupLabel>Agent</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {agentItems.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarSeparator />
-
-        {/* Social */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Social</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {socialItems.map((item) => (
+              {navItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <NavLink to={item.url} onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
