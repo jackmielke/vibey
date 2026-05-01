@@ -428,6 +428,10 @@ export default function Automations() {
                     </Button>
                   </div>
                 </div>
+
+                <div className="pt-3 border-t border-border">
+                  <AutomationRunsPanel automationId={a.id} refreshKey={historyTick[a.id] ?? 0} />
+                </div>
               </Card>
             );
           })}
