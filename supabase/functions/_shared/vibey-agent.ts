@@ -320,6 +320,73 @@ ${memoryBlock}
   return `${basePrompt}\n\n${toolsBlock}`;
 }
 
+// ── Per-user preferences ─────────────────────────────────────────────────────
+
+export type UserPrefs = {
+  display_name: string | null;
+  telegram_username: string | null;
+  telegram_user_id: number | null;
+  relationship_notes: string | null;
+  interaction_count: number | null;
+  last_interaction_at: string | null;
+};
+
+export async function loadUserPreferences(
+  supabase: SupabaseClient,
+  lookup: { telegram_user_id?: number | null; telegram_username?: string | null }
+): Promise<UserPrefs | null> {
+  const tgId = lookup.telegram_user_id ?? null;
+  const tgUser = lookup.telegram_username ?? null;
+  if (tgId == null && !tgUser) return null;
+
+  // Prefer match by telegram_user_id; fall back to username.
+  if (tgId != null) {
+    const { data } = await supabase
+      .from("vibey_relationships")
+      .select("display_name, telegram_username, telegram_user_id, relationship_notes, interaction_count, last_interaction_at")
+      .eq("community_id", VIBEY_COMMUNITY_ID)
+      .eq("telegram_user_id", tgId)
+      .maybeSingle();
+    if (data) return data as UserPrefs;
+  }
+  if (tgUser) {
+    const { data } = await supabase
+      .from("vibey_relationships")
+      .select("display_name, telegram_username, telegram_user_id, relationship_notes, interaction_count, last_interaction_at")
+      .eq("community_id", VIBEY_COMMUNITY_ID)
+      .ilike("telegram_username", tgUser)
+      .maybeSingle();
+    if (data) return data as UserPrefs;
+  }
+  return null;
+}
+
+export function buildUserContextBlock(
+  prefs: UserPrefs | null,
+  fallback: { display_name?: string | null; telegram_username?: string | null }
+): string {
+  const name = prefs?.display_name || fallback.display_name || fallback.telegram_username || "this person";
+  const handle = prefs?.telegram_username || fallback.telegram_username;
+  const notes = prefs?.relationship_notes?.trim();
+
+  const lines: string[] = [];
+  lines.push(`## Who you're talking to right now`);
+  lines.push(`- Name: ${name}${handle ? ` (@${handle})` : ""}`);
+  if (prefs?.interaction_count) {
+    lines.push(`- Past interactions with you: ${prefs.interaction_count}`);
+  }
+  if (notes) {
+    lines.push(``);
+    lines.push(`### Their preferences & context (admin-curated)`);
+    lines.push(notes);
+    lines.push(``);
+    lines.push(`Use these preferences naturally — adapt tone, topics, and suggestions accordingly. Don't recite them back unprompted.`);
+  } else {
+    lines.push(`- No saved preferences yet for this person.`);
+  }
+  return lines.join("\n");
+}
+
 // ── Agent loop ───────────────────────────────────────────────────────────────
 //
 // Non-streaming variant. Returns the final assistant text. Used directly by
