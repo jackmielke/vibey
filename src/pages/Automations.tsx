@@ -208,19 +208,123 @@ export default function Automations() {
     }));
   };
 
+  const composer = (
+    <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetDraft(); }}>
+      <DialogTrigger asChild>
+        <Button size="sm" className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" /> New heartbeat
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="font-mono uppercase tracking-wider text-sm flex items-center gap-2">
+            <Heart className="h-4 w-4 text-primary" /> New heartbeat
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-label">Name</Label>
+            <Input
+              placeholder="Morning check-in"
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-label">Description</Label>
+            <Input
+              placeholder="What this heartbeat is for"
+              value={draft.description}
+              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-label">Schedule</Label>
+            <Select value={draft.schedule_preset} onValueChange={(v) => setDraft({ ...draft, schedule_preset: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {SCHEDULE_PRESETS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Heads up: scheduling isn't wired to cron yet — use Run now to fire it manually.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-label">Runner</Label>
+            <Select value={draft.runner} onValueChange={(v) => setDraft({ ...draft, runner: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {RUNNER_OPTIONS.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                ))}
+                <SelectItem value="custom">Custom edge function…</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {RUNNER_OPTIONS.find((r) => r.value === draft.runner)?.hint
+                ?? "Point at any deployed edge function by name."}
+            </p>
+          </div>
+          {draft.runner === "custom" && (
+            <div className="space-y-1.5">
+              <Label className="text-label">Edge function name</Label>
+              <Input
+                placeholder="my-custom-function"
+                value={draft.edge_function_custom}
+                onChange={(e) => setDraft({ ...draft, edge_function_custom: e.target.value })}
+                className="font-mono text-xs"
+              />
+            </div>
+          )}
+          {draft.runner === "vibey-prompt" && (
+            <div className="space-y-1.5">
+              <Label className="text-label">Prompt for Vibey</Label>
+              <Textarea
+                placeholder="Write a warm good-morning message for the community. Pull anything notable from yesterday."
+                value={draft.prompt}
+                onChange={(e) => setDraft({ ...draft, prompt: e.target.value })}
+                rows={5}
+                className="text-sm"
+              />
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+          <Button onClick={createHeartbeat} disabled={creating} className="gap-1.5">
+            {creating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Create heartbeat
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
-    <PageShell title="Scheduled Heartbeat" description="Recurring tasks Vibey runs on its own — daily check-ins, recaps, nudges.">
+    <PageShell
+      title="Scheduled Heartbeat"
+      description="Recurring tasks Vibey runs on its own — daily check-ins, recaps, nudges."
+      actions={composer}
+    >
       {loading ? (
         <div className="flex items-center justify-center py-12 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading…
         </div>
       ) : automations.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No automations yet.</p>
+        <div className="text-center py-12 space-y-3">
+          <p className="text-sm text-muted-foreground">No heartbeats yet.</p>
+          <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Create your first heartbeat
+          </Button>
+        </div>
       ) : (
         <div className="space-y-4">
           {automations.map((a) => {
             const recs = recipients[a.id] ?? [];
-            const draft = newRecip[a.id] ?? { chat_id: "", label: "" };
+            const recipDraft = newRecip[a.id] ?? { chat_id: "", label: "" };
             return (
               <Card key={a.id} className="p-5 space-y-4">
                 <div className="flex items-start justify-between gap-4">
