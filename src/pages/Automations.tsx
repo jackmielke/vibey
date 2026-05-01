@@ -67,6 +67,64 @@ export default function Automations() {
   const [runningId, setRunningId] = useState<string | null>(null);
   const [newRecip, setNewRecip] = useState<Record<string, { chat_id: string; label: string }>>({});
 
+  // Create dialog state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState({
+    name: "",
+    description: "",
+    runner: "vibey-prompt",
+    edge_function_custom: "",
+    prompt: "",
+    schedule_preset: "daily-9am-pt",
+  });
+
+  const resetDraft = () => setDraft({
+    name: "", description: "", runner: "vibey-prompt", edge_function_custom: "",
+    prompt: "", schedule_preset: "daily-9am-pt",
+  });
+
+  const createHeartbeat = async () => {
+    if (!draft.name.trim()) { toast.error("Name is required"); return; }
+    const edgeFn = draft.runner === "vibey-prompt"
+      ? "vibey-prompt"
+      : draft.runner === "daily-recap"
+      ? "daily-recap"
+      : draft.edge_function_custom.trim();
+    if (!edgeFn) { toast.error("Edge function name required"); return; }
+    if (draft.runner === "vibey-prompt" && !draft.prompt.trim()) {
+      toast.error("Prompt is required for Vibey runs"); return;
+    }
+
+    // Need a community_id. Use the one from existing automations, else fetch first community the user can see.
+    let communityId = automations[0]?.["community_id" as keyof Automation] as string | undefined;
+    if (!communityId) {
+      const { data: cm } = await supabase.from("communities").select("id").limit(1).maybeSingle();
+      communityId = cm?.id;
+    }
+    if (!communityId) { toast.error("No community found to attach this heartbeat to."); return; }
+
+    const preset = SCHEDULE_PRESETS.find((p) => p.value === draft.schedule_preset)!;
+    setCreating(true);
+    const { error } = await supabase.from("automations").insert({
+      community_id: communityId,
+      slug: slugify(draft.name),
+      name: draft.name.trim(),
+      description: draft.description.trim() || null,
+      edge_function: edgeFn,
+      prompt: draft.runner === "vibey-prompt" ? draft.prompt.trim() : null,
+      schedule_cron: preset.cron || null,
+      schedule_label: preset.cron ? preset.label : "Manual",
+      enabled: true,
+    });
+    setCreating(false);
+    if (error) { toast.error("Failed to create", { description: error.message }); return; }
+    toast.success("Heartbeat created", { description: "Scheduling is manual for now — use Run now to fire it." });
+    setCreateOpen(false);
+    resetDraft();
+    await load();
+  };
+
   const load = async () => {
     setLoading(true);
     const [{ data: autos, error: e1 }, { data: recs, error: e2 }] = await Promise.all([
