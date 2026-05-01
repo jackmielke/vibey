@@ -7,12 +7,38 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Loader2, Play, Plus, Trash2, Clock, Zap } from "lucide-react";
+import { Loader2, Play, Plus, Trash2, Clock, Zap, Heart } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+
+const SCHEDULE_PRESETS: { value: string; cron: string; label: string }[] = [
+  { value: "daily-8am-pt", cron: "0 15 * * *", label: "Daily · 8:00 AM Pacific" },
+  { value: "daily-9am-pt", cron: "0 16 * * *", label: "Daily · 9:00 AM Pacific" },
+  { value: "daily-6pm-pt", cron: "0 1 * * *", label: "Daily · 6:00 PM Pacific" },
+  { value: "weekly-mon-9am-pt", cron: "0 16 * * 1", label: "Weekly · Mon 9:00 AM Pacific" },
+  { value: "hourly", cron: "0 * * * *", label: "Hourly" },
+  { value: "manual", cron: "", label: "Manual only (no schedule)" },
+];
+
+const RUNNER_OPTIONS: { value: string; label: string; hint: string }[] = [
+  { value: "vibey-prompt", label: "Run a prompt via Vibey", hint: "Generic — Vibey reads memories/tools and replies to your prompt." },
+  { value: "daily-recap", label: "Daily community recap", hint: "Reads last 24h of chat and writes a brief." },
+];
+
+function slugify(s: string) {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || `heartbeat-${Date.now()}`;
+}
 
 type Automation = {
   id: string;
+  community_id: string;
   slug: string;
   name: string;
   description: string | null;
@@ -41,6 +67,64 @@ export default function Automations() {
   const [loading, setLoading] = useState(true);
   const [runningId, setRunningId] = useState<string | null>(null);
   const [newRecip, setNewRecip] = useState<Record<string, { chat_id: string; label: string }>>({});
+
+  // Create dialog state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState({
+    name: "",
+    description: "",
+    runner: "vibey-prompt",
+    edge_function_custom: "",
+    prompt: "",
+    schedule_preset: "daily-9am-pt",
+  });
+
+  const resetDraft = () => setDraft({
+    name: "", description: "", runner: "vibey-prompt", edge_function_custom: "",
+    prompt: "", schedule_preset: "daily-9am-pt",
+  });
+
+  const createHeartbeat = async () => {
+    if (!draft.name.trim()) { toast.error("Name is required"); return; }
+    const edgeFn = draft.runner === "vibey-prompt"
+      ? "vibey-prompt"
+      : draft.runner === "daily-recap"
+      ? "daily-recap"
+      : draft.edge_function_custom.trim();
+    if (!edgeFn) { toast.error("Edge function name required"); return; }
+    if (draft.runner === "vibey-prompt" && !draft.prompt.trim()) {
+      toast.error("Prompt is required for Vibey runs"); return;
+    }
+
+    // Need a community_id. Use the one from existing automations, else fetch first community the user can see.
+    let communityId: string | undefined = automations[0]?.community_id;
+    if (!communityId) {
+      const { data: cm } = await supabase.from("communities").select("id").limit(1).maybeSingle();
+      communityId = cm?.id;
+    }
+    if (!communityId) { toast.error("No community found to attach this heartbeat to."); return; }
+
+    const preset = SCHEDULE_PRESETS.find((p) => p.value === draft.schedule_preset)!;
+    setCreating(true);
+    const { error } = await supabase.from("automations").insert({
+      community_id: communityId,
+      slug: slugify(draft.name),
+      name: draft.name.trim(),
+      description: draft.description.trim() || null,
+      edge_function: edgeFn,
+      prompt: draft.runner === "vibey-prompt" ? draft.prompt.trim() : null,
+      schedule_cron: preset.cron || null,
+      schedule_label: preset.cron ? preset.label : "Manual",
+      enabled: true,
+    });
+    setCreating(false);
+    if (error) { toast.error("Failed to create", { description: error.message }); return; }
+    toast.success("Heartbeat created", { description: "Scheduling is manual for now — use Run now to fire it." });
+    setCreateOpen(false);
+    resetDraft();
+    await load();
+  };
 
   const load = async () => {
     setLoading(true);
@@ -124,19 +208,123 @@ export default function Automations() {
     }));
   };
 
+  const composer = (
+    <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetDraft(); }}>
+      <DialogTrigger asChild>
+        <Button size="sm" className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" /> New heartbeat
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="font-mono uppercase tracking-wider text-sm flex items-center gap-2">
+            <Heart className="h-4 w-4 text-primary" /> New heartbeat
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-label">Name</Label>
+            <Input
+              placeholder="Morning check-in"
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-label">Description</Label>
+            <Input
+              placeholder="What this heartbeat is for"
+              value={draft.description}
+              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-label">Schedule</Label>
+            <Select value={draft.schedule_preset} onValueChange={(v) => setDraft({ ...draft, schedule_preset: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {SCHEDULE_PRESETS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Heads up: scheduling isn't wired to cron yet — use Run now to fire it manually.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-label">Runner</Label>
+            <Select value={draft.runner} onValueChange={(v) => setDraft({ ...draft, runner: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {RUNNER_OPTIONS.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                ))}
+                <SelectItem value="custom">Custom edge function…</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {RUNNER_OPTIONS.find((r) => r.value === draft.runner)?.hint
+                ?? "Point at any deployed edge function by name."}
+            </p>
+          </div>
+          {draft.runner === "custom" && (
+            <div className="space-y-1.5">
+              <Label className="text-label">Edge function name</Label>
+              <Input
+                placeholder="my-custom-function"
+                value={draft.edge_function_custom}
+                onChange={(e) => setDraft({ ...draft, edge_function_custom: e.target.value })}
+                className="font-mono text-xs"
+              />
+            </div>
+          )}
+          {draft.runner === "vibey-prompt" && (
+            <div className="space-y-1.5">
+              <Label className="text-label">Prompt for Vibey</Label>
+              <Textarea
+                placeholder="Write a warm good-morning message for the community. Pull anything notable from yesterday."
+                value={draft.prompt}
+                onChange={(e) => setDraft({ ...draft, prompt: e.target.value })}
+                rows={5}
+                className="text-sm"
+              />
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+          <Button onClick={createHeartbeat} disabled={creating} className="gap-1.5">
+            {creating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Create heartbeat
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
-    <PageShell title="Scheduled Heartbeat" description="Recurring tasks Vibey runs on its own — daily check-ins, recaps, nudges.">
+    <PageShell
+      title="Scheduled Heartbeat"
+      description="Recurring tasks Vibey runs on its own — daily check-ins, recaps, nudges."
+      actions={composer}
+    >
       {loading ? (
         <div className="flex items-center justify-center py-12 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading…
         </div>
       ) : automations.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No automations yet.</p>
+        <div className="text-center py-12 space-y-3">
+          <p className="text-sm text-muted-foreground">No heartbeats yet.</p>
+          <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Create your first heartbeat
+          </Button>
+        </div>
       ) : (
         <div className="space-y-4">
           {automations.map((a) => {
             const recs = recipients[a.id] ?? [];
-            const draft = newRecip[a.id] ?? { chat_id: "", label: "" };
+            const recipDraft = newRecip[a.id] ?? { chat_id: "", label: "" };
             return (
               <Card key={a.id} className="p-5 space-y-4">
                 <div className="flex items-start justify-between gap-4">
@@ -211,14 +399,14 @@ export default function Automations() {
                   <div className="flex gap-2 pt-1">
                     <Input
                       placeholder="Telegram chat ID"
-                      value={draft.chat_id}
-                      onChange={(e) => setNewRecip((p) => ({ ...p, [a.id]: { ...draft, chat_id: e.target.value } }))}
+                      value={recipDraft.chat_id}
+                      onChange={(e) => setNewRecip((p) => ({ ...p, [a.id]: { ...recipDraft, chat_id: e.target.value } }))}
                       className="font-mono text-xs h-8"
                     />
                     <Input
                       placeholder="Label (optional)"
-                      value={draft.label}
-                      onChange={(e) => setNewRecip((p) => ({ ...p, [a.id]: { ...draft, label: e.target.value } }))}
+                      value={recipDraft.label}
+                      onChange={(e) => setNewRecip((p) => ({ ...p, [a.id]: { ...recipDraft, label: e.target.value } }))}
                       className="text-xs h-8"
                     />
                     <Button size="sm" variant="outline" onClick={() => addRecipient(a.id)} className="gap-1 shrink-0">
