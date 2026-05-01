@@ -17,7 +17,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   buildSystemPromptWithMemories,
+  buildUserContextBlock,
   loadRecentMemories,
+  loadUserPreferences,
   runAgentLoop,
 } from "../_shared/vibey-agent.ts";
 
