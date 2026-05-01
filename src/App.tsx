@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -10,7 +10,7 @@ import Login from "@/pages/Login";
 import Chat from "@/pages/Chat";
 import Dashboard from "@/pages/Dashboard";
 import Soul from "@/pages/Soul";
-import Identity from "@/pages/Identity";
+
 import Memory from "@/pages/Memory";
 import Media from "@/pages/Media";
 import Interfaces from "@/pages/Interfaces";
@@ -38,7 +38,7 @@ const App = () => (
             <Route index element={<Chat />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="soul" element={<Soul />} />
-            <Route path="identity" element={<Identity />} />
+            <Route path="identity" element={<Navigate to="/soul" replace />} />
             <Route path="memory" element={<Memory />} />
             <Route path="media" element={<Media />} />
             <Route path="interfaces" element={<Interfaces />} />
