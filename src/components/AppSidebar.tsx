@@ -1,7 +1,6 @@
 import {
   MessageCircle,
   Sparkles,
-  User,
   Brain,
   Image,
   Settings2,
@@ -10,7 +9,7 @@ import {
   UsersRound,
   ExternalLink,
   LayoutDashboard,
-  Zap,
+  Heart,
   Wrench,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -39,9 +38,9 @@ const dashboardItem = { title: "Vibey Control", url: "/dashboard", icon: LayoutD
 
 const agentItems = [
   { title: "Soul", url: "/soul", icon: Sparkles },
-  { title: "Identity", url: "/identity", icon: User },
   { title: "Memory", url: "/memory", icon: Brain },
   { title: "Tools", url: "/tools", icon: Wrench },
+  { title: "Scheduled Heartbeat", url: "/automations", icon: Heart },
   { title: "Media Library", url: "/media", icon: Image },
   { title: "Interfaces", url: "/interfaces", icon: Settings2 },
 ];
@@ -50,7 +49,6 @@ const socialItems = [
   { title: "Relationships", url: "/relationships", icon: Users },
   { title: "Conversations", url: "/conversations", icon: MessagesSquare },
   { title: "Group Chats", url: "/groups", icon: UsersRound },
-  { title: "Automations", url: "/automations", icon: Zap },
 ];
 
 export function AppSidebar() {
