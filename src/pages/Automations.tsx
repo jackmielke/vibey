@@ -38,6 +38,7 @@ function slugify(s: string) {
 
 type Automation = {
   id: string;
+  community_id: string;
   slug: string;
   name: string;
   description: string | null;
