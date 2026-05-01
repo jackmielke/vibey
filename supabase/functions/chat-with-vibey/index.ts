@@ -10,7 +10,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   buildSystemPromptWithMemories,
+  buildUserContextBlock,
   loadRecentMemories,
+  loadUserPreferences,
   runAgentLoopStreaming,
 } from "../_shared/vibey-agent.ts";
 
@@ -225,11 +227,22 @@ Deno.serve(async (req) => {
         })()
       : Promise.resolve([]);
 
-    // Augment system prompt with: image-handling note + recent community memories.
-    const memories = await loadRecentMemories(supabase);
+    // Augment system prompt with: image-handling note + recent community memories + per-user prefs.
+    const tgIdNum = context?.surface === "telegram" && context?.external_id
+      ? Number(context.external_id) || null
+      : null;
+    const tgHandle = context?.external_handle ?? null;
+    const [memories, userPrefs] = await Promise.all([
+      loadRecentMemories(supabase),
+      loadUserPreferences(supabase, { telegram_user_id: tgIdNum, telegram_username: tgHandle }),
+    ]);
     const baseSystemPrompt =
       `${agent.system_prompt}\n\nNote: when the user asks to see photos/images, the app will attach matching gallery images below your reply automatically. Just speak naturally about them — do NOT paste image URLs or markdown image syntax.`;
-    const systemPrompt = buildSystemPromptWithMemories(baseSystemPrompt, memories);
+    const userContext = buildUserContextBlock(userPrefs, {
+      display_name: null,
+      telegram_username: tgHandle,
+    });
+    const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories)}\n\n${userContext}`;
 
     // Split incoming messages into prior history + the current user turn so the
     // agent loop can run tool iterations before streaming the final reply.

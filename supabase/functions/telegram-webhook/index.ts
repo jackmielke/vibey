@@ -17,7 +17,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   buildSystemPromptWithMemories,
+  buildUserContextBlock,
   loadRecentMemories,
+  loadUserPreferences,
   runAgentLoop,
 } from "../_shared/vibey-agent.ts";
 
@@ -367,12 +369,17 @@ Deno.serve(async (req) => {
       return new Response("ok", { status: 200 });
     }
 
-    // Hydrate history for this group session + load community memories.
-    const [history, memories] = await Promise.all([
+    // Hydrate history for this group session + load community memories + per-user prefs.
+    const [history, memories, userPrefs] = await Promise.all([
       loadHistory(supabase, sessionKey),
       loadRecentMemories(supabase),
+      loadUserPreferences(supabase, { telegram_user_id: userId, telegram_username: msg.from?.username ?? null }),
     ]);
-    const systemPrompt = buildSystemPromptWithMemories(agent.system_prompt, memories);
+    const userContext = buildUserContextBlock(userPrefs, {
+      display_name: msg.from?.first_name ?? null,
+      telegram_username: msg.from?.username ?? null,
+    });
+    const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories)}\n\n${userContext}`;
 
     const reply = await runAgentLoop({
       supabase,
@@ -440,11 +447,16 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200 });
   }
 
-  const [history, memories] = await Promise.all([
+  const [history, memories, userPrefs] = await Promise.all([
     loadHistory(supabase, sessionKey),
     loadRecentMemories(supabase),
+    loadUserPreferences(supabase, { telegram_user_id: userId, telegram_username: msg.from?.username ?? null }),
   ]);
-  const systemPrompt = buildSystemPromptWithMemories(agent.system_prompt, memories);
+  const userContext = buildUserContextBlock(userPrefs, {
+    display_name: msg.from?.first_name ?? null,
+    telegram_username: msg.from?.username ?? null,
+  });
+  const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories)}\n\n${userContext}`;
 
   const reply = await runAgentLoop({
     supabase,
