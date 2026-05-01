@@ -162,6 +162,7 @@ export default function Automations() {
         toast.error(`${a.name} failed`, { description: JSON.stringify(result?.result).slice(0, 200) });
       }
       await load();
+      setHistoryTick((p) => ({ ...p, [a.id]: (p[a.id] ?? 0) + 1 }));
     } catch (e) {
       toast.error("Run failed", { description: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -345,10 +346,20 @@ export default function Automations() {
                       )}
                     </div>
                     {a.description && <p className="text-sm text-muted-foreground">{a.description}</p>}
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono flex-wrap">
                       {a.schedule_label && (
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{a.schedule_label}</span>
                       )}
+                      {(() => {
+                        const next = a.enabled && a.schedule_cron ? nextCronRun(a.schedule_cron) : null;
+                        return next ? (
+                          <span className="flex items-center gap-1" title={format(next, "PPpp")}>
+                            <CalendarClock className="h-3 w-3" />next {formatDistanceToNow(next, { addSuffix: true })}
+                          </span>
+                        ) : a.schedule_cron && !a.enabled ? (
+                          <span className="flex items-center gap-1 opacity-60"><CalendarClock className="h-3 w-3" />paused</span>
+                        ) : null;
+                      })()}
                       {a.last_run_at && (
                         <span>last run {formatDistanceToNow(new Date(a.last_run_at), { addSuffix: true })}</span>
                       )}
