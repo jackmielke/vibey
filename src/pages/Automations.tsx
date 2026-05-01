@@ -98,7 +98,7 @@ export default function Automations() {
     }
 
     // Need a community_id. Use the one from existing automations, else fetch first community the user can see.
-    let communityId = automations[0]?.["community_id" as keyof Automation] as string | undefined;
+    let communityId: string | undefined = automations[0]?.community_id;
     if (!communityId) {
       const { data: cm } = await supabase.from("communities").select("id").limit(1).maybeSingle();
       communityId = cm?.id;
