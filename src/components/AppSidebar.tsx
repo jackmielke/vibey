@@ -12,6 +12,7 @@ import {
   Heart,
   Wrench,
   IdCard,
+  Gauge,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useLocation } from "react-router-dom";
@@ -35,7 +36,8 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const chatItem = { title: "Talk to Vibey", url: "/", icon: MessageCircle };
-const dashboardItem = { title: "Vibey Control", url: "/dashboard", icon: LayoutDashboard };
+const dashboardItem = { title: "Mission Control", url: "/dashboard", icon: Gauge };
+const sectionsItem = { title: "Sections", url: "/sections", icon: LayoutDashboard };
 
 const navItems = [
   { title: "Soul", url: "/soul", icon: Sparkles },
