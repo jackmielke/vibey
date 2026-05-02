@@ -9,6 +9,7 @@ import RequireAdmin from "@/components/RequireAdmin";
 import Login from "@/pages/Login";
 import Chat from "@/pages/Chat";
 import Dashboard from "@/pages/Dashboard";
+import MissionControl from "@/pages/MissionControl";
 import Soul from "@/pages/Soul";
 import Identity from "@/pages/Identity";
 
@@ -37,7 +38,8 @@ const App = () => (
           <Route path="/mini" element={<TelegramMini />} />
           <Route element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
             <Route index element={<Chat />} />
-            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="dashboard" element={<MissionControl />} />
+            <Route path="sections" element={<Dashboard />} />
             <Route path="soul" element={<Soul />} />
             <Route path="identity" element={<Identity />} />
             <Route path="memory" element={<Memory />} />
