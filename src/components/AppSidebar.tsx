@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Heart,
   Wrench,
+  IdCard,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useLocation } from "react-router-dom";
@@ -38,6 +39,7 @@ const dashboardItem = { title: "Vibey Control", url: "/dashboard", icon: LayoutD
 
 const navItems = [
   { title: "Soul", url: "/soul", icon: Sparkles },
+  { title: "Identity", url: "/identity", icon: IdCard },
   { title: "Memory", url: "/memory", icon: Brain },
   { title: "Tools", url: "/tools", icon: Wrench },
   { title: "Preferences", url: "/relationships", icon: Users },
