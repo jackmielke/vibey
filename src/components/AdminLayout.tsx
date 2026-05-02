@@ -19,7 +19,7 @@ export default function AdminLayout() {
   const isStandalone = useIsStandalone();
 
   // Routes that render inside the Vibey Control panel (vs. their own full page).
-  const controlRoutes = ["/dashboard", "/soul", "/identity", "/memory", "/media", "/interfaces", "/relationships", "/conversations", "/groups", "/automations"];
+  const controlRoutes = ["/dashboard", "/sections", "/soul", "/identity", "/memory", "/media", "/interfaces", "/relationships", "/conversations", "/groups", "/automations"];
   const isControlRoute = controlRoutes.some((r) => location.pathname.startsWith(r));
   const isChatRoute = location.pathname === "/";
 
