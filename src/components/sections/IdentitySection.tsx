@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
 import { Loader2 } from "lucide-react";
+import { ModelSection } from "@/components/sections/ModelSection";
 
 export function IdentitySection() {
   const { agent, loading, saving, save } = useVibeyAgent();
@@ -62,6 +63,7 @@ export function IdentitySection() {
           className="bg-card border-border"
         />
       </div>
+      <ModelSection />
       <p className="text-xs text-muted-foreground">
         {saving ? "Saving…" : "Saves automatically when you click away."}
       </p>
