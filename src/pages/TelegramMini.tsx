@@ -69,6 +69,7 @@ export default function TelegramMini() {
     tg.ready();
     tg.expand();
     setTgName(tg.initDataUnsafe?.user?.first_name ?? null);
+    setTgUserId(tg.initDataUnsafe?.user?.id ?? null);
 
     const initData = tg.initData;
     if (!initData) {
