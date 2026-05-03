@@ -1,1 +1,4 @@
 project_id = "efdqqnubowgwsnwvlalp"
+
+[functions.lovable-chat]
+verify_jwt = false
