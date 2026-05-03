@@ -48,6 +48,58 @@ function memorySource(metadata: Record<string, unknown> | null): string | null {
   return null;
 }
 
+function MemoryCard({ m, highlight }: { m: MemoryRow; highlight?: boolean }) {
+  const source = memorySource(m.metadata);
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className={
+        "p-3 rounded-lg bg-card border " +
+        (highlight ? "border-primary/40" : "border-border")
+      }
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm whitespace-pre-wrap flex-1">{m.content}</p>
+        <a
+          href={buildTelegramShareUrl(formatMemoryForTelegram(m))}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-muted-foreground hover:text-primary p-1 -m-1 shrink-0"
+          aria-label="Share to Telegram"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+        </a>
+      </div>
+      <div className="flex items-center gap-3 mt-2 flex-wrap">
+        <span className="text-[10px] text-muted-foreground font-mono">
+          {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
+        </span>
+        {source && (
+          <span className="text-[10px] text-muted-foreground font-mono">
+            via {source}
+          </span>
+        )}
+        {m.tags && m.tags.length > 0 && (
+          <div className="flex items-center gap-1 flex-wrap">
+            <Tag className="w-3 h-3 text-muted-foreground" />
+            {m.tags.map((t) => (
+              <span
+                key={t}
+                className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 export default function TelegramMini() {
   const { agent } = useVibeyAgent();
   const [authState, setAuthState] = useState<AuthState>("loading");
