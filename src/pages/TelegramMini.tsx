@@ -22,7 +22,7 @@ declare global {
     Telegram?: {
       WebApp?: {
         initData: string;
-        initDataUnsafe?: { user?: { first_name?: string } };
+        initDataUnsafe?: { user?: { id?: number; first_name?: string } };
         ready: () => void;
         expand: () => void;
         colorScheme?: "light" | "dark";
