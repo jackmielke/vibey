@@ -203,7 +203,7 @@ export default function TelegramMini() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold leading-tight truncate">
-            {agent?.name ?? "Vibey"}'s memory
+            {agent?.name ?? "Vibey"}'s Brain
           </p>
           <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             {memLoading
@@ -215,7 +215,7 @@ export default function TelegramMini() {
       </div>
 
       {/* Stream */}
-      <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
+      <div className="flex-1 overflow-auto px-4 py-3 space-y-4">
         {memLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -230,61 +230,48 @@ export default function TelegramMini() {
               vibey will save things here as conversations happen.
             </p>
           </div>
-        ) : (
-          <AnimatePresence initial={false}>
-            {memories.map((m) => {
-              const source = memorySource(m.metadata);
-              return (
-                <motion.div
-                  key={m.id}
-                  layout
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="p-3 rounded-lg bg-card border border-border"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm whitespace-pre-wrap flex-1">{m.content}</p>
-                    <a
-                      href={buildTelegramShareUrl(formatMemoryForTelegram(m))}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-primary p-1 -m-1 shrink-0"
-                      aria-label="Share to Telegram"
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                    </a>
-                  </div>
-                  <div className="flex items-center gap-3 mt-2 flex-wrap">
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      {formatDistanceToNow(new Date(m.created_at), {
-                        addSuffix: true,
-                      })}
-                    </span>
-                    {source && (
-                      <span className="text-[10px] text-muted-foreground font-mono">
-                        via {source}
-                      </span>
-                    )}
-                    {m.tags && m.tags.length > 0 && (
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <Tag className="w-3 h-3 text-muted-foreground" />
-                        {m.tags.map((t) => (
-                          <span
-                            key={t}
-                            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary"
-                          >
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        )}
+        ) : (() => {
+          const mine = tgUserId
+            ? memories.filter(
+                (m) =>
+                  Number((m.metadata as Record<string, unknown> | null)?.telegram_user_id) ===
+                  tgUserId,
+              )
+            : [];
+          const others = memories.filter((m) => !mine.includes(m));
+          return (
+            <>
+              <section className="space-y-2">
+                <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary">
+                  your preferences{mine.length ? ` · ${mine.length}` : ""}
+                </h2>
+                {mine.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-1">
+                    nothing saved about you yet. dm vibey something like
+                    "remember i'm vegetarian."
+                  </p>
+                ) : (
+                  <AnimatePresence initial={false}>
+                    {mine.map((m) => (
+                      <MemoryCard key={m.id} m={m} highlight />
+                    ))}
+                  </AnimatePresence>
+                )}
+              </section>
+
+              <section className="space-y-2">
+                <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  community memory{others.length ? ` · ${others.length}` : ""}
+                </h2>
+                <AnimatePresence initial={false}>
+                  {others.map((m) => (
+                    <MemoryCard key={m.id} m={m} />
+                  ))}
+                </AnimatePresence>
+              </section>
+            </>
+          );
+        })()}
       </div>
     </div>
   );
