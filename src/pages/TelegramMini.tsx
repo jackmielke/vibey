@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Brain, Tag, Share2, Heart } from "lucide-react";
+import { Loader2, Brain, Tag, Share2, Heart, Sparkles } from "lucide-react";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
