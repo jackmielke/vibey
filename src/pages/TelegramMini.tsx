@@ -229,6 +229,36 @@ export default function TelegramMini() {
     };
   }, [authState]);
 
+  // 3. Load preferences (vibey_relationships) for current Telegram user
+  useEffect(() => {
+    if (authState !== "ready" || !tgUserId) {
+      setPrefsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("vibey_relationships")
+        .select("id, community_id, relationship_notes, display_name, updated_at")
+        .eq("telegram_user_id", tgUserId)
+        .not("relationship_notes", "is", null);
+      if (cancelled) return;
+      if (error) {
+        console.error("load prefs failed", error.message);
+      } else {
+        setPrefs(
+          ((data ?? []) as PreferenceRow[]).filter((p) =>
+            (p.relationship_notes ?? "").trim().length > 0,
+          ),
+        );
+      }
+      setPrefsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authState, tgUserId]);
+
   // ===== Render =====
   if (authState === "loading") {
     return (
