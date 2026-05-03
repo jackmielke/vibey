@@ -131,14 +131,58 @@ Deno.serve(async (req) => {
     }
     void existing;
 
-    // Backfill telegram_user_id on the public.users row, if present
+    // Link the public.users row that already exists for this Telegram user
+    // (telegram bot creates rows w/ telegram_user_id but auth_user_id = NULL).
+    // Without this, RLS on memories/community_members will hide everything.
+    const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
+    let publicUserId: string | null = null;
     if (userId) {
-      await admin
+      // Try to find existing public.users row by telegram_user_id
+      const { data: existingUser } = await admin
         .from("users")
-        .update({
-          telegram_user_id: tgUser.id,
-        })
-        .eq("auth_user_id", userId);
+        .select("id, auth_user_id")
+        .eq("telegram_user_id", tgUser.id)
+        .maybeSingle();
+
+      if (existingUser) {
+        publicUserId = existingUser.id;
+        if (existingUser.auth_user_id !== userId) {
+          await admin
+            .from("users")
+            .update({ auth_user_id: userId })
+            .eq("id", existingUser.id);
+        }
+      } else {
+        // Create a public.users row for this Telegram user
+        const { data: newUser } = await admin
+          .from("users")
+          .insert({
+            auth_user_id: userId,
+            telegram_user_id: tgUser.id,
+            name: displayName,
+            avatar_url: tgUser.photo_url ?? null,
+          })
+          .select("id")
+          .single();
+        publicUserId = newUser?.id ?? null;
+      }
+
+      // Ensure community membership so RLS lets them read memories
+      if (publicUserId) {
+        const { data: existingMember } = await admin
+          .from("community_members")
+          .select("id")
+          .eq("community_id", VIBEY_COMMUNITY_ID)
+          .eq("user_id", publicUserId)
+          .maybeSingle();
+        if (!existingMember) {
+          await admin.from("community_members").insert({
+            community_id: VIBEY_COMMUNITY_ID,
+            user_id: publicUserId,
+            role: "member",
+          });
+        }
+      }
     }
 
     // Generate a magiclink and return token_hash for client to verifyOtp
