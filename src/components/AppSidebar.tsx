@@ -37,7 +37,6 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const chatItem = { title: "Talk to Vibey", url: "/", icon: MessageCircle };
-const lovableChatItem = { title: "Lovable AI Chat", url: "/lovable-chat", icon: Bot };
 const dashboardItem = { title: "Mission Control", url: "/dashboard", icon: Gauge };
 const sectionsItem = { title: "Sections", url: "/sections", icon: LayoutDashboard };
 
@@ -99,14 +98,6 @@ export function AppSidebar() {
                   <NavLink to="/" end onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
                     <chatItem.icon className="h-4 w-4" />
                     {!collapsed && <span>{chatItem.title}</span>}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={isActive("/lovable-chat")}>
-                  <NavLink to="/lovable-chat" onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
-                    <lovableChatItem.icon className="h-4 w-4" />
-                    {!collapsed && <span>{lovableChatItem.title}</span>}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
