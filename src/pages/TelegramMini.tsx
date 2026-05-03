@@ -17,6 +17,14 @@ type MemoryRow = {
   metadata: Record<string, unknown> | null;
 };
 
+type PreferenceRow = {
+  id: string;
+  community_id: string;
+  relationship_notes: string | null;
+  display_name: string | null;
+  updated_at: string | null;
+};
+
 declare global {
   interface Window {
     Telegram?: {
