@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Brain, Loader2, Tag, Plus, Trash2, Pencil, Check, X } from "lucide-react";
+import { Brain, Loader2, Tag, Plus, Trash2, Pencil, Check, X, Share2 } from "lucide-react";
+import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
