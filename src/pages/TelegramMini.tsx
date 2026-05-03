@@ -53,6 +53,7 @@ export default function TelegramMini() {
   const [authState, setAuthState] = useState<AuthState>("loading");
   const [authError, setAuthError] = useState<string | null>(null);
   const [tgName, setTgName] = useState<string | null>(null);
+  const [tgUserId, setTgUserId] = useState<number | null>(null);
 
   const [memories, setMemories] = useState<MemoryRow[]>([]);
   const [memLoading, setMemLoading] = useState(true);
