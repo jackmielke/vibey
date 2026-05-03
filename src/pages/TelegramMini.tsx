@@ -307,7 +307,45 @@ export default function TelegramMini() {
       </div>
 
       {/* Stream */}
-      <div className="flex-1 overflow-auto px-4 py-3 space-y-4">
+      <div className="flex-1 overflow-auto px-4 py-3 space-y-5">
+        {/* Preferences (from vibey_relationships) — what Vibey personally knows about you */}
+        <section className="space-y-2">
+          <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
+            <Heart className="w-3 h-3" />
+            your preferences{prefs.length ? ` · ${prefs.length}` : ""}
+          </h2>
+          {prefsLoading ? (
+            <div className="flex items-center py-4">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : prefs.length === 0 ? (
+            <p className="text-xs text-muted-foreground px-1">
+              vibey hasn't noted any preferences for you yet. dm vibey something
+              like "remember i prefer lowercase" or "call me sir."
+            </p>
+          ) : (
+            prefs.map((p) => (
+              <div
+                key={p.id}
+                className="p-3 rounded-lg bg-card border border-primary/40"
+              >
+                <p className="text-sm whitespace-pre-wrap">
+                  {p.relationship_notes}
+                </p>
+                {p.updated_at && (
+                  <p className="text-[10px] text-muted-foreground font-mono mt-2">
+                    updated{" "}
+                    {formatDistanceToNow(new Date(p.updated_at), {
+                      addSuffix: true,
+                    })}
+                  </p>
+                )}
+              </div>
+            ))
+          )}
+        </section>
+
+        {/* Memories */}
         {memLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -333,23 +371,19 @@ export default function TelegramMini() {
           const others = memories.filter((m) => !mine.includes(m));
           return (
             <>
-              <section className="space-y-2">
-                <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary">
-                  your preferences{mine.length ? ` · ${mine.length}` : ""}
-                </h2>
-                {mine.length === 0 ? (
-                  <p className="text-xs text-muted-foreground px-1">
-                    nothing saved about you yet. dm vibey something like
-                    "remember i'm vegetarian."
-                  </p>
-                ) : (
+              {mine.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
+                    <Brain className="w-3 h-3" />
+                    memories about you · {mine.length}
+                  </h2>
                   <AnimatePresence initial={false}>
                     {mine.map((m) => (
                       <MemoryCard key={m.id} m={m} highlight />
                     ))}
                   </AnimatePresence>
-                )}
-              </section>
+                </section>
+              )}
 
               <section className="space-y-2">
                 <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
