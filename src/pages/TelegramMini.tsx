@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Brain, Tag, Share2, Heart, Sparkles } from "lucide-react";
+import { Loader2, Brain, Tag, Share2, Heart, Sparkles, Filter } from "lucide-react";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -123,6 +123,7 @@ export default function TelegramMini() {
   const [memLoading, setMemLoading] = useState(true);
   const [prefs, setPrefs] = useState<PreferenceRow[]>([]);
   const [prefsLoading, setPrefsLoading] = useState(true);
+  const [memFilter, setMemFilter] = useState<"all" | "mine" | "others">("all");
 
   // 1. Initialize Telegram WebApp + auth
   useEffect(() => {
@@ -366,41 +367,59 @@ export default function TelegramMini() {
             </p>
           </div>
         ) : (() => {
-          const mine = tgUserId
-            ? memories.filter(
-                (m) =>
-                  Number((m.metadata as Record<string, unknown> | null)?.telegram_user_id) ===
-                  tgUserId,
-              )
-            : [];
-          const others = memories.filter((m) => !mine.includes(m));
-          return (
-            <>
-              {mine.length > 0 && (
-                <section className="space-y-2">
-                  <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
-                    <Brain className="w-3 h-3" />
-                    memories about you · {mine.length}
-                  </h2>
-                  <AnimatePresence initial={false}>
-                    {mine.map((m) => (
-                      <MemoryCard key={m.id} m={m} highlight />
-                    ))}
-                  </AnimatePresence>
-                </section>
-              )}
+          const isMine = (m: MemoryRow) =>
+            tgUserId != null &&
+            Number((m.metadata as Record<string, unknown> | null)?.telegram_user_id) === tgUserId;
+          const mineCount = memories.filter(isMine).length;
+          const othersCount = memories.length - mineCount;
+          const filtered =
+            memFilter === "mine"
+              ? memories.filter(isMine)
+              : memFilter === "others"
+              ? memories.filter((m) => !isMine(m))
+              : memories;
 
-              <section className="space-y-2">
-                <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  community memory{others.length ? ` · ${others.length}` : ""}
+          const chip = (key: typeof memFilter, label: string, count: number) => (
+            <button
+              key={key}
+              onClick={() => setMemFilter(key)}
+              className={
+                "px-2 py-1 rounded font-mono text-[10px] uppercase tracking-widest transition-colors " +
+                (memFilter === key
+                  ? "bg-primary/15 text-primary border border-primary/40"
+                  : "bg-muted text-muted-foreground border border-transparent hover:text-foreground")
+              }
+            >
+              {label} · {count}
+            </button>
+          );
+
+          return (
+            <section className="space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <Brain className="w-3 h-3" />
+                  community memory · {memories.length}
                 </h2>
+                <div className="flex items-center gap-1">
+                  <Filter className="w-3 h-3 text-muted-foreground" />
+                  {chip("all", "all", memories.length)}
+                  {tgUserId != null && chip("mine", "mine", mineCount)}
+                  {chip("others", "others", othersCount)}
+                </div>
+              </div>
+              {filtered.length === 0 ? (
+                <p className="text-xs text-muted-foreground px-1 py-2">
+                  nothing here yet for this filter.
+                </p>
+              ) : (
                 <AnimatePresence initial={false}>
-                  {others.map((m) => (
-                    <MemoryCard key={m.id} m={m} />
+                  {filtered.map((m) => (
+                    <MemoryCard key={m.id} m={m} highlight={isMine(m)} />
                   ))}
                 </AnimatePresence>
-              </section>
-            </>
+              )}
+            </section>
           );
         })()}
 
