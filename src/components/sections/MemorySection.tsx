@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Brain, Loader2, Tag, Plus, Trash2, Pencil, Check, X } from "lucide-react";
+import { Brain, Loader2, Tag, Plus, Trash2, Pencil, Check, X, Share2 } from "lucide-react";
+import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -253,6 +254,16 @@ export function MemorySection() {
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm whitespace-pre-wrap flex-1">{m.content}</p>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a
+                          href={buildTelegramShareUrl(formatMemoryForTelegram(m))}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-primary p-1"
+                          aria-label="Share to Telegram"
+                          title="Share to Telegram"
+                        >
+                          <Share2 className="w-3.5 h-3.5" />
+                        </a>
                         <button
                           onClick={() => startEdit(m)}
                           className="text-muted-foreground hover:text-primary p-1"

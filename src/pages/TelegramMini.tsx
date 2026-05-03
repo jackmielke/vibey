@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Brain, Tag } from "lucide-react";
+import { Loader2, Brain, Tag, Share2 } from "lucide-react";
+import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
@@ -240,7 +241,18 @@ export default function TelegramMini() {
                   exit={{ opacity: 0 }}
                   className="p-3 rounded-lg bg-card border border-border"
                 >
-                  <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm whitespace-pre-wrap flex-1">{m.content}</p>
+                    <a
+                      href={buildTelegramShareUrl(formatMemoryForTelegram(m))}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-primary p-1 -m-1 shrink-0"
+                      aria-label="Share to Telegram"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
                   <div className="flex items-center gap-3 mt-2 flex-wrap">
                     <span className="text-[10px] text-muted-foreground font-mono">
                       {formatDistanceToNow(new Date(m.created_at), {
