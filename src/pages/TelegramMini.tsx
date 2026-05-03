@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Brain, Tag, Share2 } from "lucide-react";
+import { Loader2, Brain, Tag, Share2, Heart } from "lucide-react";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,14 @@ type MemoryRow = {
   tags: string[] | null;
   created_at: string;
   metadata: Record<string, unknown> | null;
+};
+
+type PreferenceRow = {
+  id: string;
+  community_id: string;
+  relationship_notes: string | null;
+  display_name: string | null;
+  updated_at: string | null;
 };
 
 declare global {
@@ -109,6 +117,8 @@ export default function TelegramMini() {
 
   const [memories, setMemories] = useState<MemoryRow[]>([]);
   const [memLoading, setMemLoading] = useState(true);
+  const [prefs, setPrefs] = useState<PreferenceRow[]>([]);
+  const [prefsLoading, setPrefsLoading] = useState(true);
 
   // 1. Initialize Telegram WebApp + auth
   useEffect(() => {
@@ -219,6 +229,36 @@ export default function TelegramMini() {
     };
   }, [authState]);
 
+  // 3. Load preferences (vibey_relationships) for current Telegram user
+  useEffect(() => {
+    if (authState !== "ready" || !tgUserId) {
+      setPrefsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("vibey_relationships")
+        .select("id, community_id, relationship_notes, display_name, updated_at")
+        .eq("telegram_user_id", tgUserId)
+        .not("relationship_notes", "is", null);
+      if (cancelled) return;
+      if (error) {
+        console.error("load prefs failed", error.message);
+      } else {
+        setPrefs(
+          ((data ?? []) as PreferenceRow[]).filter((p) =>
+            (p.relationship_notes ?? "").trim().length > 0,
+          ),
+        );
+      }
+      setPrefsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authState, tgUserId]);
+
   // ===== Render =====
   if (authState === "loading") {
     return (
@@ -267,7 +307,45 @@ export default function TelegramMini() {
       </div>
 
       {/* Stream */}
-      <div className="flex-1 overflow-auto px-4 py-3 space-y-4">
+      <div className="flex-1 overflow-auto px-4 py-3 space-y-5">
+        {/* Preferences (from vibey_relationships) — what Vibey personally knows about you */}
+        <section className="space-y-2">
+          <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
+            <Heart className="w-3 h-3" />
+            your preferences{prefs.length ? ` · ${prefs.length}` : ""}
+          </h2>
+          {prefsLoading ? (
+            <div className="flex items-center py-4">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : prefs.length === 0 ? (
+            <p className="text-xs text-muted-foreground px-1">
+              vibey hasn't noted any preferences for you yet. dm vibey something
+              like "remember i prefer lowercase" or "call me sir."
+            </p>
+          ) : (
+            prefs.map((p) => (
+              <div
+                key={p.id}
+                className="p-3 rounded-lg bg-card border border-primary/40"
+              >
+                <p className="text-sm whitespace-pre-wrap">
+                  {p.relationship_notes}
+                </p>
+                {p.updated_at && (
+                  <p className="text-[10px] text-muted-foreground font-mono mt-2">
+                    updated{" "}
+                    {formatDistanceToNow(new Date(p.updated_at), {
+                      addSuffix: true,
+                    })}
+                  </p>
+                )}
+              </div>
+            ))
+          )}
+        </section>
+
+        {/* Memories */}
         {memLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -293,23 +371,19 @@ export default function TelegramMini() {
           const others = memories.filter((m) => !mine.includes(m));
           return (
             <>
-              <section className="space-y-2">
-                <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary">
-                  your preferences{mine.length ? ` · ${mine.length}` : ""}
-                </h2>
-                {mine.length === 0 ? (
-                  <p className="text-xs text-muted-foreground px-1">
-                    nothing saved about you yet. dm vibey something like
-                    "remember i'm vegetarian."
-                  </p>
-                ) : (
+              {mine.length > 0 && (
+                <section className="space-y-2">
+                  <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
+                    <Brain className="w-3 h-3" />
+                    memories about you · {mine.length}
+                  </h2>
                   <AnimatePresence initial={false}>
                     {mine.map((m) => (
                       <MemoryCard key={m.id} m={m} highlight />
                     ))}
                   </AnimatePresence>
-                )}
-              </section>
+                </section>
+              )}
 
               <section className="space-y-2">
                 <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
