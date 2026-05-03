@@ -5,9 +5,13 @@ import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemor
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
+import { VIBE_CODE_RESIDENCY_COMMUNITY_ID, VIBEY_COMMUNITY_ID } from "@/lib/vibey";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 
-const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
+const PREFERENCE_COMMUNITY_IDS = [
+  VIBE_CODE_RESIDENCY_COMMUNITY_ID,
+  VIBEY_COMMUNITY_ID,
+];
 
 type MemoryRow = {
   id: string;
@@ -240,6 +244,7 @@ export default function TelegramMini() {
       const { data, error } = await supabase
         .from("vibey_relationships")
         .select("id, community_id, relationship_notes, display_name, updated_at")
+        .in("community_id", PREFERENCE_COMMUNITY_IDS)
         .eq("telegram_user_id", tgUserId)
         .not("relationship_notes", "is", null);
       if (cancelled) return;
