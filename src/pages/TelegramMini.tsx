@@ -403,6 +403,24 @@ export default function TelegramMini() {
             </>
           );
         })()}
+
+        {/* Soul — public, read-only peek at Vibey's system prompt */}
+        {agent?.system_prompt && (
+          <section className="space-y-2 pt-2">
+            <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3" />
+              vibey's soul · system prompt
+            </h2>
+            <div className="p-3 rounded-lg bg-card border border-border">
+              <pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed text-foreground/90">
+                {agent.system_prompt}
+              </pre>
+              <p className="text-[10px] text-muted-foreground font-mono mt-3">
+                read-only · this is the bones of who vibey is
+              </p>
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
