@@ -8,6 +8,7 @@ import AdminLayout from "@/components/AdminLayout";
 import RequireAdmin from "@/components/RequireAdmin";
 import Login from "@/pages/Login";
 import Chat from "@/pages/Chat";
+import LovableChat from "@/pages/LovableChat";
 import Dashboard from "@/pages/Dashboard";
 import MissionControl from "@/pages/MissionControl";
 import Soul from "@/pages/Soul";
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/mini" element={<TelegramMini />} />
           <Route element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
             <Route index element={<Chat />} />
+            <Route path="lovable-chat" element={<LovableChat />} />
             <Route path="dashboard" element={<MissionControl />} />
             <Route path="sections" element={<Dashboard />} />
             <Route path="soul" element={<Soul />} />
