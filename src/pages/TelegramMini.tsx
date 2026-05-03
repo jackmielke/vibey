@@ -117,6 +117,8 @@ export default function TelegramMini() {
 
   const [memories, setMemories] = useState<MemoryRow[]>([]);
   const [memLoading, setMemLoading] = useState(true);
+  const [prefs, setPrefs] = useState<PreferenceRow[]>([]);
+  const [prefsLoading, setPrefsLoading] = useState(true);
 
   // 1. Initialize Telegram WebApp + auth
   useEffect(() => {
