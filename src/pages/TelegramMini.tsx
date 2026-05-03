@@ -123,6 +123,7 @@ export default function TelegramMini() {
   const [memLoading, setMemLoading] = useState(true);
   const [prefs, setPrefs] = useState<PreferenceRow[]>([]);
   const [prefsLoading, setPrefsLoading] = useState(true);
+  const [memFilter, setMemFilter] = useState<"all" | "mine" | "others">("all");
 
   // 1. Initialize Telegram WebApp + auth
   useEffect(() => {
