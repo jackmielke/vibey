@@ -123,4 +123,7 @@
   .min-h-safe-screen {
     min-height: 100svh;
   }
+  .h-safe-screen {
+    height: 100svh;
+  }
 }
