@@ -329,7 +329,8 @@ async function fetchUrl(args: { url: string }): Promise<string> {
 async function executeToolCall(
   supabase: SupabaseClient,
   call: NonNullable<ChatMessage["tool_calls"]>[number],
-  metadata: Record<string, unknown>
+  metadata: Record<string, unknown>,
+  callerVibeUserId: string | null = null
 ): Promise<string> {
   let parsed: Record<string, unknown> = {};
   try {
@@ -343,7 +344,16 @@ async function executeToolCall(
       const result = await saveMemory(
         supabase,
         parsed as { content: string; tags?: string[] },
-        metadata
+        metadata,
+        callerVibeUserId
+      );
+      return JSON.stringify(result);
+    }
+    case "update_memory": {
+      const result = await updateMemory(
+        supabase,
+        parsed as { id: string; content: string; tags?: string[] },
+        callerVibeUserId
       );
       return JSON.stringify(result);
     }
