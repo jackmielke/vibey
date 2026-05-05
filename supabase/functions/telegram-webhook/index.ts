@@ -410,6 +410,7 @@ Deno.serve(async (req) => {
         telegram_user_id: userId,
         telegram_username: username,
       },
+      callerVibeUserId: vibeUserId,
       referer: "https://t.me/vibey_ai_bot",
       title: "Vibey (Telegram)",
     });
