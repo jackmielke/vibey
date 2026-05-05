@@ -866,13 +866,15 @@ export async function runAgentLoopStreaming(opts: {
               args: parsedArgs,
             });
 
-            const result = await executeToolCall(supabase, call, toolMetadata);
+            const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId);
 
+            const done = describeToolDone(call.function.name, parsedArgs, result);
             emitTool({
               id: call.id,
               name: call.function.name,
               status: "done",
-              label: describeToolDone(call.function.name, parsedArgs, result),
+              label: done.label,
+              details: done.details,
             });
 
             messages.push({
