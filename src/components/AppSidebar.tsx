@@ -35,6 +35,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { SidebarUserProfile } from "@/components/SidebarUserProfile";
 
 const chatItem = { title: "Talk to Vibey", url: "/", icon: MessageCircle };
 const dashboardItem = { title: "Mission Control", url: "/dashboard", icon: Gauge };
