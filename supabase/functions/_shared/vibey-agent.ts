@@ -684,31 +684,48 @@ function describeToolStart(name: string, args: Record<string, unknown>): string 
     }
     case "save_memory":
       return "🧠 jotting this one down…";
+    case "update_memory":
+      return "✏️ rewriting that memory…";
     default:
       return `⚙️ running ${name}…`;
   }
 }
 
-function describeToolDone(name: string, args: Record<string, unknown>, resultJson: string): string {
+function describeToolDone(
+  name: string,
+  args: Record<string, unknown>,
+  resultJson: string
+): { label: string; details?: string } {
   let result: any = null;
   try { result = JSON.parse(resultJson); } catch { /* ignore */ }
   switch (name) {
     case "web_search": {
       const n = Array.isArray(result?.results) ? result.results.length : 0;
-      if (result?.ok === false) return `🤷 search hit a snag`;
-      return n > 0 ? `📡 found ${n} result${n === 1 ? "" : "s"}` : `🪨 nothing solid found`;
+      if (result?.ok === false) return { label: `🤷 search hit a snag` };
+      return { label: n > 0 ? `📡 found ${n} result${n === 1 ? "" : "s"}` : `🪨 nothing solid found` };
     }
     case "fetch_url": {
-      if (result?.ok === false) return `📭 couldn't read that page`;
+      if (result?.ok === false) return { label: `📭 couldn't read that page` };
       const url = String(args?.url ?? "");
       let host = url;
       try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* ignore */ }
-      return `📖 read ${host}`;
+      return { label: `📖 read ${host}` };
     }
     case "save_memory":
-      return result?.ok ? `✨ memory saved` : `🤔 couldn't save that one`;
+      return { label: result?.ok ? `✨ memory saved` : `🤔 couldn't save that one` };
+    case "update_memory": {
+      if (result?.ok === false) {
+        return { label: `🚫 couldn't update`, details: result?.error ?? undefined };
+      }
+      const before = result?.before?.content ?? "";
+      const after = result?.after?.content ?? "";
+      return {
+        label: `📝 memory updated`,
+        details: `before: ${before}\nafter:  ${after}`,
+      };
+    }
     default:
-      return `✅ ${name} done`;
+      return { label: `✅ ${name} done` };
   }
 }
 
