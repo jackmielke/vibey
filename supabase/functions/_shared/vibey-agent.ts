@@ -131,7 +131,7 @@ export async function loadRecentMemories(
 ): Promise<Memory[]> {
   const { data, error } = await supabase
     .from("memories")
-    .select("id, content, tags, created_at, metadata")
+    .select("id, content, tags, created_at, created_by, metadata")
     .eq("community_id", VIBEY_COMMUNITY_ID)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -146,7 +146,8 @@ export async function loadRecentMemories(
 async function saveMemory(
   supabase: SupabaseClient,
   args: { content: string; tags?: string[] },
-  metadata: Record<string, unknown> = {}
+  metadata: Record<string, unknown> = {},
+  callerVibeUserId: string | null = null
 ): Promise<{ ok: boolean; id?: string; error?: string }> {
   const content = (args?.content ?? "").trim();
   if (!content) return { ok: false, error: "content is required" };
@@ -161,7 +162,7 @@ async function saveMemory(
       content,
       tags,
       metadata,
-      // created_by stays null — Telegram callers aren't auth.users.
+      created_by: callerVibeUserId,
     })
     .select("id")
     .single();
@@ -171,6 +172,67 @@ async function saveMemory(
     return { ok: false, error: error.message };
   }
   return { ok: true, id: data.id };
+}
+
+async function updateMemory(
+  supabase: SupabaseClient,
+  args: { id: string; content: string; tags?: string[] },
+  callerVibeUserId: string | null
+): Promise<{
+  ok: boolean;
+  id?: string;
+  error?: string;
+  before?: { content: string | null; tags: string[] | null };
+  after?: { content: string; tags: string[] | null };
+}> {
+  const id = (args?.id ?? "").trim();
+  const content = (args?.content ?? "").trim();
+  if (!id) return { ok: false, error: "id is required" };
+  if (!content) return { ok: false, error: "content is required" };
+  if (!callerVibeUserId) {
+    return { ok: false, error: "anonymous callers can't update memories — sign in first" };
+  }
+
+  // Fetch current row to confirm ownership and capture the "before" snapshot.
+  const { data: existing, error: fetchErr } = await supabase
+    .from("memories")
+    .select("id, content, tags, created_by, community_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+  if (!existing) return { ok: false, error: "memory not found" };
+  if (existing.created_by !== callerVibeUserId) {
+    return {
+      ok: false,
+      error: "you can only update memories you originally created",
+    };
+  }
+
+  const tagsProvided = Array.isArray(args?.tags);
+  const tags = tagsProvided
+    ? (args!.tags as string[]).filter((t) => typeof t === "string").slice(0, 6)
+    : (existing.tags as string[] | null);
+
+  const updatePatch: Record<string, unknown> = { content };
+  if (tagsProvided) updatePatch.tags = tags;
+
+  const { error: updErr } = await supabase
+    .from("memories")
+    .update(updatePatch)
+    .eq("id", id);
+
+  if (updErr) {
+    console.error("update_memory failed:", updErr.message);
+    return { ok: false, error: updErr.message };
+  }
+
+  return {
+    ok: true,
+    id,
+    before: { content: existing.content, tags: existing.tags },
+    after: { content, tags },
+  };
 }
 
 // ── Web tools ────────────────────────────────────────────────────────────────
