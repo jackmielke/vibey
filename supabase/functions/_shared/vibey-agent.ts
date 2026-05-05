@@ -370,7 +370,8 @@ async function executeToolCall(
 
 export function buildSystemPromptWithMemories(
   basePrompt: string,
-  memories: Memory[]
+  memories: Memory[],
+  callerVibeUserId: string | null = null
 ): string {
   const memoryBlock =
     memories.length === 0
@@ -378,9 +379,16 @@ export function buildSystemPromptWithMemories(
       : memories
           .map((m, i) => {
             const tags = m.tags && m.tags.length ? ` [${m.tags.join(", ")}]` : "";
-            return `${i + 1}. ${m.content}${tags}`;
+            const owner = m.created_by ?? "unknown";
+            const mine =
+              callerVibeUserId && m.created_by === callerVibeUserId ? " (yours)" : "";
+            return `${i + 1}. id=${m.id} owner=${owner}${mine} — ${m.content}${tags}`;
           })
           .join("\n");
+
+  const callerLine = callerVibeUserId
+    ? `\nCurrent caller's vibe user id: ${callerVibeUserId}. You may update only memories where owner matches this id.`
+    : `\nCurrent caller is anonymous (no vibe user id). You cannot update any memories for them.`;
 
   const toolsBlock = `
 ## Tools available
@@ -392,6 +400,11 @@ You have access to these tools:
   community norms, recurring events, important projects/people, stated preferences.
   Do NOT save: small talk, jokes, ephemeral state, or things already in memory.
   Tags should be 1-4 short lowercase keywords.
+
+- **update_memory(id, content, tags?)** — edit an existing memory.
+  Pass the memory's UUID (shown as id=… in the list below) and the FULL new content.
+  You can ONLY update memories where the owner matches the current caller's vibe user id
+  (marked "(yours)" in the list). For anyone else's memory, refuse politely instead of calling.
 
 - **web_search(query, count?)** — search the live web (Brave) for current info.
   Use for recent events, news, prices, dates, public facts you can't answer from memory.
@@ -405,6 +418,7 @@ You can call any tool zero, one, or multiple times before replying. After all to
 calls finish, give the user your normal natural-language reply — don't mention tools
 by name unless they ask. When citing web info, mention the source naturally
 ("According to nytimes.com…").
+${callerLine}
 
 ## Recent community memories (top ${memories.length})
 
