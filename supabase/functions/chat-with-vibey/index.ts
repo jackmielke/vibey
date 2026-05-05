@@ -264,7 +264,7 @@ Deno.serve(async (req) => {
       display_name: null,
       telegram_username: tgHandleFromCtx,
     });
-    const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories)}\n\n${userContext}`;
+    const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories, vibeUserId)}\n\n${userContext}`;
 
     // Split incoming messages into prior history + the current user turn so the
     // agent loop can run tool iterations before streaming the final reply.
