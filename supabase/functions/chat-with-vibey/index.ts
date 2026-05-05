@@ -217,6 +217,25 @@ Deno.serve(async (req) => {
     });
     const sessionKey = unifiedSessionKey(vibeUserId, buildFallbackSessionKey(context));
 
+    // If we resolved a Vibe profile (e.g. signed-in web user), pull their name
+    // + telegram identity so the agent context block recognizes them by name
+    // and we can look up their saved preferences even without telegram ctx.
+    let resolvedDisplayName: string | null = null;
+    let resolvedTgUsername: string | null = tgHandleFromCtx;
+    let resolvedTgUserId: number | null = tgIdFromCtx;
+    if (vibeUserId) {
+      const { data: profile } = await supabase
+        .from("users")
+        .select("name, telegram_username, telegram_user_id")
+        .eq("id", vibeUserId)
+        .maybeSingle();
+      if (profile) {
+        resolvedDisplayName = (profile.name as string) ?? null;
+        resolvedTgUsername = resolvedTgUsername ?? (profile.telegram_username as string | null) ?? null;
+        resolvedTgUserId = resolvedTgUserId ?? (profile.telegram_user_id as number | null) ?? null;
+      }
+    }
+
     if (messages.length === 0) {
       return new Response(JSON.stringify({ error: "messages is required" }), {
         status: 400,
@@ -254,15 +273,15 @@ Deno.serve(async (req) => {
     const [memories, userPrefs] = await Promise.all([
       loadRecentMemories(supabase),
       loadUserPreferences(supabase, {
-        telegram_user_id: tgIdFromCtx,
-        telegram_username: tgHandleFromCtx,
+        telegram_user_id: resolvedTgUserId,
+        telegram_username: resolvedTgUsername,
       }),
     ]);
     const baseSystemPrompt =
       `${agent.system_prompt}\n\nNote: when the user asks to see photos/images, the app will attach matching gallery images below your reply automatically. Just speak naturally about them — do NOT paste image URLs or markdown image syntax.`;
     const userContext = buildUserContextBlock(userPrefs, {
-      display_name: null,
-      telegram_username: tgHandleFromCtx,
+      display_name: resolvedDisplayName,
+      telegram_username: resolvedTgUsername,
     });
     const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories, vibeUserId)}\n\n${userContext}`;
 
