@@ -235,6 +235,27 @@ export default function Chat() {
                 </div>
               )}
               <div className={`max-w-[70%] flex flex-col gap-2 ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                {/* Tool-call breadcrumbs — playful peek at what Vibey is doing */}
+                {msg.role === "assistant" && msg.tools && msg.tools.length > 0 && (
+                  <div className="flex flex-col gap-1 w-full">
+                    <AnimatePresence initial={false}>
+                      {msg.tools.map((t) => (
+                        <motion.div
+                          key={t.id + ":" + t.status}
+                          initial={{ opacity: 0, y: -2 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          className="inline-flex items-center gap-1.5 self-start text-[11px] font-mono px-2 py-1 rounded-md bg-muted/60 border border-border text-muted-foreground"
+                        >
+                          {t.status === "start" && (
+                            <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                          )}
+                          <span className="truncate">{t.label}</span>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                )}
                 <div
                   className={`rounded-lg px-4 py-2.5 text-sm whitespace-pre-wrap ${
                     msg.role === "user"
