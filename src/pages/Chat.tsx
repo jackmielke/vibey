@@ -126,11 +126,16 @@ export default function Chat() {
       .map(({ role, content }) => ({ role, content }));
 
     try {
+      // Use the signed-in user's JWT when available so the edge function can
+      // identify them and persist the conversation under their unified key.
+      const accessToken =
+        session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ messages: payloadMessages }),
       });
