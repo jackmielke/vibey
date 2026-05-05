@@ -22,6 +22,7 @@ interface ToolEvent {
   name: string;
   status: "start" | "done";
   label: string;
+  details?: string;
 }
 
 interface Message {
