@@ -106,7 +106,7 @@ export default function AdminLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-safe-screen flex w-full">
+      <div className="h-safe-screen flex w-full overflow-hidden">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="pt-safe shrink-0 border-b border-border">
@@ -143,7 +143,9 @@ export default function AdminLayout() {
             {/* Chat is always mounted as the main view */}
             <main
               className={cn(
-                "flex-1 min-w-0 overflow-auto",
+                "flex-1 min-w-0 min-h-0 flex flex-col",
+                // Chat owns its own internal scroll; other routes can scroll the main area.
+                isChatRoute || isControlRoute ? "overflow-hidden" : "overflow-auto",
                 showInlineControl && "md:border-r md:border-border"
               )}
             >
