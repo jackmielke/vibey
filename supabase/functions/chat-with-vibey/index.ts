@@ -44,7 +44,7 @@ type GalleryPhoto = {
   residency_name: string | null;
 };
 
-function buildSessionKey(ctx: CallerContext | undefined): string {
+function buildFallbackSessionKey(ctx: CallerContext | undefined): string {
   const surface = ctx?.surface || "web";
   const id = ctx?.external_id || "anon";
   return `${surface}:${id}`;
