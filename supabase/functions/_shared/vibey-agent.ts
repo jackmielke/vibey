@@ -34,6 +34,7 @@ export type Memory = {
   content: string | null;
   tags: string[] | null;
   created_at: string;
+  created_by: string | null;
   metadata: Record<string, unknown> | null;
 };
 
@@ -65,6 +66,27 @@ export const TOOLS = [
           },
         },
         required: ["content"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "update_memory",
+      description:
+        "Update an existing memory's content and/or tags. You may ONLY update memories that the CURRENT user originally created (their id appears as `owner` in the memory list). If the user asks to change a memory they didn't create, politely refuse — don't call this tool. Always pass the full new content (not a diff).",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "The UUID of the memory to update (from the memory list)." },
+          content: { type: "string", description: "New full content for the memory." },
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional replacement tags (1-4 short lowercase keywords). Omit to leave tags unchanged.",
+          },
+        },
+        required: ["id", "content"],
       },
     },
   },
@@ -109,7 +131,7 @@ export async function loadRecentMemories(
 ): Promise<Memory[]> {
   const { data, error } = await supabase
     .from("memories")
-    .select("id, content, tags, created_at, metadata")
+    .select("id, content, tags, created_at, created_by, metadata")
     .eq("community_id", VIBEY_COMMUNITY_ID)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -124,7 +146,8 @@ export async function loadRecentMemories(
 async function saveMemory(
   supabase: SupabaseClient,
   args: { content: string; tags?: string[] },
-  metadata: Record<string, unknown> = {}
+  metadata: Record<string, unknown> = {},
+  callerVibeUserId: string | null = null
 ): Promise<{ ok: boolean; id?: string; error?: string }> {
   const content = (args?.content ?? "").trim();
   if (!content) return { ok: false, error: "content is required" };
@@ -139,7 +162,7 @@ async function saveMemory(
       content,
       tags,
       metadata,
-      // created_by stays null — Telegram callers aren't auth.users.
+      created_by: callerVibeUserId,
     })
     .select("id")
     .single();
@@ -149,6 +172,67 @@ async function saveMemory(
     return { ok: false, error: error.message };
   }
   return { ok: true, id: data.id };
+}
+
+async function updateMemory(
+  supabase: SupabaseClient,
+  args: { id: string; content: string; tags?: string[] },
+  callerVibeUserId: string | null
+): Promise<{
+  ok: boolean;
+  id?: string;
+  error?: string;
+  before?: { content: string | null; tags: string[] | null };
+  after?: { content: string; tags: string[] | null };
+}> {
+  const id = (args?.id ?? "").trim();
+  const content = (args?.content ?? "").trim();
+  if (!id) return { ok: false, error: "id is required" };
+  if (!content) return { ok: false, error: "content is required" };
+  if (!callerVibeUserId) {
+    return { ok: false, error: "anonymous callers can't update memories — sign in first" };
+  }
+
+  // Fetch current row to confirm ownership and capture the "before" snapshot.
+  const { data: existing, error: fetchErr } = await supabase
+    .from("memories")
+    .select("id, content, tags, created_by, community_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (fetchErr) return { ok: false, error: fetchErr.message };
+  if (!existing) return { ok: false, error: "memory not found" };
+  if (existing.created_by !== callerVibeUserId) {
+    return {
+      ok: false,
+      error: "you can only update memories you originally created",
+    };
+  }
+
+  const tagsProvided = Array.isArray(args?.tags);
+  const tags = tagsProvided
+    ? (args!.tags as string[]).filter((t) => typeof t === "string").slice(0, 6)
+    : (existing.tags as string[] | null);
+
+  const updatePatch: Record<string, unknown> = { content };
+  if (tagsProvided) updatePatch.tags = tags;
+
+  const { error: updErr } = await supabase
+    .from("memories")
+    .update(updatePatch)
+    .eq("id", id);
+
+  if (updErr) {
+    console.error("update_memory failed:", updErr.message);
+    return { ok: false, error: updErr.message };
+  }
+
+  return {
+    ok: true,
+    id,
+    before: { content: existing.content, tags: existing.tags },
+    after: { content, tags },
+  };
 }
 
 // ── Web tools ────────────────────────────────────────────────────────────────
@@ -245,7 +329,8 @@ async function fetchUrl(args: { url: string }): Promise<string> {
 async function executeToolCall(
   supabase: SupabaseClient,
   call: NonNullable<ChatMessage["tool_calls"]>[number],
-  metadata: Record<string, unknown>
+  metadata: Record<string, unknown>,
+  callerVibeUserId: string | null = null
 ): Promise<string> {
   let parsed: Record<string, unknown> = {};
   try {
@@ -259,7 +344,16 @@ async function executeToolCall(
       const result = await saveMemory(
         supabase,
         parsed as { content: string; tags?: string[] },
-        metadata
+        metadata,
+        callerVibeUserId
+      );
+      return JSON.stringify(result);
+    }
+    case "update_memory": {
+      const result = await updateMemory(
+        supabase,
+        parsed as { id: string; content: string; tags?: string[] },
+        callerVibeUserId
       );
       return JSON.stringify(result);
     }
@@ -276,7 +370,8 @@ async function executeToolCall(
 
 export function buildSystemPromptWithMemories(
   basePrompt: string,
-  memories: Memory[]
+  memories: Memory[],
+  callerVibeUserId: string | null = null
 ): string {
   const memoryBlock =
     memories.length === 0
@@ -284,9 +379,16 @@ export function buildSystemPromptWithMemories(
       : memories
           .map((m, i) => {
             const tags = m.tags && m.tags.length ? ` [${m.tags.join(", ")}]` : "";
-            return `${i + 1}. ${m.content}${tags}`;
+            const owner = m.created_by ?? "unknown";
+            const mine =
+              callerVibeUserId && m.created_by === callerVibeUserId ? " (yours)" : "";
+            return `${i + 1}. id=${m.id} owner=${owner}${mine} — ${m.content}${tags}`;
           })
           .join("\n");
+
+  const callerLine = callerVibeUserId
+    ? `\nCurrent caller's vibe user id: ${callerVibeUserId}. You may update only memories where owner matches this id.`
+    : `\nCurrent caller is anonymous (no vibe user id). You cannot update any memories for them.`;
 
   const toolsBlock = `
 ## Tools available
@@ -298,6 +400,11 @@ You have access to these tools:
   community norms, recurring events, important projects/people, stated preferences.
   Do NOT save: small talk, jokes, ephemeral state, or things already in memory.
   Tags should be 1-4 short lowercase keywords.
+
+- **update_memory(id, content, tags?)** — edit an existing memory.
+  Pass the memory's UUID (shown as id=… in the list below) and the FULL new content.
+  You can ONLY update memories where the owner matches the current caller's vibe user id
+  (marked "(yours)" in the list). For anyone else's memory, refuse politely instead of calling.
 
 - **web_search(query, count?)** — search the live web (Brave) for current info.
   Use for recent events, news, prices, dates, public facts you can't answer from memory.
@@ -311,6 +418,7 @@ You can call any tool zero, one, or multiple times before replying. After all to
 calls finish, give the user your normal natural-language reply — don't mention tools
 by name unless they ask. When citing web info, mention the source naturally
 ("According to nytimes.com…").
+${callerLine}
 
 ## Recent community memories (top ${memories.length})
 
@@ -450,6 +558,7 @@ export async function runAgentLoop(opts: {
   history: ChatMessage[]; // prior user/assistant turns
   userText: string;
   toolMetadata?: Record<string, unknown>; // attached to any saved memories
+  callerVibeUserId?: string | null;
   referer?: string;
   title?: string;
 }): Promise<string> {
@@ -463,6 +572,7 @@ export async function runAgentLoop(opts: {
     history,
     userText,
     toolMetadata = {},
+    callerVibeUserId = null,
     referer = "https://community-vibes-ai.lovable.app",
     title = "Vibey",
   } = opts;
@@ -517,7 +627,7 @@ export async function runAgentLoop(opts: {
     });
 
     for (const call of toolCalls) {
-      const result = await executeToolCall(supabase, call, toolMetadata);
+      const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId);
       messages.push({
         role: "tool",
         tool_call_id: call.id,
@@ -574,31 +684,48 @@ function describeToolStart(name: string, args: Record<string, unknown>): string 
     }
     case "save_memory":
       return "🧠 jotting this one down…";
+    case "update_memory":
+      return "✏️ rewriting that memory…";
     default:
       return `⚙️ running ${name}…`;
   }
 }
 
-function describeToolDone(name: string, args: Record<string, unknown>, resultJson: string): string {
+function describeToolDone(
+  name: string,
+  args: Record<string, unknown>,
+  resultJson: string
+): { label: string; details?: string } {
   let result: any = null;
   try { result = JSON.parse(resultJson); } catch { /* ignore */ }
   switch (name) {
     case "web_search": {
       const n = Array.isArray(result?.results) ? result.results.length : 0;
-      if (result?.ok === false) return `🤷 search hit a snag`;
-      return n > 0 ? `📡 found ${n} result${n === 1 ? "" : "s"}` : `🪨 nothing solid found`;
+      if (result?.ok === false) return { label: `🤷 search hit a snag` };
+      return { label: n > 0 ? `📡 found ${n} result${n === 1 ? "" : "s"}` : `🪨 nothing solid found` };
     }
     case "fetch_url": {
-      if (result?.ok === false) return `📭 couldn't read that page`;
+      if (result?.ok === false) return { label: `📭 couldn't read that page` };
       const url = String(args?.url ?? "");
       let host = url;
       try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* ignore */ }
-      return `📖 read ${host}`;
+      return { label: `📖 read ${host}` };
     }
     case "save_memory":
-      return result?.ok ? `✨ memory saved` : `🤔 couldn't save that one`;
+      return { label: result?.ok ? `✨ memory saved` : `🤔 couldn't save that one` };
+    case "update_memory": {
+      if (result?.ok === false) {
+        return { label: `🚫 couldn't update`, details: result?.error ?? undefined };
+      }
+      const before = result?.before?.content ?? "";
+      const after = result?.after?.content ?? "";
+      return {
+        label: `📝 memory updated`,
+        details: `before: ${before}\nafter:  ${after}`,
+      };
+    }
     default:
-      return `✅ ${name} done`;
+      return { label: `✅ ${name} done` };
   }
 }
 
@@ -612,6 +739,7 @@ export async function runAgentLoopStreaming(opts: {
   history: ChatMessage[];
   userText: string;
   toolMetadata?: Record<string, unknown>;
+  callerVibeUserId?: string | null;
   referer?: string;
   title?: string;
 }): Promise<Response> {
@@ -625,6 +753,7 @@ export async function runAgentLoopStreaming(opts: {
     history,
     userText,
     toolMetadata = {},
+    callerVibeUserId = null,
     referer = "https://community-vibes-ai.lovable.app",
     title = "Vibey",
   } = opts;
@@ -737,13 +866,15 @@ export async function runAgentLoopStreaming(opts: {
               args: parsedArgs,
             });
 
-            const result = await executeToolCall(supabase, call, toolMetadata);
+            const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId);
 
+            const done = describeToolDone(call.function.name, parsedArgs, result);
             emitTool({
               id: call.id,
               name: call.function.name,
               status: "done",
-              label: describeToolDone(call.function.name, parsedArgs, result),
+              label: done.label,
+              details: done.details,
             });
 
             messages.push({

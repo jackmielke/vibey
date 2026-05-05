@@ -287,12 +287,12 @@ Deno.serve(async (req) => {
 
   // Resolve unified Vibe identity so web + Telegram share one conversation.
   // Group chats stay isolated per-group (multiple people in one room).
+  const vibeUserId = await resolveVibeUserId(supabase, {
+    telegram_user_id: userId,
+    telegram_username: msg.from?.username ?? null,
+  });
   let sessionKey = fallbackSessionKey;
   if (!isGroup) {
-    const vibeUserId = await resolveVibeUserId(supabase, {
-      telegram_user_id: userId,
-      telegram_username: msg.from?.username ?? null,
-    });
     sessionKey = unifiedSessionKey(vibeUserId, fallbackSessionKey);
   }
 
@@ -392,7 +392,7 @@ Deno.serve(async (req) => {
       display_name: msg.from?.first_name ?? null,
       telegram_username: msg.from?.username ?? null,
     });
-    const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories)}\n\n${userContext}`;
+    const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId)}\n\n${userContext}`;
 
     const reply = await runAgentLoop({
       supabase,
@@ -410,6 +410,7 @@ Deno.serve(async (req) => {
         telegram_user_id: userId,
         telegram_username: username,
       },
+      callerVibeUserId: vibeUserId,
       referer: "https://t.me/vibey_ai_bot",
       title: "Vibey (Telegram)",
     });
@@ -469,7 +470,7 @@ Deno.serve(async (req) => {
     display_name: msg.from?.first_name ?? null,
     telegram_username: msg.from?.username ?? null,
   });
-  const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories)}\n\n${userContext}`;
+  const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId)}\n\n${userContext}`;
 
   const reply = await runAgentLoop({
     supabase,
@@ -486,6 +487,7 @@ Deno.serve(async (req) => {
       telegram_user_id: userId,
       telegram_username: username,
     },
+    callerVibeUserId: vibeUserId,
     referer: "https://t.me/vibey_ai_bot",
     title: "Vibey (Telegram)",
   });
