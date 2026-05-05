@@ -13,7 +13,9 @@ import {
   buildUserContextBlock,
   loadRecentMemories,
   loadUserPreferences,
+  resolveVibeUserId,
   runAgentLoopStreaming,
+  unifiedSessionKey,
 } from "../_shared/vibey-agent.ts";
 
 const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
@@ -42,7 +44,7 @@ type GalleryPhoto = {
   residency_name: string | null;
 };
 
-function buildSessionKey(ctx: CallerContext | undefined): string {
+function buildFallbackSessionKey(ctx: CallerContext | undefined): string {
   const surface = ctx?.surface || "web";
   const id = ctx?.external_id || "anon";
   return `${surface}:${id}`;
@@ -193,7 +195,28 @@ Deno.serve(async (req) => {
     const context: CallerContext | undefined = body?.context && typeof body.context === "object"
       ? body.context
       : undefined;
-    const sessionKey = buildSessionKey(context);
+
+    // Try to identify the caller from the Supabase auth JWT (web users).
+    let authUserId: string | null = null;
+    const authHeader = req.headers.get("Authorization") ?? "";
+    if (authHeader.startsWith("Bearer ")) {
+      const { data: userData } = await supabase.auth.getUser(authHeader.slice(7));
+      authUserId = userData?.user?.id ?? null;
+    }
+
+    // Resolve a unified Vibe user id (web auth → telegram identity → null).
+    const tgIdFromCtx =
+      context?.surface === "telegram" && context?.external_id
+        ? Number(context.external_id) || null
+        : null;
+    const tgHandleFromCtx = context?.external_handle ?? null;
+    const vibeUserId = await resolveVibeUserId(supabase, {
+      auth_user_id: authUserId,
+      telegram_user_id: tgIdFromCtx,
+      telegram_username: tgHandleFromCtx,
+    });
+    const sessionKey = unifiedSessionKey(vibeUserId, buildFallbackSessionKey(context));
+
     if (messages.length === 0) {
       return new Response(JSON.stringify({ error: "messages is required" }), {
         status: 400,
@@ -228,19 +251,18 @@ Deno.serve(async (req) => {
       : Promise.resolve([]);
 
     // Augment system prompt with: image-handling note + recent community memories + per-user prefs.
-    const tgIdNum = context?.surface === "telegram" && context?.external_id
-      ? Number(context.external_id) || null
-      : null;
-    const tgHandle = context?.external_handle ?? null;
     const [memories, userPrefs] = await Promise.all([
       loadRecentMemories(supabase),
-      loadUserPreferences(supabase, { telegram_user_id: tgIdNum, telegram_username: tgHandle }),
+      loadUserPreferences(supabase, {
+        telegram_user_id: tgIdFromCtx,
+        telegram_username: tgHandleFromCtx,
+      }),
     ]);
     const baseSystemPrompt =
       `${agent.system_prompt}\n\nNote: when the user asks to see photos/images, the app will attach matching gallery images below your reply automatically. Just speak naturally about them — do NOT paste image URLs or markdown image syntax.`;
     const userContext = buildUserContextBlock(userPrefs, {
       display_name: null,
-      telegram_username: tgHandle,
+      telegram_username: tgHandleFromCtx,
     });
     const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories)}\n\n${userContext}`;
 

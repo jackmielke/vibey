@@ -4,6 +4,8 @@ import { Send, Loader2, AudioLines } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { VoiceMode } from "@/components/VoiceMode";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
@@ -34,10 +36,12 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-with-vi
 
 export default function Chat() {
   const { agent } = useVibeyAgent();
+  const { session } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Sticky-bottom: only auto-scroll if the user is already near the bottom.
   const stickToBottomRef = useRef(true);
@@ -48,11 +52,56 @@ export default function Chat() {
     stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
   };
 
+  // Load prior unified-conversation history (web + Telegram) for signed-in users.
   useEffect(() => {
-    if (agent && messages.length === 0 && agent.intro_message) {
-      setMessages([{ id: "intro", role: "assistant", content: agent.intro_message }]);
+    if (historyLoaded) return;
+    if (!session?.user) {
+      // Anonymous: just show the intro message once the agent loads.
+      if (agent?.intro_message && messages.length === 0) {
+        setMessages([{ id: "intro", role: "assistant", content: agent.intro_message }]);
+      }
+      return;
     }
-  }, [agent, messages.length]);
+    let cancelled = false;
+    (async () => {
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("id")
+        .eq("auth_user_id", session.user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (!userRow?.id) {
+        setHistoryLoaded(true);
+        return;
+      }
+      const { data: logs } = await supabase
+        .from("agent_chat_logs")
+        .select("id, user_message, agent_response, created_at")
+        .eq("session_key", `user:${userRow.id}`)
+        .order("created_at", { ascending: true })
+        .limit(50);
+      if (cancelled) return;
+      const hydrated: Message[] = [];
+      if (agent?.intro_message) {
+        hydrated.push({ id: "intro", role: "assistant", content: agent.intro_message });
+      }
+      for (const row of logs ?? []) {
+        hydrated.push({ id: `u-${row.id}`, role: "user", content: row.user_message });
+        hydrated.push({ id: `a-${row.id}`, role: "assistant", content: row.agent_response });
+      }
+      setMessages(hydrated);
+      setHistoryLoaded(true);
+      // Scroll to bottom on initial load.
+      requestAnimationFrame(() => {
+        const el = scrollRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id, agent?.intro_message, historyLoaded]);
+
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -77,11 +126,16 @@ export default function Chat() {
       .map(({ role, content }) => ({ role, content }));
 
     try {
+      // Use the signed-in user's JWT when available so the edge function can
+      // identify them and persist the conversation under their unified key.
+      const accessToken =
+        session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ messages: payloadMessages }),
       });
