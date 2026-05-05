@@ -287,12 +287,12 @@ Deno.serve(async (req) => {
 
   // Resolve unified Vibe identity so web + Telegram share one conversation.
   // Group chats stay isolated per-group (multiple people in one room).
+  const vibeUserId = await resolveVibeUserId(supabase, {
+    telegram_user_id: userId,
+    telegram_username: msg.from?.username ?? null,
+  });
   let sessionKey = fallbackSessionKey;
   if (!isGroup) {
-    const vibeUserId = await resolveVibeUserId(supabase, {
-      telegram_user_id: userId,
-      telegram_username: msg.from?.username ?? null,
-    });
     sessionKey = unifiedSessionKey(vibeUserId, fallbackSessionKey);
   }
 
