@@ -273,15 +273,15 @@ Deno.serve(async (req) => {
     const [memories, userPrefs] = await Promise.all([
       loadRecentMemories(supabase),
       loadUserPreferences(supabase, {
-        telegram_user_id: tgIdFromCtx,
-        telegram_username: tgHandleFromCtx,
+        telegram_user_id: resolvedTgUserId,
+        telegram_username: resolvedTgUsername,
       }),
     ]);
     const baseSystemPrompt =
       `${agent.system_prompt}\n\nNote: when the user asks to see photos/images, the app will attach matching gallery images below your reply automatically. Just speak naturally about them — do NOT paste image URLs or markdown image syntax.`;
     const userContext = buildUserContextBlock(userPrefs, {
-      display_name: null,
-      telegram_username: tgHandleFromCtx,
+      display_name: resolvedDisplayName,
+      telegram_username: resolvedTgUsername,
     });
     const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories, vibeUserId)}\n\n${userContext}`;
 
