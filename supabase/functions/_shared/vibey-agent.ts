@@ -558,6 +558,7 @@ export async function runAgentLoop(opts: {
   history: ChatMessage[]; // prior user/assistant turns
   userText: string;
   toolMetadata?: Record<string, unknown>; // attached to any saved memories
+  callerVibeUserId?: string | null;
   referer?: string;
   title?: string;
 }): Promise<string> {
@@ -571,6 +572,7 @@ export async function runAgentLoop(opts: {
     history,
     userText,
     toolMetadata = {},
+    callerVibeUserId = null,
     referer = "https://community-vibes-ai.lovable.app",
     title = "Vibey",
   } = opts;
