@@ -262,7 +262,7 @@ Deno.serve(async (req) => {
       `${agent.system_prompt}\n\nNote: when the user asks to see photos/images, the app will attach matching gallery images below your reply automatically. Just speak naturally about them — do NOT paste image URLs or markdown image syntax.`;
     const userContext = buildUserContextBlock(userPrefs, {
       display_name: null,
-      telegram_username: tgHandle,
+      telegram_username: tgHandleFromCtx,
     });
     const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories)}\n\n${userContext}`;
 
