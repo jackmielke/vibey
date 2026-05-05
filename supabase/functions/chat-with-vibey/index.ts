@@ -251,13 +251,12 @@ Deno.serve(async (req) => {
       : Promise.resolve([]);
 
     // Augment system prompt with: image-handling note + recent community memories + per-user prefs.
-    const tgIdNum = context?.surface === "telegram" && context?.external_id
-      ? Number(context.external_id) || null
-      : null;
-    const tgHandle = context?.external_handle ?? null;
     const [memories, userPrefs] = await Promise.all([
       loadRecentMemories(supabase),
-      loadUserPreferences(supabase, { telegram_user_id: tgIdNum, telegram_username: tgHandle }),
+      loadUserPreferences(supabase, {
+        telegram_user_id: tgIdFromCtx,
+        telegram_username: tgHandleFromCtx,
+      }),
     ]);
     const baseSystemPrompt =
       `${agent.system_prompt}\n\nNote: when the user asks to see photos/images, the app will attach matching gallery images below your reply automatically. Just speak naturally about them — do NOT paste image URLs or markdown image syntax.`;
