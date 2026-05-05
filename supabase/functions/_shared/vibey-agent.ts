@@ -72,6 +72,27 @@ export const TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "update_memory",
+      description:
+        "Update an existing memory's content and/or tags. You may ONLY update memories that the CURRENT user originally created (their id appears as `owner` in the memory list). If the user asks to change a memory they didn't create, politely refuse — don't call this tool. Always pass the full new content (not a diff).",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "The UUID of the memory to update (from the memory list)." },
+          content: { type: "string", description: "New full content for the memory." },
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional replacement tags (1-4 short lowercase keywords). Omit to leave tags unchanged.",
+          },
+        },
+        required: ["id", "content"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "web_search",
       description:
         "Search the live web (via Brave Search) for current information. Use when the user asks about recent events, news, prices, dates, or anything you can't answer from memory or the community context. Returns up to 5 result snippets with URLs. Follow up with fetch_url if you need full content from a specific page.",
