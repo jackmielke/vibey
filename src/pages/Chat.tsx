@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Send, Loader2, AudioLines } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,11 +15,19 @@ interface GalleryImage {
   description: string | null;
 }
 
+interface ToolEvent {
+  id: string;
+  name: string;
+  status: "start" | "done";
+  label: string;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   images?: GalleryImage[];
+  tools?: ToolEvent[];
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-with-vibey`;
@@ -142,6 +150,28 @@ export default function Chat() {
             continue;
           }
 
+          // Custom event: tool call breadcrumbs (start/done with playful labels)
+          if (pendingEvent === "tool") {
+            try {
+              const evt = JSON.parse(payload) as ToolEvent;
+              if (evt && evt.id && evt.label) {
+                setMessages((prev) =>
+                  prev.map((m) => {
+                    if (m.id !== assistantId) return m;
+                    const tools = m.tools ? [...m.tools] : [];
+                    const idx = tools.findIndex((t) => t.id === evt.id);
+                    if (idx >= 0) tools[idx] = evt;
+                    else tools.push(evt);
+                    return { ...m, tools };
+                  })
+                );
+              }
+            } catch {
+              // ignore malformed tool payloads
+            }
+            continue;
+          }
+
           if (payload === "[DONE]") {
             done = true;
             break;
@@ -205,6 +235,27 @@ export default function Chat() {
                 </div>
               )}
               <div className={`max-w-[70%] flex flex-col gap-2 ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                {/* Tool-call breadcrumbs — playful peek at what Vibey is doing */}
+                {msg.role === "assistant" && msg.tools && msg.tools.length > 0 && (
+                  <div className="flex flex-col gap-1 w-full">
+                    <AnimatePresence initial={false}>
+                      {msg.tools.map((t) => (
+                        <motion.div
+                          key={t.id + ":" + t.status}
+                          initial={{ opacity: 0, y: -2 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          className="inline-flex items-center gap-1.5 self-start text-[11px] font-mono px-2 py-1 rounded-md bg-muted/60 border border-border text-muted-foreground"
+                        >
+                          {t.status === "start" && (
+                            <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                          )}
+                          <span className="truncate">{t.label}</span>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                )}
                 <div
                   className={`rounded-lg px-4 py-2.5 text-sm whitespace-pre-wrap ${
                     msg.role === "user"

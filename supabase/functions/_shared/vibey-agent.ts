@@ -509,9 +509,53 @@ export async function runAgentLoop(opts: {
 
 // ── Streaming variant for the web chat ───────────────────────────────────────
 //
-// Runs tool iterations non-streaming, then issues the FINAL model call with
-// stream:true and returns the raw Response so the caller can pipe SSE bytes
-// to the browser. This keeps the existing chat-with-vibey streaming UX.
+// Runs tool iterations, emitting playful `event: tool` SSE frames for each
+// tool call (start + done), then pipes the final OpenRouter streaming response
+// into the same stream. Returns a Response whose body is text/event-stream.
+
+// Playful, human-readable labels for tool calls. Kept here so both the
+// "starting" chip and the "done" chip stay consistent.
+function describeToolStart(name: string, args: Record<string, unknown>): string {
+  switch (name) {
+    case "web_search": {
+      const q = String(args?.query ?? "").trim();
+      return q ? `🔎 googling "${q.slice(0, 80)}"…` : "🔎 searching the web…";
+    }
+    case "fetch_url": {
+      const url = String(args?.url ?? "");
+      let host = url;
+      try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* ignore */ }
+      return `🌐 reading ${host}…`;
+    }
+    case "save_memory":
+      return "🧠 jotting this one down…";
+    default:
+      return `⚙️ running ${name}…`;
+  }
+}
+
+function describeToolDone(name: string, args: Record<string, unknown>, resultJson: string): string {
+  let result: any = null;
+  try { result = JSON.parse(resultJson); } catch { /* ignore */ }
+  switch (name) {
+    case "web_search": {
+      const n = Array.isArray(result?.results) ? result.results.length : 0;
+      if (result?.ok === false) return `🤷 search hit a snag`;
+      return n > 0 ? `📡 found ${n} result${n === 1 ? "" : "s"}` : `🪨 nothing solid found`;
+    }
+    case "fetch_url": {
+      if (result?.ok === false) return `📭 couldn't read that page`;
+      const url = String(args?.url ?? "");
+      let host = url;
+      try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* ignore */ }
+      return `📖 read ${host}`;
+    }
+    case "save_memory":
+      return result?.ok ? `✨ memory saved` : `🤔 couldn't save that one`;
+    default:
+      return `✅ ${name} done`;
+  }
+}
 
 export async function runAgentLoopStreaming(opts: {
   supabase: SupabaseClient;
@@ -546,88 +590,161 @@ export async function runAgentLoopStreaming(opts: {
     { role: "user", content: userText },
   ];
 
-  for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
-    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": referer,
-        "X-Title": title,
-      },
-      body: JSON.stringify({
-        model,
-        temperature,
-        max_tokens: maxTokens,
-        stream: false,
-        tools: TOOLS,
-        messages,
-      }),
-    });
+  const encoder = new TextEncoder();
 
-    if (!resp.ok) {
-      console.error("OpenRouter (probe) error", resp.status, await resp.text());
-      return resp;
-    }
+  // We build a single ReadableStream that:
+  //   1. Runs the tool loop, emitting `event: tool` frames as it goes.
+  //   2. Pipes the final OpenRouter streaming response bytes through.
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const emitTool = (payload: Record<string, unknown>) => {
+        controller.enqueue(
+          encoder.encode(`event: tool\ndata: ${JSON.stringify(payload)}\n\n`)
+        );
+      };
 
-    const json = await resp.json();
-    const choice = json?.choices?.[0]?.message;
-    const toolCalls = choice?.tool_calls as ChatMessage["tool_calls"];
+      try {
+        for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
+          const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": referer,
+              "X-Title": title,
+            },
+            body: JSON.stringify({
+              model,
+              temperature,
+              max_tokens: maxTokens,
+              stream: false,
+              tools: TOOLS,
+              messages,
+            }),
+          });
 
-    if (!toolCalls || toolCalls.length === 0) {
-      // No tools needed — issue the streaming call now. We could return the
-      // already-fetched text, but streaming gives a nicer UX and keeps the
-      // existing SSE wiring untouched. Cost: one extra cheap round-trip.
-      return await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": referer,
-          "X-Title": title,
-        },
-        body: JSON.stringify({
-          model,
-          temperature,
-          max_tokens: maxTokens,
-          stream: true,
-          messages, // no tools — we already know the model is done
-        }),
-      });
-    }
+          if (!resp.ok) {
+            const errText = await resp.text().catch(() => "");
+            console.error("OpenRouter (probe) error", resp.status, errText);
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ error: `OpenRouter ${resp.status}` })}\n\n`
+              )
+            );
+            controller.close();
+            return;
+          }
 
-    // Run the tools, then loop.
-    messages.push({
-      role: "assistant",
-      content: choice.content ?? null,
-      tool_calls: toolCalls,
-    });
-    for (const call of toolCalls) {
-      const result = await executeToolCall(supabase, call, toolMetadata);
-      messages.push({
-        role: "tool",
-        tool_call_id: call.id,
-        name: call.function.name,
-        content: result,
-      });
-    }
-  }
+          const json = await resp.json();
+          const choice = json?.choices?.[0]?.message;
+          const toolCalls = choice?.tool_calls as ChatMessage["tool_calls"];
 
-  // Iteration cap reached — force a streaming reply with no tools.
-  return await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": referer,
-      "X-Title": title,
+          if (!toolCalls || toolCalls.length === 0) {
+            // Done with tools — stream the final reply.
+            const finalResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": referer,
+                "X-Title": title,
+              },
+              body: JSON.stringify({
+                model,
+                temperature,
+                max_tokens: maxTokens,
+                stream: true,
+                messages,
+              }),
+            });
+            if (!finalResp.ok || !finalResp.body) {
+              const errText = await finalResp.text().catch(() => "");
+              console.error("final stream error", finalResp.status, errText);
+              controller.close();
+              return;
+            }
+            const reader = finalResp.body.getReader();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              controller.enqueue(value);
+            }
+            controller.close();
+            return;
+          }
+
+          // Run each tool, emitting start + done frames.
+          messages.push({
+            role: "assistant",
+            content: choice.content ?? null,
+            tool_calls: toolCalls,
+          });
+
+          for (const call of toolCalls) {
+            let parsedArgs: Record<string, unknown> = {};
+            try { parsedArgs = JSON.parse(call.function.arguments || "{}"); } catch { /* ignore */ }
+
+            emitTool({
+              id: call.id,
+              name: call.function.name,
+              status: "start",
+              label: describeToolStart(call.function.name, parsedArgs),
+              args: parsedArgs,
+            });
+
+            const result = await executeToolCall(supabase, call, toolMetadata);
+
+            emitTool({
+              id: call.id,
+              name: call.function.name,
+              status: "done",
+              label: describeToolDone(call.function.name, parsedArgs, result),
+            });
+
+            messages.push({
+              role: "tool",
+              tool_call_id: call.id,
+              name: call.function.name,
+              content: result,
+            });
+          }
+        }
+
+        // Iteration cap — force a final streaming reply with no tools.
+        const finalResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": referer,
+            "X-Title": title,
+          },
+          body: JSON.stringify({
+            model,
+            temperature,
+            max_tokens: maxTokens,
+            stream: true,
+            messages,
+          }),
+        });
+        if (finalResp.ok && finalResp.body) {
+          const reader = finalResp.body.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            controller.enqueue(value);
+          }
+        }
+        controller.close();
+      } catch (e) {
+        console.error("runAgentLoopStreaming error:", e);
+        try { controller.close(); } catch { /* already closed */ }
+      }
     },
-    body: JSON.stringify({
-      model,
-      temperature,
-      max_tokens: maxTokens,
-      stream: true,
-      messages,
-    }),
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
   });
 }
