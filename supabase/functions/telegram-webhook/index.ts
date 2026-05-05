@@ -392,7 +392,7 @@ Deno.serve(async (req) => {
       display_name: msg.from?.first_name ?? null,
       telegram_username: msg.from?.username ?? null,
     });
-    const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories)}\n\n${userContext}`;
+    const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId)}\n\n${userContext}`;
 
     const reply = await runAgentLoop({
       supabase,
