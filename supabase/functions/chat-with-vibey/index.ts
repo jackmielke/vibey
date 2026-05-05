@@ -291,6 +291,7 @@ Deno.serve(async (req) => {
         external_id: context?.external_id ?? null,
         external_handle: context?.external_handle ?? null,
       },
+      callerVibeUserId: vibeUserId,
     });
 
     if (!orResponse.ok || !orResponse.body) {
