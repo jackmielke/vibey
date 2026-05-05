@@ -4,6 +4,8 @@ import { Send, Loader2, AudioLines } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { VoiceMode } from "@/components/VoiceMode";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
