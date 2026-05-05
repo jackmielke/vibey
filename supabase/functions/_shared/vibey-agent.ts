@@ -320,6 +320,51 @@ ${memoryBlock}
   return `${basePrompt}\n\n${toolsBlock}`;
 }
 
+// ── Identity resolution ──────────────────────────────────────────────────────
+
+// Resolve a public.users.id from either a Supabase auth uid (web) or a Telegram
+// identity (telegram_user_id, with fallback to telegram_username). Returns null
+// if no Vibe profile can be linked. Used to build a unified `user:<id>` session
+// key so the same conversation persists across web + Telegram.
+export async function resolveVibeUserId(
+  supabase: SupabaseClient,
+  lookup: {
+    auth_user_id?: string | null;
+    telegram_user_id?: number | null;
+    telegram_username?: string | null;
+  }
+): Promise<string | null> {
+  if (lookup.auth_user_id) {
+    const { data } = await supabase
+      .from("users")
+      .select("id")
+      .eq("auth_user_id", lookup.auth_user_id)
+      .maybeSingle();
+    if (data?.id) return data.id as string;
+  }
+  if (lookup.telegram_user_id != null) {
+    const { data } = await supabase
+      .from("users")
+      .select("id")
+      .eq("telegram_user_id", lookup.telegram_user_id)
+      .maybeSingle();
+    if (data?.id) return data.id as string;
+  }
+  if (lookup.telegram_username) {
+    const { data } = await supabase
+      .from("users")
+      .select("id")
+      .ilike("telegram_username", lookup.telegram_username)
+      .maybeSingle();
+    if (data?.id) return data.id as string;
+  }
+  return null;
+}
+
+export function unifiedSessionKey(vibeUserId: string | null, fallback: string): string {
+  return vibeUserId ? `user:${vibeUserId}` : fallback;
+}
+
 // ── Per-user preferences ─────────────────────────────────────────────────────
 
 export type UserPrefs = {
