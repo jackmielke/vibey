@@ -34,6 +34,7 @@ export type Memory = {
   content: string | null;
   tags: string[] | null;
   created_at: string;
+  created_by: string | null;
   metadata: Record<string, unknown> | null;
 };
 
