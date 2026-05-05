@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Send, Loader2, AudioLines } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,11 +15,19 @@ interface GalleryImage {
   description: string | null;
 }
 
+interface ToolEvent {
+  id: string;
+  name: string;
+  status: "start" | "done";
+  label: string;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   images?: GalleryImage[];
+  tools?: ToolEvent[];
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-with-vibey`;
