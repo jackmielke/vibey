@@ -144,18 +144,21 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-4">
-        {!collapsed && (
-          <div className="flex flex-col gap-3">
-            <ThemeToggle />
-            <a
-              href="#"
-              className="text-label flex items-center gap-2 hover:text-foreground transition-colors"
-            >
-              <ExternalLink className="h-3 w-3" />
-              View Site
-            </a>
-          </div>
-        )}
+        <div className="flex flex-col gap-3">
+          <SidebarUserProfile collapsed={collapsed} />
+          {!collapsed && (
+            <>
+              <ThemeToggle />
+              <a
+                href="#"
+                className="text-label flex items-center gap-2 hover:text-foreground transition-colors"
+              >
+                <ExternalLink className="h-3 w-3" />
+                View Site
+              </a>
+            </>
+          )}
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
