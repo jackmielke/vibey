@@ -232,7 +232,7 @@ Deno.serve(async (req) => {
   const userId = msg.from?.id ?? chatId;
   const username = msg.from?.username ?? msg.from?.first_name ?? "unknown";
   const isGroup = chatType === "group" || chatType === "supergroup";
-  const sessionKey = `telegram:${chatId}`;
+  const fallbackSessionKey = `telegram:${chatId}`;
 
   // Resolve the user's text — either raw text, or transcribed voice/audio.
   let userText = (msg.text ?? "").trim();
