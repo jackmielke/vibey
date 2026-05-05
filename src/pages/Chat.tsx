@@ -300,12 +300,19 @@ export default function Chat() {
                           initial={{ opacity: 0, y: -2 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0 }}
-                          className="inline-flex items-center gap-1.5 self-start text-[11px] font-mono px-2 py-1 rounded-md bg-muted/60 border border-border text-muted-foreground"
+                          className="self-start max-w-full"
                         >
-                          {t.status === "start" && (
-                            <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                          <div className="inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded-md bg-muted/60 border border-border text-muted-foreground">
+                            {t.status === "start" && (
+                              <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                            )}
+                            <span className="truncate">{t.label}</span>
+                          </div>
+                          {t.details && (
+                            <pre className="mt-1 text-[10.5px] font-mono whitespace-pre-wrap leading-snug px-2 py-1.5 rounded-md bg-muted/40 border border-border/60 text-muted-foreground max-w-full overflow-x-auto">
+{t.details}
+                            </pre>
                           )}
-                          <span className="truncate">{t.label}</span>
                         </motion.div>
                       ))}
                     </AnimatePresence>
