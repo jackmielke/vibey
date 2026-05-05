@@ -150,6 +150,28 @@ export default function Chat() {
             continue;
           }
 
+          // Custom event: tool call breadcrumbs (start/done with playful labels)
+          if (pendingEvent === "tool") {
+            try {
+              const evt = JSON.parse(payload) as ToolEvent;
+              if (evt && evt.id && evt.label) {
+                setMessages((prev) =>
+                  prev.map((m) => {
+                    if (m.id !== assistantId) return m;
+                    const tools = m.tools ? [...m.tools] : [];
+                    const idx = tools.findIndex((t) => t.id === evt.id);
+                    if (idx >= 0) tools[idx] = evt;
+                    else tools.push(evt);
+                    return { ...m, tools };
+                  })
+                );
+              }
+            } catch {
+              // ignore malformed tool payloads
+            }
+            continue;
+          }
+
           if (payload === "[DONE]") {
             done = true;
             break;
