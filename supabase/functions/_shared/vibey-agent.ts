@@ -339,7 +339,51 @@ async function fetchUrl(args: { url: string }): Promise<string> {
   }
 }
 
-// ── Tool dispatch ────────────────────────────────────────────────────────────
+// ── VIBE pricing tool (GeckoTerminal) ────────────────────────────────────────
+
+const VIBE_POOL_URL =
+  "https://api.geckoterminal.com/api/v2/networks/base/pools/0xc3ad498815597f1e6f71d3cb1166856e947efb46";
+
+async function getVibePrice(args: { usd?: number; vibe?: number }): Promise<string> {
+  try {
+    const resp = await fetch(VIBE_POOL_URL, {
+      headers: { "User-Agent": "VibeyBot/1.0", Accept: "application/json" },
+    });
+    if (!resp.ok) {
+      return JSON.stringify({ ok: false, error: `GeckoTerminal ${resp.status}` });
+    }
+    const json = await resp.json();
+    const attrs = json?.data?.attributes ?? {};
+    const price = Number(attrs.base_token_price_usd);
+    if (!isFinite(price) || price <= 0) {
+      return JSON.stringify({ ok: false, error: "no price returned" });
+    }
+    const out: Record<string, unknown> = {
+      ok: true,
+      token: "VIBE",
+      network: "base",
+      contract: "0x7255ecf1020a95fed5323dd4feb23a54ab1aa7d1",
+      price_usd: price,
+      fdv_usd: Number(attrs.fdv_usd) || null,
+      liquidity_usd: Number(attrs.reserve_in_usd) || null,
+      volume_24h_usd: Number(attrs?.volume_usd?.h24) || null,
+      price_change_24h_pct: Number(attrs?.price_change_percentage?.h24) || null,
+      pool_name: attrs.name ?? null,
+      source: "geckoterminal",
+    };
+    if (typeof args?.usd === "number" && isFinite(args.usd)) {
+      out.usd_input = args.usd;
+      out.vibe_amount = args.usd / price;
+    }
+    if (typeof args?.vibe === "number" && isFinite(args.vibe)) {
+      out.vibe_input = args.vibe;
+      out.usd_amount = args.vibe * price;
+    }
+    return JSON.stringify(out);
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+}
 
 async function executeToolCall(
   supabase: SupabaseClient,
