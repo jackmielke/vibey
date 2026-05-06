@@ -1,6 +1,8 @@
-// Returns the status of each Vibey tool by checking which required secrets
-// are configured in the edge runtime environment. The frontend uses this to
-// render the Tools panel without ever exposing secret values.
+// Returns the status of each Vibey tool. The tool registry now lives in the
+// `agent_tools` table so admins can edit labels/descriptions/enabled state from
+// the UI. This function merges the DB rows with runtime secret availability.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,78 +11,60 @@ const corsHeaders = {
 };
 
 type ToolStatus = {
+  id: string;
   name: string;
   label: string;
   description: string;
   category: "memory" | "web" | "future";
   requiredSecrets: string[];
-  status: "ready" | "missing_secret" | "planned";
+  is_enabled: boolean;
+  sort_order: number;
+  status: "ready" | "missing_secret" | "planned" | "disabled";
   missing: string[];
 };
 
-const TOOLS: Omit<ToolStatus, "status" | "missing">[] = [
-  {
-    name: "save_memory",
-    label: "Save Memory",
-    description:
-      "Stores a durable fact about the community in long-term memory.",
-    category: "memory",
-    requiredSecrets: ["SUPABASE_SERVICE_ROLE_KEY"],
-  },
-  {
-    name: "web_search",
-    label: "Web Search",
-    description:
-      "Searches the live web via Brave for current info, news, and facts.",
-    category: "web",
-    requiredSecrets: ["BRAVE_SEARCH_API_KEY"],
-  },
-  {
-    name: "fetch_url",
-    label: "Fetch URL",
-    description:
-      "Fetches readable text from a specific web page (up to ~6k chars).",
-    category: "web",
-    requiredSecrets: [],
-  },
-  {
-    name: "get_vibe_price",
-    label: "VIBE Price",
-    description:
-      "Fetches live VibeCoin (VIBE on Base) price from GeckoTerminal and converts USD ↔ VIBE.",
-    category: "web",
-    requiredSecrets: [],
-  },
-  {
-    name: "recall_memories",
-    label: "Recall Memories",
-    description:
-      "Semantic search over the memory corpus. Coming when corpus outgrows preload.",
-    category: "future",
-    requiredSecrets: [],
-  },
-  {
-    name: "send_telegram",
-    label: "Send Telegram Message",
-    description:
-      "Proactively message a person or group on Telegram. Planned.",
-    category: "future",
-    requiredSecrets: ["TELEGRAM_BOT_TOKEN"],
-  },
-];
-
-Deno.serve((req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const tools: ToolStatus[] = TOOLS.map((t) => {
-    const missing = t.requiredSecrets.filter((s) => !Deno.env.get(s));
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  const { data, error } = await supabase
+    .from("agent_tools")
+    .select("id, name, label, description, category, required_secrets, is_enabled, sort_order")
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const tools: ToolStatus[] = (data ?? []).map((t: any) => {
+    const requiredSecrets: string[] = t.required_secrets ?? [];
+    const missing = requiredSecrets.filter((s) => !Deno.env.get(s));
     let status: ToolStatus["status"];
-    if (t.category === "future") status = "planned";
+    if (!t.is_enabled) status = "disabled";
+    else if (t.category === "future") status = "planned";
     else if (missing.length > 0) status = "missing_secret";
     else status = "ready";
-    return { ...t, status, missing };
+    return {
+      id: t.id,
+      name: t.name,
+      label: t.label,
+      description: t.description,
+      category: t.category,
+      requiredSecrets,
+      is_enabled: t.is_enabled,
+      sort_order: t.sort_order,
+      status,
+      missing,
+    };
   });
 
   return new Response(JSON.stringify({ tools }), {
