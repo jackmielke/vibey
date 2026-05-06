@@ -138,6 +138,27 @@ export const TOOLS = [
   },
 ];
 
+// ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
+
+export async function loadEnabledToolNames(
+  supabase: SupabaseClient
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("agent_tools")
+    .select("name, is_enabled")
+    .eq("is_enabled", true);
+  if (error) {
+    console.error("loadEnabledToolNames failed:", error.message);
+    // fall back to allowing all built-in tools
+    return new Set(TOOLS.map((t) => t.function.name));
+  }
+  return new Set((data ?? []).map((r: { name: string }) => r.name));
+}
+
+export function filterToolsByEnabled(enabled: Set<string>) {
+  return TOOLS.filter((t) => enabled.has(t.function.name));
+}
+
 // ── Memory store ─────────────────────────────────────────────────────────────
 
 export async function loadRecentMemories(
