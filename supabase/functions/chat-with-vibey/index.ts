@@ -271,13 +271,14 @@ Deno.serve(async (req) => {
         })()
       : Promise.resolve([]);
 
-    // Augment system prompt with: image-handling note + recent community memories + per-user prefs.
-    const [memories, userPrefs] = await Promise.all([
+    // Augment system prompt with: image-handling note + recent community memories + per-user prefs + skills.
+    const [memories, userPrefs, skills] = await Promise.all([
       loadRecentMemories(supabase),
       loadUserPreferences(supabase, {
         telegram_user_id: resolvedTgUserId,
         telegram_username: resolvedTgUsername,
       }),
+      loadEnabledSkills(supabase),
     ]);
     const baseSystemPrompt =
       `${agent.system_prompt}\n\nNote: when the user asks to see photos/images, the app will attach matching gallery images below your reply automatically. Just speak naturally about them — do NOT paste image URLs or markdown image syntax.`;
@@ -285,7 +286,7 @@ Deno.serve(async (req) => {
       display_name: resolvedDisplayName,
       telegram_username: resolvedTgUsername,
     });
-    const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories, vibeUserId)}\n\n${userContext}`;
+    const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories, vibeUserId)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
     // Split incoming messages into prior history + the current user turn so the
     // agent loop can run tool iterations before streaming the final reply.
