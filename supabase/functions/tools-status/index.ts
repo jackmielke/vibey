@@ -44,6 +44,14 @@ const TOOLS: Omit<ToolStatus, "status" | "missing">[] = [
     requiredSecrets: [],
   },
   {
+    name: "get_vibe_price",
+    label: "VIBE Price",
+    description:
+      "Fetches live VibeCoin (VIBE on Base) price from GeckoTerminal and converts USD ↔ VIBE.",
+    category: "web",
+    requiredSecrets: [],
+  },
+  {
     name: "recall_memories",
     label: "Recall Memories",
     description:
