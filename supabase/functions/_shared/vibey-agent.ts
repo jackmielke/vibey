@@ -754,6 +754,12 @@ function describeToolStart(name: string, args: Record<string, unknown>): string 
       return "🧠 jotting this one down…";
     case "update_memory":
       return "✏️ rewriting that memory…";
+    case "get_vibe_price": {
+      const usd = args?.usd, vibe = args?.vibe;
+      if (typeof usd === "number") return `🪙 checking VIBE for $${usd}…`;
+      if (typeof vibe === "number") return `🪙 valuing ${Number(vibe).toLocaleString()} VIBE…`;
+      return "🪙 fetching live VIBE price…";
+    }
     default:
       return `⚙️ running ${name}…`;
   }
