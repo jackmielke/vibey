@@ -420,6 +420,8 @@ async function executeToolCall(
       return await webSearch(parsed as { query: string; count?: number });
     case "fetch_url":
       return await fetchUrl(parsed as { url: string });
+    case "get_vibe_price":
+      return await getVibePrice(parsed as { usd?: number; vibe?: number });
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
