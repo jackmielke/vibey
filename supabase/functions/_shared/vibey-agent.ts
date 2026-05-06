@@ -109,6 +109,21 @@ export const TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "get_vibe_price",
+      description:
+        "Fetch the LIVE price of VibeCoin (VIBE on Base, contract 0x7255ecf1020a95fed5323dd4feb23a54ab1aa7d1) from GeckoTerminal, and optionally convert between USD and VIBE. Use this ANY time the user mentions VIBE, VibeCoin, 'vibes' as a token, sending/distributing VibeCoin, calculating how many VIBE equals a $ amount, or asking what their VIBE holdings are worth. Casual phrasings count too: 'how many vibes is $50', 'what's vibe at', 'how much vibe should I send my friend', 'what's my wallet worth'. NEVER answer VIBE pricing from memory or stale numbers — always call this tool. Returns price_usd, fdv_usd, liquidity_usd, 24h volume + change. If usd is provided, also returns vibe_amount; if vibe is provided, also returns usd_amount. Pool liquidity is thin (~$60-70K) — flag this only when the user is talking about distribution or selling.",
+      parameters: {
+        type: "object",
+        properties: {
+          usd: { type: "number", description: "Optional: USD amount to convert to VIBE." },
+          vibe: { type: "number", description: "Optional: VIBE amount to convert to USD." },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "fetch_url",
       description:
         "Fetch the readable text content of a specific web page. Use when you have a URL (from web_search results or the user) and need the actual page content to answer accurately. Strips HTML and returns up to ~6000 characters of clean text. Do NOT use for social media or paywalled content — won't work well there.",
