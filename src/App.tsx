@@ -18,6 +18,7 @@ import Memory from "@/pages/Memory";
 import Media from "@/pages/Media";
 import Interfaces from "@/pages/Interfaces";
 import Tools from "@/pages/Tools";
+import Skills from "@/pages/Skills";
 import Relationships from "@/pages/Relationships";
 import Conversations from "@/pages/Conversations";
 import Groups from "@/pages/Groups";
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="media" element={<Media />} />
             <Route path="interfaces" element={<Interfaces />} />
             <Route path="tools" element={<Tools />} />
+            <Route path="skills" element={<Skills />} />
             <Route path="relationships" element={<Relationships />} />
             <Route path="conversations" element={<Conversations />} />
             <Route path="groups" element={<Groups />} />

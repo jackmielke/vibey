@@ -14,6 +14,7 @@ import {
   IdCard,
   Gauge,
   Bot,
+  Zap,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useLocation } from "react-router-dom";
@@ -43,12 +44,13 @@ const sectionsItem = { title: "Sections", url: "/sections", icon: LayoutDashboar
 
 const navItems = [
   { title: "Soul", url: "/soul", icon: Sparkles },
-  { title: "Identity", url: "/identity", icon: IdCard },
   { title: "Memory", url: "/memory", icon: Brain },
+  { title: "Skills", url: "/skills", icon: Zap },
   { title: "Tools", url: "/tools", icon: Wrench },
   { title: "Preferences", url: "/relationships", icon: Users },
   { title: "Scheduled Heartbeat", url: "/automations", icon: Heart },
-  { title: "Interface Config", url: "/interfaces", icon: Settings2 },
+  { title: "Interfaces", url: "/interfaces", icon: Settings2 },
+  { title: "Identity", url: "/identity", icon: IdCard },
   { title: "Chat History", url: "/conversations", icon: MessagesSquare },
   { title: "Media Library", url: "/media", icon: Image },
   { title: "Group Chats", url: "/groups", icon: UsersRound },
