@@ -71,6 +71,42 @@ export type Database = {
           },
         ]
       }
+      agent_skills: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          id: string
+          is_enabled: boolean
+          label: string
+          name: string
+          prompt: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description: string
+          id?: string
+          is_enabled?: boolean
+          label: string
+          name: string
+          prompt: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          is_enabled?: boolean
+          label?: string
+          name?: string
+          prompt?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       agent_tools: {
         Row: {
           category: string
