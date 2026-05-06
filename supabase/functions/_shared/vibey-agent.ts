@@ -370,6 +370,8 @@ async function getVibePrice(args: { usd?: number; vibe?: number }): Promise<stri
       price_change_24h_pct: Number(attrs?.price_change_percentage?.h24) || null,
       pool_name: attrs.name ?? null,
       source: "geckoterminal",
+      // always-included reference stat: how much 1,000,000 VIBE is worth right now
+      million_vibe_usd: price * 1_000_000,
     };
     if (typeof args?.usd === "number" && isFinite(args.usd)) {
       out.usd_input = args.usd;
