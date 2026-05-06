@@ -805,6 +805,9 @@ function describeToolDone(
       const p = Number(result?.price_usd);
       const priceStr = p ? `$${p.toFixed(10).replace(/0+$/, "0")}` : "—";
       const lines = [`price: ${priceStr}`];
+      if (typeof result?.million_vibe_usd === "number") {
+        lines.push(`1,000,000 VIBE = $${Math.round(result.million_vibe_usd).toLocaleString()}`);
+      }
       if (typeof result?.vibe_amount === "number") {
         lines.push(`$${result.usd_input} = ${Math.round(result.vibe_amount).toLocaleString()} VIBE`);
       }
