@@ -370,6 +370,8 @@ async function getVibePrice(args: { usd?: number; vibe?: number }): Promise<stri
       price_change_24h_pct: Number(attrs?.price_change_percentage?.h24) || null,
       pool_name: attrs.name ?? null,
       source: "geckoterminal",
+      // always-included reference stat: how much 1,000,000 VIBE is worth right now
+      million_vibe_usd: price * 1_000_000,
     };
     if (typeof args?.usd === "number" && isFinite(args.usd)) {
       out.usd_input = args.usd;
@@ -481,6 +483,8 @@ You have access to these tools:
   VIBE pricing from memory — always call this tool. Pass \`usd\` to convert dollars→VIBE,
   or \`vibe\` to convert VIBE→dollars. Pool liquidity is thin (~\$60-70K), so flag that only
   when the user is talking about distribution or selling, not for simple lookups.
+  The result always includes \`million_vibe_usd\` (what 1,000,000 VIBE is worth right now) —
+  weave that in naturally as a fun reference stat when sharing the price.
 
 You can call any tool zero, one, or multiple times before replying. After all tool
 calls finish, give the user your normal natural-language reply — don't mention tools
@@ -803,6 +807,9 @@ function describeToolDone(
       const p = Number(result?.price_usd);
       const priceStr = p ? `$${p.toFixed(10).replace(/0+$/, "0")}` : "—";
       const lines = [`price: ${priceStr}`];
+      if (typeof result?.million_vibe_usd === "number") {
+        lines.push(`1,000,000 VIBE = $${Math.round(result.million_vibe_usd).toLocaleString()}`);
+      }
       if (typeof result?.vibe_amount === "number") {
         lines.push(`$${result.usd_input} = ${Math.round(result.vibe_amount).toLocaleString()} VIBE`);
       }
