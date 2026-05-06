@@ -109,6 +109,21 @@ export const TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "get_vibe_price",
+      description:
+        "Fetch the LIVE price of VibeCoin (VIBE on Base, contract 0x7255ecf1020a95fed5323dd4feb23a54ab1aa7d1) from GeckoTerminal, and optionally convert between USD and VIBE. Use this ANY time the user mentions VIBE, VibeCoin, 'vibes' as a token, sending/distributing VibeCoin, calculating how many VIBE equals a $ amount, or asking what their VIBE holdings are worth. Casual phrasings count too: 'how many vibes is $50', 'what's vibe at', 'how much vibe should I send my friend', 'what's my wallet worth'. NEVER answer VIBE pricing from memory or stale numbers — always call this tool. Returns price_usd, fdv_usd, liquidity_usd, 24h volume + change. If usd is provided, also returns vibe_amount; if vibe is provided, also returns usd_amount. Pool liquidity is thin (~$60-70K) — flag this only when the user is talking about distribution or selling.",
+      parameters: {
+        type: "object",
+        properties: {
+          usd: { type: "number", description: "Optional: USD amount to convert to VIBE." },
+          vibe: { type: "number", description: "Optional: VIBE amount to convert to USD." },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "fetch_url",
       description:
         "Fetch the readable text content of a specific web page. Use when you have a URL (from web_search results or the user) and need the actual page content to answer accurately. Strips HTML and returns up to ~6000 characters of clean text. Do NOT use for social media or paywalled content — won't work well there.",
@@ -324,7 +339,51 @@ async function fetchUrl(args: { url: string }): Promise<string> {
   }
 }
 
-// ── Tool dispatch ────────────────────────────────────────────────────────────
+// ── VIBE pricing tool (GeckoTerminal) ────────────────────────────────────────
+
+const VIBE_POOL_URL =
+  "https://api.geckoterminal.com/api/v2/networks/base/pools/0xc3ad498815597f1e6f71d3cb1166856e947efb46";
+
+async function getVibePrice(args: { usd?: number; vibe?: number }): Promise<string> {
+  try {
+    const resp = await fetch(VIBE_POOL_URL, {
+      headers: { "User-Agent": "VibeyBot/1.0", Accept: "application/json" },
+    });
+    if (!resp.ok) {
+      return JSON.stringify({ ok: false, error: `GeckoTerminal ${resp.status}` });
+    }
+    const json = await resp.json();
+    const attrs = json?.data?.attributes ?? {};
+    const price = Number(attrs.base_token_price_usd);
+    if (!isFinite(price) || price <= 0) {
+      return JSON.stringify({ ok: false, error: "no price returned" });
+    }
+    const out: Record<string, unknown> = {
+      ok: true,
+      token: "VIBE",
+      network: "base",
+      contract: "0x7255ecf1020a95fed5323dd4feb23a54ab1aa7d1",
+      price_usd: price,
+      fdv_usd: Number(attrs.fdv_usd) || null,
+      liquidity_usd: Number(attrs.reserve_in_usd) || null,
+      volume_24h_usd: Number(attrs?.volume_usd?.h24) || null,
+      price_change_24h_pct: Number(attrs?.price_change_percentage?.h24) || null,
+      pool_name: attrs.name ?? null,
+      source: "geckoterminal",
+    };
+    if (typeof args?.usd === "number" && isFinite(args.usd)) {
+      out.usd_input = args.usd;
+      out.vibe_amount = args.usd / price;
+    }
+    if (typeof args?.vibe === "number" && isFinite(args.vibe)) {
+      out.vibe_input = args.vibe;
+      out.usd_amount = args.vibe * price;
+    }
+    return JSON.stringify(out);
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+}
 
 async function executeToolCall(
   supabase: SupabaseClient,
@@ -361,6 +420,8 @@ async function executeToolCall(
       return await webSearch(parsed as { query: string; count?: number });
     case "fetch_url":
       return await fetchUrl(parsed as { url: string });
+    case "get_vibe_price":
+      return await getVibePrice(parsed as { usd?: number; vibe?: number });
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
@@ -413,6 +474,13 @@ You have access to these tools:
 - **fetch_url(url)** — fetch the readable text of a specific web page.
   Use after web_search, or when the user gives you a URL. Returns up to ~6000 chars of clean text.
   Don't use for social media or paywalled sites — won't work well.
+
+- **get_vibe_price(usd?, vibe?)** — fetch the LIVE price of VibeCoin (VIBE on Base) from GeckoTerminal.
+  Call this ANY time the user mentions VIBE, VibeCoin, "vibes" as a token, sending VibeCoin,
+  or asks "how many vibes is $X" / "what's my X VIBE worth" / "what's vibe at". NEVER answer
+  VIBE pricing from memory — always call this tool. Pass `usd` to convert dollars→VIBE,
+  or `vibe` to convert VIBE→dollars. Pool liquidity is thin (~$60-70K), so flag that only
+  when the user is talking about distribution or selling, not for simple lookups.
 
 You can call any tool zero, one, or multiple times before replying. After all tool
 calls finish, give the user your normal natural-language reply — don't mention tools
@@ -686,6 +754,12 @@ function describeToolStart(name: string, args: Record<string, unknown>): string 
       return "🧠 jotting this one down…";
     case "update_memory":
       return "✏️ rewriting that memory…";
+    case "get_vibe_price": {
+      const usd = args?.usd, vibe = args?.vibe;
+      if (typeof usd === "number") return `🪙 checking VIBE for $${usd}…`;
+      if (typeof vibe === "number") return `🪙 valuing ${Number(vibe).toLocaleString()} VIBE…`;
+      return "🪙 fetching live VIBE price…";
+    }
     default:
       return `⚙️ running ${name}…`;
   }
@@ -723,6 +797,19 @@ function describeToolDone(
         label: `📝 memory updated`,
         details: `before: ${before}\nafter:  ${after}`,
       };
+    }
+    case "get_vibe_price": {
+      if (result?.ok === false) return { label: `🥲 couldn't fetch VIBE price`, details: result?.error };
+      const p = Number(result?.price_usd);
+      const priceStr = p ? `$${p.toFixed(10).replace(/0+$/, "0")}` : "—";
+      const lines = [`price: ${priceStr}`];
+      if (typeof result?.vibe_amount === "number") {
+        lines.push(`$${result.usd_input} = ${Math.round(result.vibe_amount).toLocaleString()} VIBE`);
+      }
+      if (typeof result?.usd_amount === "number") {
+        lines.push(`${Number(result.vibe_input).toLocaleString()} VIBE = $${result.usd_amount.toFixed(4)}`);
+      }
+      return { label: `🪙 VIBE price fetched`, details: lines.join("\n") };
     }
     default:
       return { label: `✅ ${name} done` };
