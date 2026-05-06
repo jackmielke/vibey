@@ -475,6 +475,13 @@ You have access to these tools:
   Use after web_search, or when the user gives you a URL. Returns up to ~6000 chars of clean text.
   Don't use for social media or paywalled sites — won't work well.
 
+- **get_vibe_price(usd?, vibe?)** — fetch the LIVE price of VibeCoin (VIBE on Base) from GeckoTerminal.
+  Call this ANY time the user mentions VIBE, VibeCoin, "vibes" as a token, sending VibeCoin,
+  or asks "how many vibes is $X" / "what's my X VIBE worth" / "what's vibe at". NEVER answer
+  VIBE pricing from memory — always call this tool. Pass `usd` to convert dollars→VIBE,
+  or `vibe` to convert VIBE→dollars. Pool liquidity is thin (~$60-70K), so flag that only
+  when the user is talking about distribution or selling, not for simple lookups.
+
 You can call any tool zero, one, or multiple times before replying. After all tool
 calls finish, give the user your normal natural-language reply — don't mention tools
 by name unless they ask. When citing web info, mention the source naturally
