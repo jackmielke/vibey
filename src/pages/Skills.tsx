@@ -1,16 +1,13 @@
 import { PageShell } from "@/components/PageShell";
+import { SkillsSection } from "@/components/sections/SkillsSection";
 
 export default function Skills() {
   return (
     <PageShell
       title="Skills"
-      description="On-demand prompts Vibey can invoke. Skills are lightweight playbooks — describe a behavior and Vibey can call it mid-conversation. Tools, by contrast, are concrete actions and API calls."
+      description="On-demand prompt playbooks Vibey can invoke. Skills are lightweight behaviors — describe one and Vibey can call it mid-conversation. Tools, by contrast, are concrete API calls."
     >
-      <div className="rounded-lg border border-dashed border-border p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          No skills defined yet. This is where you'll author reusable prompts Vibey can pull from.
-        </p>
-      </div>
+      <SkillsSection />
     </PageShell>
   );
 }
