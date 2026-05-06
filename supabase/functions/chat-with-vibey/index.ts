@@ -9,8 +9,10 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
+  buildSkillsBlock,
   buildSystemPromptWithMemories,
   buildUserContextBlock,
+  loadEnabledSkills,
   loadRecentMemories,
   loadUserPreferences,
   resolveVibeUserId,
