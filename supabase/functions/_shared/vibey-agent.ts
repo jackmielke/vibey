@@ -798,6 +798,19 @@ function describeToolDone(
         details: `before: ${before}\nafter:  ${after}`,
       };
     }
+    case "get_vibe_price": {
+      if (result?.ok === false) return { label: `🥲 couldn't fetch VIBE price`, details: result?.error };
+      const p = Number(result?.price_usd);
+      const priceStr = p ? `$${p.toFixed(10).replace(/0+$/, "0")}` : "—";
+      const lines = [`price: ${priceStr}`];
+      if (typeof result?.vibe_amount === "number") {
+        lines.push(`$${result.usd_input} = ${Math.round(result.vibe_amount).toLocaleString()} VIBE`);
+      }
+      if (typeof result?.usd_amount === "number") {
+        lines.push(`${Number(result.vibe_input).toLocaleString()} VIBE = $${result.usd_amount.toFixed(4)}`);
+      }
+      return { label: `🪙 VIBE price fetched`, details: lines.join("\n") };
+    }
     default:
       return { label: `✅ ${name} done` };
   }
