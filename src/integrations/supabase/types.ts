@@ -71,6 +71,45 @@ export type Database = {
           },
         ]
       }
+      agent_tools: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          id: string
+          is_enabled: boolean
+          label: string
+          name: string
+          required_secrets: string[]
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description: string
+          id?: string
+          is_enabled?: boolean
+          label: string
+          name: string
+          required_secrets?: string[]
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          is_enabled?: boolean
+          label?: string
+          name?: string
+          required_secrets?: string[]
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       agents: {
         Row: {
           avatar_url: string | null
