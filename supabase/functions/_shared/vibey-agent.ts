@@ -159,6 +159,41 @@ export function filterToolsByEnabled(enabled: Set<string>) {
   return TOOLS.filter((t) => enabled.has(t.function.name));
 }
 
+// ── Skills (DB-backed prompt playbooks) ─────────────────────────────────────
+
+export type Skill = {
+  name: string;
+  label: string;
+  description: string;
+  prompt: string;
+  category: string;
+};
+
+export async function loadEnabledSkills(supabase: SupabaseClient): Promise<Skill[]> {
+  const { data, error } = await supabase
+    .from("agent_skills")
+    .select("name, label, description, prompt, category")
+    .eq("is_enabled", true)
+    .order("category")
+    .order("label");
+  if (error) {
+    console.error("loadEnabledSkills failed:", error.message);
+    return [];
+  }
+  return (data ?? []) as Skill[];
+}
+
+export function buildSkillsBlock(skills: Skill[]): string {
+  if (skills.length === 0) return "";
+  const lines = skills
+    .map(
+      (s) =>
+        `### ${s.label} (${s.name})\n_When to use:_ ${s.description}\n_Playbook:_ ${s.prompt}`
+    )
+    .join("\n\n");
+  return `\n\n## Skills (on-demand playbooks)\n\nThese are prompt-level behaviors you can invoke yourself when the user's request fits. Don't announce them by name — just follow the playbook.\n\n${lines}`;
+}
+
 // ── Memory store ─────────────────────────────────────────────────────────────
 
 export async function loadRecentMemories(

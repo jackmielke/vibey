@@ -16,8 +16,10 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
+  buildSkillsBlock,
   buildSystemPromptWithMemories,
   buildUserContextBlock,
+  loadEnabledSkills,
   loadRecentMemories,
   loadUserPreferences,
   resolveVibeUserId,
@@ -383,16 +385,17 @@ Deno.serve(async (req) => {
     }
 
     // Hydrate history for this group session + load community memories + per-user prefs.
-    const [history, memories, userPrefs] = await Promise.all([
+    const [history, memories, userPrefs, skills] = await Promise.all([
       loadHistory(supabase, sessionKey),
       loadRecentMemories(supabase),
       loadUserPreferences(supabase, { telegram_user_id: userId, telegram_username: msg.from?.username ?? null }),
+      loadEnabledSkills(supabase),
     ]);
     const userContext = buildUserContextBlock(userPrefs, {
       display_name: msg.from?.first_name ?? null,
       telegram_username: msg.from?.username ?? null,
     });
-    const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId)}\n\n${userContext}`;
+    const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
     const reply = await runAgentLoop({
       supabase,
@@ -461,16 +464,17 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200 });
   }
 
-  const [history, memories, userPrefs] = await Promise.all([
+  const [history, memories, userPrefs, skills] = await Promise.all([
     loadHistory(supabase, sessionKey),
     loadRecentMemories(supabase),
     loadUserPreferences(supabase, { telegram_user_id: userId, telegram_username: msg.from?.username ?? null }),
+    loadEnabledSkills(supabase),
   ]);
   const userContext = buildUserContextBlock(userPrefs, {
     display_name: msg.from?.first_name ?? null,
     telegram_username: msg.from?.username ?? null,
   });
-  const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId)}\n\n${userContext}`;
+  const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
   const reply = await runAgentLoop({
     supabase,
