@@ -141,13 +141,26 @@ export function MemorySection() {
     const prev = memories;
     setMemories((m) => m.filter((x) => x.id !== id));
     setDeleteId(null);
-    const { error } = await supabase.from("memories").delete().eq("id", id);
+    // Use .select() so we can detect when RLS silently blocks the delete
+    // (Supabase returns success with 0 rows instead of erroring).
+    const { data, error } = await supabase
+      .from("memories")
+      .delete()
+      .eq("id", id)
+      .select("id");
     if (error) {
       toast.error("Couldn't delete", { description: error.message });
       setMemories(prev);
-    } else {
-      toast.success("memory deleted");
+      return;
     }
+    if (!data || data.length === 0) {
+      toast.error("Couldn't delete", {
+        description: "You don't have permission to delete this memory.",
+      });
+      setMemories(prev);
+      return;
+    }
+    toast.success("memory deleted");
   }
 
   return (
