@@ -537,7 +537,7 @@ Deno.serve(async (req) => {
     }
 
     // Strip the @mention from the text so the model doesn't see it as part of the message.
-    const cleanText = userText
+    const cleanText = userTextForModel
       .replace(new RegExp(`@${BOT_USERNAME}`, "gi"), "")
       .trim();
 
@@ -577,7 +577,8 @@ Deno.serve(async (req) => {
       maxTokens: agent.max_tokens ?? 2048,
       systemPrompt,
       history,
-      userText: cleanText || userText,
+      userText: cleanText || userTextForModel,
+      images: attachmentImages,
       toolMetadata: {
         source: "telegram_group",
         chat_id: chatId,
