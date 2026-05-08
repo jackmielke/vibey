@@ -202,7 +202,7 @@ function PeopleList({
   return (
     <ul className="divide-y divide-border border border-border rounded">
       {items.map((r) => {
-        const avatar = r.profile_picture_url || r.avatar_url || undefined;
+        const avatar = r.profile_picture_url || r.avatar_url || r.telegram_photo_url || undefined;
         const handle = r.telegram_username || r.username;
         const rel = r.relationship;
         const hasNotes = !!rel?.relationship_notes?.trim();
