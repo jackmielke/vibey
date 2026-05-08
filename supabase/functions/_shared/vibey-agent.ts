@@ -16,9 +16,15 @@ export const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 // (We can swap this for a `recall_memories` tool later when the corpus grows.)
 export const MEMORY_PRELOAD_LIMIT = 50;
 
+export type ImageInput = { url: string; detail?: "low" | "high" | "auto" };
+
+export type UserContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } };
+
 export type ChatMessage = {
   role: "user" | "assistant" | "system" | "tool";
-  content: string | null;
+  content: string | UserContentPart[] | null;
   // OpenAI-format tool calling
   tool_calls?: Array<{
     id: string;
