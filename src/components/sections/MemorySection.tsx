@@ -18,6 +18,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 
 type MemoryRow = {
@@ -26,13 +28,18 @@ type MemoryRow = {
   tags: string[] | null;
   created_at: string;
   metadata: Record<string, unknown> | null;
+  created_by: string | null;
+};
+
+type AuthorInfo = {
+  name: string | null;
+  username: string | null;
+  avatar_url: string | null;
 };
 
 function memorySource(metadata: Record<string, unknown> | null): string | null {
   if (!metadata) return null;
-  const username = metadata.telegram_username as string | undefined;
   const source = metadata.source as string | undefined;
-  if (username) return `@${username}`;
   if (source === "telegram_group") return "telegram group";
   if (source === "telegram_dm") return "telegram dm";
   if (source === "telegram_agent") return "telegram";
@@ -40,8 +47,15 @@ function memorySource(metadata: Record<string, unknown> | null): string | null {
   return null;
 }
 
+function initials(name: string | null | undefined): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
+}
+
 export function MemorySection() {
   const [memories, setMemories] = useState<MemoryRow[]>([]);
+  const [authors, setAuthors] = useState<Record<string, AuthorInfo>>({});
   const [loading, setLoading] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);
   const [newContent, setNewContent] = useState("");
@@ -56,7 +70,7 @@ export function MemorySection() {
   async function loadMemories() {
     const { data, error } = await supabase
       .from("memories")
-      .select("id, content, tags, created_at, metadata")
+      .select("id, content, tags, created_at, metadata, created_by")
       .eq("community_id", VIBEY_COMMUNITY_ID)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -66,8 +80,76 @@ export function MemorySection() {
       setLoading(false);
       return;
     }
-    setMemories((data ?? []) as MemoryRow[]);
+    const rows = (data ?? []) as MemoryRow[];
+    setMemories(rows);
     setLoading(false);
+
+    // Resolve authors: by created_by uuid OR by metadata.telegram_user_id /
+    // telegram_username. Batch-fetch.
+    const userIds = new Set<string>();
+    const tgIds = new Set<number>();
+    const tgUsernames = new Set<string>();
+    for (const m of rows) {
+      if (m.created_by) userIds.add(m.created_by);
+      const meta = m.metadata ?? {};
+      const tid = (meta as { telegram_user_id?: number }).telegram_user_id;
+      const tuser = (meta as { telegram_username?: string }).telegram_username;
+      if (typeof tid === "number") tgIds.add(tid);
+      if (typeof tuser === "string" && tuser) tgUsernames.add(tuser.toLowerCase());
+    }
+
+    const cols = "id, name, username, telegram_username, telegram_user_id, telegram_photo_url, avatar_url, profile_picture_url";
+    const lookup: Record<string, AuthorInfo> = {};
+
+    const toInfo = (row: Record<string, unknown>): AuthorInfo => ({
+      name: (row.name as string) ?? null,
+      username: (row.telegram_username as string) ?? (row.username as string) ?? null,
+      avatar_url:
+        (row.telegram_photo_url as string) ??
+        (row.avatar_url as string) ??
+        (row.profile_picture_url as string) ??
+        null,
+    });
+
+    if (userIds.size) {
+      const { data: u } = await supabase.from("users").select(cols).in("id", Array.from(userIds));
+      for (const row of (u ?? []) as Record<string, unknown>[]) {
+        lookup[`id:${row.id}`] = toInfo(row);
+      }
+    }
+    if (tgIds.size) {
+      const { data: u } = await supabase
+        .from("users")
+        .select(cols)
+        .in("telegram_user_id", Array.from(tgIds));
+      for (const row of (u ?? []) as Record<string, unknown>[]) {
+        lookup[`tgid:${row.telegram_user_id}`] = toInfo(row);
+      }
+    }
+    if (tgUsernames.size) {
+      const { data: u } = await supabase
+        .from("users")
+        .select(cols)
+        .in("telegram_username", Array.from(tgUsernames));
+      for (const row of (u ?? []) as Record<string, unknown>[]) {
+        const tu = row.telegram_username as string | null;
+        if (tu) lookup[`tguser:${tu.toLowerCase()}`] = toInfo(row);
+      }
+    }
+    setAuthors(lookup);
+  }
+
+  function authorFor(m: MemoryRow): AuthorInfo | null {
+    if (m.created_by && authors[`id:${m.created_by}`]) return authors[`id:${m.created_by}`];
+    const meta = m.metadata ?? {};
+    const tid = (meta as { telegram_user_id?: number }).telegram_user_id;
+    const tuser = (meta as { telegram_username?: string }).telegram_username;
+    if (typeof tid === "number" && authors[`tgid:${tid}`]) return authors[`tgid:${tid}`];
+    if (typeof tuser === "string" && authors[`tguser:${tuser.toLowerCase()}`]) {
+      return authors[`tguser:${tuser.toLowerCase()}`];
+    }
+    if (typeof tuser === "string") return { name: null, username: tuser, avatar_url: null };
+    return null;
   }
 
   useEffect(() => {
