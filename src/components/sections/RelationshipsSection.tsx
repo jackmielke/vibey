@@ -303,7 +303,7 @@ function UserDrawer({
 
   if (!row) return null;
 
-  const avatar = row.profile_picture_url || row.avatar_url || undefined;
+  const avatar = row.profile_picture_url || row.avatar_url || row.telegram_photo_url || undefined;
   const handle = row.telegram_username || row.username;
   const rel = row.relationship;
 
