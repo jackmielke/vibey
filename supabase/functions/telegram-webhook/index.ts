@@ -282,6 +282,72 @@ async function processAttachments(
   return { images, extraText };
 }
 
+// ── Telegram avatar caching ──────────────────────────────────────────────────
+// Fetches the user's profile photo from Telegram, uploads to the avatars
+// bucket, and stores the public URL on users.telegram_photo_url. Best-effort:
+// returns silently on any failure. Skips if we already cached one recently.
+
+// deno-lint-ignore no-explicit-any
+async function ensureTelegramAvatar(
+  supabase: any,
+  botToken: string,
+  vibeUserId: string | null,
+  telegramUserId: number,
+): Promise<void> {
+  if (!vibeUserId) return;
+  try {
+    // Skip if we already have a photo cached.
+    const { data: existing } = await supabase
+      .from("users")
+      .select("telegram_photo_url")
+      .eq("id", vibeUserId)
+      .maybeSingle();
+    if (existing?.telegram_photo_url) return;
+
+    // 1. Get user profile photos.
+    const photosResp = await fetch(
+      `https://api.telegram.org/bot${botToken}/getUserProfilePhotos?user_id=${telegramUserId}&limit=1`,
+    );
+    const photosJson = await photosResp.json();
+    const photoSizes = photosJson?.result?.photos?.[0];
+    if (!photoSizes || photoSizes.length === 0) return;
+    // Pick the largest size.
+    const largest = photoSizes.reduce(
+      // deno-lint-ignore no-explicit-any
+      (a: any, b: any) => (a.width * a.height > b.width * b.height ? a : b),
+    );
+
+    // 2. Download the file.
+    const file = await downloadTelegramFile(botToken, largest.file_id, "image/jpeg");
+    if (!file) return;
+
+    // 3. Upload to avatars bucket.
+    const ext = file.filename.split(".").pop() || "jpg";
+    const path = `telegram/${telegramUserId}.${ext}`;
+    const { error: uploadErr } = await supabase.storage
+      .from("avatars")
+      .upload(path, file.bytes, {
+        contentType: file.mime,
+        upsert: true,
+      });
+    if (uploadErr) {
+      console.error("avatar upload failed:", uploadErr.message);
+      return;
+    }
+    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+    const url = pub?.publicUrl;
+    if (!url) return;
+
+    // 4. Save URL on user row.
+    await supabase
+      .from("users")
+      .update({ telegram_photo_url: url })
+      .eq("id", vibeUserId);
+  } catch (e) {
+    console.error("ensureTelegramAvatar threw:", e);
+  }
+}
+
 // ── Mention detection ─────────────────────────────────────────────────────────
 
 function isMentioned(msg: TelegramMessage): boolean {
@@ -469,6 +535,12 @@ Deno.serve(async (req) => {
   if (!isGroup) {
     sessionKey = unifiedSessionKey(vibeUserId, fallbackSessionKey);
   }
+
+  // Best-effort: cache the user's Telegram profile photo so the mini app can
+  // display it next to their memories. Fire-and-forget.
+  ensureTelegramAvatar(supabase, TELEGRAM_BOT_TOKEN, vibeUserId, userId).catch(
+    (e) => console.error("ensureTelegramAvatar failed:", e),
+  );
 
   // ── Group chat: opt-in logic ──────────────────────────────────────────────
 
