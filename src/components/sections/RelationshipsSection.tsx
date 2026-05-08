@@ -85,7 +85,7 @@ export function RelationshipsSection() {
     const [{ data: users }, { data: rels }] = await Promise.all([
       supabase
         .from("users")
-        .select("id, name, username, telegram_username, telegram_user_id, avatar_url, profile_picture_url, headline")
+        .select("id, name, username, telegram_username, telegram_user_id, avatar_url, profile_picture_url, telegram_photo_url, headline")
         .in("id", userIds),
       supabase
         .from("vibey_relationships")
