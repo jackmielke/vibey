@@ -15,6 +15,10 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Settings2,
+  Image as ImageIcon,
+  UsersRound,
+  LayoutDashboard,
 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -76,11 +80,17 @@ function Label({ children }: { children: React.ReactNode }) {
 
 const SHORTCUTS = [
   { to: "/soul", label: "Soul", icon: Sparkles },
-  { to: "/identity", label: "Identity", icon: IdCard },
   { to: "/memory", label: "Memory", icon: Brain },
+  { to: "/skills", label: "Skills", icon: Zap },
   { to: "/tools", label: "Tools", icon: Wrench },
-  { to: "/relationships", label: "Members", icon: Users },
+  { to: "/relationships", label: "Preferences", icon: Users },
   { to: "/automations", label: "Heartbeat", icon: Heart },
+  { to: "/interfaces", label: "Interfaces", icon: Settings2 },
+  { to: "/identity", label: "Identity", icon: IdCard },
+  { to: "/conversations", label: "Chat History", icon: MessagesSquare },
+  { to: "/media", label: "Media", icon: ImageIcon },
+  { to: "/groups", label: "Groups", icon: UsersRound },
+  { to: "/sections", label: "Sections", icon: LayoutDashboard },
 ];
 
 export default function MissionControl() {
@@ -114,6 +124,23 @@ export default function MissionControl() {
             <Label>Last message</Label>
             <p className="font-mono text-sm">{timeAgo(stats?.lastMessageAt ?? null)}</p>
           </div>
+        </div>
+      </div>
+
+      {/* Quick edit shortcuts — pinned to the top, Notion-style tab strip */}
+      <div>
+        <p className="text-label mb-2">Quick edit</p>
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
+          {SHORTCUTS.map((s) => (
+            <Link
+              key={s.to}
+              to={s.to}
+              className="group rounded-md border border-border bg-card p-3 flex flex-col items-center justify-center gap-1.5 hover:border-primary/40 hover:bg-primary/5 transition-colors"
+            >
+              <s.icon className="h-4 w-4 text-primary" />
+              <span className="font-mono text-[10px] uppercase tracking-wider text-center leading-tight">{s.label}</span>
+            </Link>
+          ))}
         </div>
       </div>
 
@@ -247,23 +274,6 @@ export default function MissionControl() {
           <div className="mt-2 font-mono text-sm font-semibold">Edit memory →</div>
           <Brain className="absolute bottom-3 right-3 h-4 w-4 text-primary/40" />
         </Tile>
-      </div>
-
-      {/* Quick edit shortcuts */}
-      <div>
-        <p className="text-label mb-2">Quick edit</p>
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-          {SHORTCUTS.map((s) => (
-            <Link
-              key={s.to}
-              to={s.to}
-              className="group rounded-md border border-border bg-card p-3 flex flex-col items-center justify-center gap-1.5 hover:border-primary/40 hover:bg-primary/5 transition-colors"
-            >
-              <s.icon className="h-4 w-4 text-primary" />
-              <span className="font-mono text-[10px] uppercase tracking-wider">{s.label}</span>
-            </Link>
-          ))}
-        </div>
       </div>
     </PageShell>
   );
