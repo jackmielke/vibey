@@ -164,6 +164,124 @@ async function transcribeVoice(
   }
 }
 
+// ── Telegram file download + attachment handling ─────────────────────────────
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB
+
+async function downloadTelegramFile(
+  botToken: string,
+  fileId: string,
+  fallbackMime?: string
+): Promise<{ bytes: Uint8Array; mime: string; filename: string } | null> {
+  try {
+    const fileResp = await fetch(
+      `https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`
+    );
+    const fileJson = await fileResp.json();
+    const filePath = fileJson?.result?.file_path;
+    if (!filePath) {
+      console.error("getFile returned no file_path", fileJson);
+      return null;
+    }
+    const dl = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
+    if (!dl.ok) {
+      console.error("file download failed", dl.status);
+      return null;
+    }
+    const buf = new Uint8Array(await dl.arrayBuffer());
+    const mime = dl.headers.get("content-type") || fallbackMime || "application/octet-stream";
+    const filename = filePath.split("/").pop() || "file";
+    return { bytes: buf, mime, filename };
+  } catch (e) {
+    console.error("downloadTelegramFile threw:", e);
+    return null;
+  }
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+
+async function extractPdfText(bytes: Uint8Array): Promise<string | null> {
+  try {
+    const { extractText, getDocumentProxy } = await import(
+      "https://esm.sh/unpdf@0.12.1"
+    );
+    const pdf = await getDocumentProxy(bytes);
+    const { text } = await extractText(pdf, { mergePages: true });
+    const merged = (Array.isArray(text) ? text.join("\n\n") : String(text || "")).trim();
+    return merged || null;
+  } catch (e) {
+    console.error("extractPdfText threw:", e);
+    return null;
+  }
+}
+
+// Returns images (data URLs for vision), extraText (e.g. parsed PDFs to prepend),
+// and an optional userError when we should bail with a friendly message.
+async function processAttachments(
+  botToken: string,
+  msg: TelegramMessage
+): Promise<{ images: { url: string }[]; extraText: string[]; userError?: string }> {
+  const images: { url: string }[] = [];
+  const extraText: string[] = [];
+
+  if (msg.photo && msg.photo.length > 0) {
+    const largest = msg.photo.reduce((a, b) =>
+      (a.file_size ?? a.width * a.height) > (b.file_size ?? b.width * b.height) ? a : b
+    );
+    if ((largest.file_size ?? 0) > MAX_IMAGE_BYTES) {
+      return { images, extraText, userError: "that photo's a bit too big — anything under ~10MB works." };
+    }
+    const file = await downloadTelegramFile(botToken, largest.file_id, "image/jpeg");
+    if (!file) {
+      return { images, extraText, userError: "couldn't download that photo — mind resending?" };
+    }
+    images.push({ url: `data:${file.mime};base64,${bytesToBase64(file.bytes)}` });
+  }
+
+  if (msg.document) {
+    const doc = msg.document;
+    const mime = (doc.mime_type || "").toLowerCase();
+    const name = doc.file_name || "file";
+
+    if (mime.startsWith("image/")) {
+      if ((doc.file_size ?? 0) > MAX_IMAGE_BYTES) {
+        return { images, extraText, userError: `"${name}" is too big — try under ~10MB.` };
+      }
+      const file = await downloadTelegramFile(botToken, doc.file_id, mime);
+      if (!file) return { images, extraText, userError: `couldn't download "${name}".` };
+      images.push({ url: `data:${file.mime};base64,${bytesToBase64(file.bytes)}` });
+    } else if (mime === "application/pdf" || name.toLowerCase().endsWith(".pdf")) {
+      if ((doc.file_size ?? 0) > MAX_PDF_BYTES) {
+        return { images, extraText, userError: `"${name}" is over 20MB — too chunky for me to read.` };
+      }
+      const file = await downloadTelegramFile(botToken, doc.file_id, "application/pdf");
+      if (!file) return { images, extraText, userError: `couldn't download "${name}".` };
+      const text = await extractPdfText(file.bytes);
+      if (!text) {
+        return { images, extraText, userError: `i grabbed "${name}" but couldn't pull any text — is it scanned/image-only?` };
+      }
+      const truncated = text.length > 60000 ? text.slice(0, 60000) + "\n…[truncated]" : text;
+      extraText.push(`[Attached PDF: ${name}]\n\n${truncated}`);
+    } else {
+      return {
+        images,
+        extraText,
+        userError: `i can read images and PDFs — "${name}" (${mime || "unknown type"}) isn't something i can open yet.`,
+      };
+    }
+  }
+
+  return { images, extraText };
+}
+
 // ── Mention detection ─────────────────────────────────────────────────────────
 
 function isMentioned(msg: TelegramMessage): boolean {
