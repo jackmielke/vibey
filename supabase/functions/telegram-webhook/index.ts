@@ -374,8 +374,8 @@ Deno.serve(async (req) => {
   const isGroup = chatType === "group" || chatType === "supergroup";
   const fallbackSessionKey = `telegram:${chatId}`;
 
-  // Resolve the user's text — either raw text, or transcribed voice/audio.
-  let userText = (msg.text ?? "").trim();
+  // Resolve the user's text — text, caption (for photos/docs), or transcribed voice.
+  let userText = (msg.text ?? msg.caption ?? "").trim();
   let wasVoice = false;
 
   if (!userText && (msg.voice || msg.audio)) {
@@ -389,7 +389,6 @@ Deno.serve(async (req) => {
       return new Response("ok", { status: 200 });
     }
 
-    // Show "recording" feedback while we transcribe.
     await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", {
       chat_id: chatId,
       action: "typing",
@@ -410,7 +409,6 @@ Deno.serve(async (req) => {
     userText = transcript;
     wasVoice = true;
 
-    // Echo back what we heard so the user can confirm.
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
       chat_id: chatId,
       text: `🎙️ <i>${transcript.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!))}</i>`,
@@ -419,8 +417,44 @@ Deno.serve(async (req) => {
     });
   }
 
-  // No text and no voice — nothing to do.
-  if (!userText) return new Response("ok", { status: 200 });
+  // Process photo / document attachments (images, PDFs).
+  const hasAttachments = !!(msg.photo?.length || msg.document);
+  let attachmentImages: { url: string }[] = [];
+  let attachmentExtraText: string[] = [];
+  if (hasAttachments) {
+    await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
+    const result = await processAttachments(TELEGRAM_BOT_TOKEN, msg);
+    if (result.userError) {
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: result.userError,
+        reply_to_message_id: msg.message_id,
+      });
+      return new Response("ok", { status: 200 });
+    }
+    attachmentImages = result.images;
+    attachmentExtraText = result.extraText;
+    // If user sent only an attachment with no caption, give the model a default prompt.
+    if (!userText) {
+      if (attachmentImages.length > 0 && attachmentExtraText.length === 0) {
+        userText = "(user sent an image with no caption — describe or react to it)";
+      } else if (attachmentExtraText.length > 0 && attachmentImages.length === 0) {
+        userText = "(user sent a PDF with no caption — summarize the key points)";
+      } else {
+        userText = "(user sent attachments with no caption)";
+      }
+    }
+  }
+
+  // No text and no attachments — nothing to do.
+  if (!userText && attachmentImages.length === 0 && attachmentExtraText.length === 0) {
+    return new Response("ok", { status: 200 });
+  }
+
+  // Prepend any parsed PDF text to the user message.
+  const userTextForModel = attachmentExtraText.length > 0
+    ? `${attachmentExtraText.join("\n\n")}\n\n---\n\n${userText}`
+    : userText;
 
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
