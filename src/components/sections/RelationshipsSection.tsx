@@ -29,6 +29,7 @@ type Member = {
   telegram_user_id: number | null;
   avatar_url: string | null;
   profile_picture_url: string | null;
+  telegram_photo_url: string | null;
   headline: string | null;
 };
 
