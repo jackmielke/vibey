@@ -15,6 +15,10 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Settings2,
+  Image as ImageIcon,
+  UsersRound,
+  LayoutDashboard,
 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { Skeleton } from "@/components/ui/skeleton";
