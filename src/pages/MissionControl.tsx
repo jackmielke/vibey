@@ -275,23 +275,6 @@ export default function MissionControl() {
           <Brain className="absolute bottom-3 right-3 h-4 w-4 text-primary/40" />
         </Tile>
       </div>
-
-      {/* Quick edit shortcuts */}
-      <div>
-        <p className="text-label mb-2">Quick edit</p>
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-          {SHORTCUTS.map((s) => (
-            <Link
-              key={s.to}
-              to={s.to}
-              className="group rounded-md border border-border bg-card p-3 flex flex-col items-center justify-center gap-1.5 hover:border-primary/40 hover:bg-primary/5 transition-colors"
-            >
-              <s.icon className="h-4 w-4 text-primary" />
-              <span className="font-mono text-[10px] uppercase tracking-wider">{s.label}</span>
-            </Link>
-          ))}
-        </div>
-      </div>
     </PageShell>
   );
 }
