@@ -29,6 +29,7 @@ type Member = {
   telegram_user_id: number | null;
   avatar_url: string | null;
   profile_picture_url: string | null;
+  telegram_photo_url: string | null;
   headline: string | null;
 };
 
@@ -84,7 +85,7 @@ export function RelationshipsSection() {
     const [{ data: users }, { data: rels }] = await Promise.all([
       supabase
         .from("users")
-        .select("id, name, username, telegram_username, telegram_user_id, avatar_url, profile_picture_url, headline")
+        .select("id, name, username, telegram_username, telegram_user_id, avatar_url, profile_picture_url, telegram_photo_url, headline")
         .in("id", userIds),
       supabase
         .from("vibey_relationships")
@@ -201,7 +202,7 @@ function PeopleList({
   return (
     <ul className="divide-y divide-border border border-border rounded">
       {items.map((r) => {
-        const avatar = r.profile_picture_url || r.avatar_url || undefined;
+        const avatar = r.profile_picture_url || r.avatar_url || r.telegram_photo_url || undefined;
         const handle = r.telegram_username || r.username;
         const rel = r.relationship;
         const hasNotes = !!rel?.relationship_notes?.trim();
@@ -302,7 +303,7 @@ function UserDrawer({
 
   if (!row) return null;
 
-  const avatar = row.profile_picture_url || row.avatar_url || undefined;
+  const avatar = row.profile_picture_url || row.avatar_url || row.telegram_photo_url || undefined;
   const handle = row.telegram_username || row.username;
   const rel = row.relationship;
 
