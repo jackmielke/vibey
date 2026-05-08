@@ -536,6 +536,12 @@ Deno.serve(async (req) => {
     sessionKey = unifiedSessionKey(vibeUserId, fallbackSessionKey);
   }
 
+  // Best-effort: cache the user's Telegram profile photo so the mini app can
+  // display it next to their memories. Fire-and-forget.
+  ensureTelegramAvatar(supabase, TELEGRAM_BOT_TOKEN, vibeUserId, userId).catch(
+    (e) => console.error("ensureTelegramAvatar failed:", e),
+  );
+
   // ── Group chat: opt-in logic ──────────────────────────────────────────────
 
   if (isGroup) {
