@@ -306,7 +306,125 @@ export function MemorySection() {
           {memories.map((m) => {
             const source = memorySource(m.metadata);
             const isEditing = editingId === m.id;
+            const author = authorFor(m);
+            const displayName = author?.name || (author?.username ? `@${author.username}` : "vibey");
             return (
+              <div
+                key={m.id}
+                className="group p-3 rounded-lg bg-card border border-border hover:border-primary/40 transition-colors"
+              >
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      rows={3}
+                      className="resize-none text-sm"
+                    />
+                    <Input
+                      value={editTags}
+                      onChange={(e) => setEditTags(e.target.value)}
+                      placeholder="tags (comma separated)"
+                      className="font-mono text-xs"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                        <X className="w-3.5 h-3.5 mr-1" /> cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={saveEdit}
+                        disabled={editSaving || !editContent.trim()}
+                      >
+                        {editSaving ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <Check className="w-3.5 h-3.5 mr-1" /> save
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <Avatar className="w-8 h-8 shrink-0 mt-0.5">
+                      {author?.avatar_url ? (
+                        <AvatarImage src={author.avatar_url} alt={displayName} />
+                      ) : null}
+                      <AvatarFallback className="text-[10px] font-mono bg-muted">
+                        {initials(author?.name ?? author?.username)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="text-xs font-medium">{displayName}</span>
+                            {author?.username && author?.name && (
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                @{author.username}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap mt-1">{m.content}</p>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <a
+                            href={buildTelegramShareUrl(formatMemoryForTelegram(m))}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-primary p-1"
+                            aria-label="Share to Telegram"
+                            title="Share to Telegram"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                          </a>
+                          <button
+                            onClick={() => startEdit(m)}
+                            className="text-muted-foreground hover:text-primary p-1"
+                            aria-label="Edit memory"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteId(m.id)}
+                            className="text-muted-foreground hover:text-destructive p-1"
+                            aria-label="Delete memory"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 mt-2 flex-wrap">
+                        <span className="text-[10px] text-muted-foreground font-mono">
+                          {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
+                        </span>
+                        {source && (
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            via {source}
+                          </span>
+                        )}
+                        {m.tags && m.tags.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Tag className="w-3 h-3 text-muted-foreground" />
+                            {m.tags.map((t) => (
+                              <span
+                                key={t}
+                                className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary"
+                              >
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
               <div
                 key={m.id}
                 className="group p-3 rounded-lg bg-card border border-border hover:border-primary/40 transition-colors"
