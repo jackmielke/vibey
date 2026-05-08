@@ -55,14 +55,34 @@ type TelegramVoice = {
   file_size?: number;
 };
 
+type TelegramPhotoSize = {
+  file_id: string;
+  file_unique_id: string;
+  width: number;
+  height: number;
+  file_size?: number;
+};
+
+type TelegramDocument = {
+  file_id: string;
+  file_unique_id: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+  thumbnail?: TelegramPhotoSize;
+};
+
 type TelegramMessage = {
   message_id: number;
   from?: TelegramUser;
   chat: TelegramChat;
   date: number;
   text?: string;
+  caption?: string;
   voice?: TelegramVoice;
   audio?: TelegramVoice;
+  photo?: TelegramPhotoSize[];
+  document?: TelegramDocument;
   reply_to_message?: TelegramMessage;
   entities?: Array<{ type: string; offset: number; length: number }>;
 };
@@ -142,6 +162,124 @@ async function transcribeVoice(
     console.error("transcribeVoice threw:", e);
     return null;
   }
+}
+
+// ── Telegram file download + attachment handling ─────────────────────────────
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB
+
+async function downloadTelegramFile(
+  botToken: string,
+  fileId: string,
+  fallbackMime?: string
+): Promise<{ bytes: Uint8Array; mime: string; filename: string } | null> {
+  try {
+    const fileResp = await fetch(
+      `https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`
+    );
+    const fileJson = await fileResp.json();
+    const filePath = fileJson?.result?.file_path;
+    if (!filePath) {
+      console.error("getFile returned no file_path", fileJson);
+      return null;
+    }
+    const dl = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
+    if (!dl.ok) {
+      console.error("file download failed", dl.status);
+      return null;
+    }
+    const buf = new Uint8Array(await dl.arrayBuffer());
+    const mime = dl.headers.get("content-type") || fallbackMime || "application/octet-stream";
+    const filename = filePath.split("/").pop() || "file";
+    return { bytes: buf, mime, filename };
+  } catch (e) {
+    console.error("downloadTelegramFile threw:", e);
+    return null;
+  }
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+
+async function extractPdfText(bytes: Uint8Array): Promise<string | null> {
+  try {
+    const { extractText, getDocumentProxy } = await import(
+      "https://esm.sh/unpdf@0.12.1"
+    );
+    const pdf = await getDocumentProxy(bytes);
+    const { text } = await extractText(pdf, { mergePages: true });
+    const merged = (Array.isArray(text) ? text.join("\n\n") : String(text || "")).trim();
+    return merged || null;
+  } catch (e) {
+    console.error("extractPdfText threw:", e);
+    return null;
+  }
+}
+
+// Returns images (data URLs for vision), extraText (e.g. parsed PDFs to prepend),
+// and an optional userError when we should bail with a friendly message.
+async function processAttachments(
+  botToken: string,
+  msg: TelegramMessage
+): Promise<{ images: { url: string }[]; extraText: string[]; userError?: string }> {
+  const images: { url: string }[] = [];
+  const extraText: string[] = [];
+
+  if (msg.photo && msg.photo.length > 0) {
+    const largest = msg.photo.reduce((a, b) =>
+      (a.file_size ?? a.width * a.height) > (b.file_size ?? b.width * b.height) ? a : b
+    );
+    if ((largest.file_size ?? 0) > MAX_IMAGE_BYTES) {
+      return { images, extraText, userError: "that photo's a bit too big — anything under ~10MB works." };
+    }
+    const file = await downloadTelegramFile(botToken, largest.file_id, "image/jpeg");
+    if (!file) {
+      return { images, extraText, userError: "couldn't download that photo — mind resending?" };
+    }
+    images.push({ url: `data:${file.mime};base64,${bytesToBase64(file.bytes)}` });
+  }
+
+  if (msg.document) {
+    const doc = msg.document;
+    const mime = (doc.mime_type || "").toLowerCase();
+    const name = doc.file_name || "file";
+
+    if (mime.startsWith("image/")) {
+      if ((doc.file_size ?? 0) > MAX_IMAGE_BYTES) {
+        return { images, extraText, userError: `"${name}" is too big — try under ~10MB.` };
+      }
+      const file = await downloadTelegramFile(botToken, doc.file_id, mime);
+      if (!file) return { images, extraText, userError: `couldn't download "${name}".` };
+      images.push({ url: `data:${file.mime};base64,${bytesToBase64(file.bytes)}` });
+    } else if (mime === "application/pdf" || name.toLowerCase().endsWith(".pdf")) {
+      if ((doc.file_size ?? 0) > MAX_PDF_BYTES) {
+        return { images, extraText, userError: `"${name}" is over 20MB — too chunky for me to read.` };
+      }
+      const file = await downloadTelegramFile(botToken, doc.file_id, "application/pdf");
+      if (!file) return { images, extraText, userError: `couldn't download "${name}".` };
+      const text = await extractPdfText(file.bytes);
+      if (!text) {
+        return { images, extraText, userError: `i grabbed "${name}" but couldn't pull any text — is it scanned/image-only?` };
+      }
+      const truncated = text.length > 60000 ? text.slice(0, 60000) + "\n…[truncated]" : text;
+      extraText.push(`[Attached PDF: ${name}]\n\n${truncated}`);
+    } else {
+      return {
+        images,
+        extraText,
+        userError: `i can read images and PDFs — "${name}" (${mime || "unknown type"}) isn't something i can open yet.`,
+      };
+    }
+  }
+
+  return { images, extraText };
 }
 
 // ── Mention detection ─────────────────────────────────────────────────────────
@@ -236,8 +374,8 @@ Deno.serve(async (req) => {
   const isGroup = chatType === "group" || chatType === "supergroup";
   const fallbackSessionKey = `telegram:${chatId}`;
 
-  // Resolve the user's text — either raw text, or transcribed voice/audio.
-  let userText = (msg.text ?? "").trim();
+  // Resolve the user's text — text, caption (for photos/docs), or transcribed voice.
+  let userText = (msg.text ?? msg.caption ?? "").trim();
   let wasVoice = false;
 
   if (!userText && (msg.voice || msg.audio)) {
@@ -251,7 +389,6 @@ Deno.serve(async (req) => {
       return new Response("ok", { status: 200 });
     }
 
-    // Show "recording" feedback while we transcribe.
     await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", {
       chat_id: chatId,
       action: "typing",
@@ -272,7 +409,6 @@ Deno.serve(async (req) => {
     userText = transcript;
     wasVoice = true;
 
-    // Echo back what we heard so the user can confirm.
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
       chat_id: chatId,
       text: `🎙️ <i>${transcript.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!))}</i>`,
@@ -281,8 +417,44 @@ Deno.serve(async (req) => {
     });
   }
 
-  // No text and no voice — nothing to do.
-  if (!userText) return new Response("ok", { status: 200 });
+  // Process photo / document attachments (images, PDFs).
+  const hasAttachments = !!(msg.photo?.length || msg.document);
+  let attachmentImages: { url: string }[] = [];
+  let attachmentExtraText: string[] = [];
+  if (hasAttachments) {
+    await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
+    const result = await processAttachments(TELEGRAM_BOT_TOKEN, msg);
+    if (result.userError) {
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: result.userError,
+        reply_to_message_id: msg.message_id,
+      });
+      return new Response("ok", { status: 200 });
+    }
+    attachmentImages = result.images;
+    attachmentExtraText = result.extraText;
+    // If user sent only an attachment with no caption, give the model a default prompt.
+    if (!userText) {
+      if (attachmentImages.length > 0 && attachmentExtraText.length === 0) {
+        userText = "(user sent an image with no caption — describe or react to it)";
+      } else if (attachmentExtraText.length > 0 && attachmentImages.length === 0) {
+        userText = "(user sent a PDF with no caption — summarize the key points)";
+      } else {
+        userText = "(user sent attachments with no caption)";
+      }
+    }
+  }
+
+  // No text and no attachments — nothing to do.
+  if (!userText && attachmentImages.length === 0 && attachmentExtraText.length === 0) {
+    return new Response("ok", { status: 200 });
+  }
+
+  // Prepend any parsed PDF text to the user message.
+  const userTextForModel = attachmentExtraText.length > 0
+    ? `${attachmentExtraText.join("\n\n")}\n\n---\n\n${userText}`
+    : userText;
 
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -365,7 +537,7 @@ Deno.serve(async (req) => {
     }
 
     // Strip the @mention from the text so the model doesn't see it as part of the message.
-    const cleanText = userText
+    const cleanText = userTextForModel
       .replace(new RegExp(`@${BOT_USERNAME}`, "gi"), "")
       .trim();
 
@@ -405,7 +577,8 @@ Deno.serve(async (req) => {
       maxTokens: agent.max_tokens ?? 2048,
       systemPrompt,
       history,
-      userText: cleanText || userText,
+      userText: cleanText || userTextForModel,
+      images: attachmentImages,
       toolMetadata: {
         source: "telegram_group",
         chat_id: chatId,
@@ -484,7 +657,8 @@ Deno.serve(async (req) => {
     maxTokens: agent.max_tokens ?? 2048,
     systemPrompt,
     history,
-    userText,
+    userText: userTextForModel,
+    images: attachmentImages,
     toolMetadata: {
       source: "telegram_dm",
       chat_id: chatId,

@@ -16,9 +16,15 @@ export const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 // (We can swap this for a `recall_memories` tool later when the corpus grows.)
 export const MEMORY_PRELOAD_LIMIT = 50;
 
+export type ImageInput = { url: string; detail?: "low" | "high" | "auto" };
+
+export type UserContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } };
+
 export type ChatMessage = {
   role: "user" | "assistant" | "system" | "tool";
-  content: string | null;
+  content: string | UserContentPart[] | null;
   // OpenAI-format tool calling
   tool_calls?: Array<{
     id: string;
@@ -685,6 +691,7 @@ export async function runAgentLoop(opts: {
   systemPrompt: string;
   history: ChatMessage[]; // prior user/assistant turns
   userText: string;
+  images?: ImageInput[]; // optional images to attach to the user turn (vision)
   toolMetadata?: Record<string, unknown>; // attached to any saved memories
   callerVibeUserId?: string | null;
   referer?: string;
@@ -699,16 +706,27 @@ export async function runAgentLoop(opts: {
     systemPrompt,
     history,
     userText,
+    images = [],
     toolMetadata = {},
     callerVibeUserId = null,
     referer = "https://community-vibes-ai.lovable.app",
     title = "Vibey",
   } = opts;
 
+  const userContent: string | UserContentPart[] = images.length > 0
+    ? [
+        { type: "text", text: userText },
+        ...images.map((img) => ({
+          type: "image_url" as const,
+          image_url: { url: img.url, detail: img.detail ?? "auto" },
+        })),
+      ]
+    : userText;
+
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
     ...history,
-    { role: "user", content: userText },
+    { role: "user", content: userContent },
   ];
 
   for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
