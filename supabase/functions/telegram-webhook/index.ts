@@ -657,7 +657,8 @@ Deno.serve(async (req) => {
     maxTokens: agent.max_tokens ?? 2048,
     systemPrompt,
     history,
-    userText,
+    userText: userTextForModel,
+    images: attachmentImages,
     toolMetadata: {
       source: "telegram_dm",
       chat_id: chatId,
