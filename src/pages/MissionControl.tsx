@@ -127,6 +127,23 @@ export default function MissionControl() {
         </div>
       </div>
 
+      {/* Quick edit shortcuts — pinned to the top, Notion-style tab strip */}
+      <div>
+        <p className="text-label mb-2">Quick edit</p>
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
+          {SHORTCUTS.map((s) => (
+            <Link
+              key={s.to}
+              to={s.to}
+              className="group rounded-md border border-border bg-card p-3 flex flex-col items-center justify-center gap-1.5 hover:border-primary/40 hover:bg-primary/5 transition-colors"
+            >
+              <s.icon className="h-4 w-4 text-primary" />
+              <span className="font-mono text-[10px] uppercase tracking-wider text-center leading-tight">{s.label}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
       {/* Bento grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 auto-rows-[110px]">
         {/* Stat tiles */}
