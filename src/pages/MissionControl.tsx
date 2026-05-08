@@ -80,11 +80,17 @@ function Label({ children }: { children: React.ReactNode }) {
 
 const SHORTCUTS = [
   { to: "/soul", label: "Soul", icon: Sparkles },
-  { to: "/identity", label: "Identity", icon: IdCard },
   { to: "/memory", label: "Memory", icon: Brain },
+  { to: "/skills", label: "Skills", icon: Zap },
   { to: "/tools", label: "Tools", icon: Wrench },
-  { to: "/relationships", label: "Members", icon: Users },
+  { to: "/relationships", label: "Preferences", icon: Users },
   { to: "/automations", label: "Heartbeat", icon: Heart },
+  { to: "/interfaces", label: "Interfaces", icon: Settings2 },
+  { to: "/identity", label: "Identity", icon: IdCard },
+  { to: "/conversations", label: "Chat History", icon: MessagesSquare },
+  { to: "/media", label: "Media", icon: ImageIcon },
+  { to: "/groups", label: "Groups", icon: UsersRound },
+  { to: "/sections", label: "Sections", icon: LayoutDashboard },
 ];
 
 export default function MissionControl() {
