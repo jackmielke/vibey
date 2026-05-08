@@ -691,6 +691,7 @@ export async function runAgentLoop(opts: {
   systemPrompt: string;
   history: ChatMessage[]; // prior user/assistant turns
   userText: string;
+  images?: ImageInput[]; // optional images to attach to the user turn (vision)
   toolMetadata?: Record<string, unknown>; // attached to any saved memories
   callerVibeUserId?: string | null;
   referer?: string;
@@ -705,16 +706,27 @@ export async function runAgentLoop(opts: {
     systemPrompt,
     history,
     userText,
+    images = [],
     toolMetadata = {},
     callerVibeUserId = null,
     referer = "https://community-vibes-ai.lovable.app",
     title = "Vibey",
   } = opts;
 
+  const userContent: string | UserContentPart[] = images.length > 0
+    ? [
+        { type: "text", text: userText },
+        ...images.map((img) => ({
+          type: "image_url" as const,
+          image_url: { url: img.url, detail: img.detail ?? "auto" },
+        })),
+      ]
+    : userText;
+
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
     ...history,
-    { role: "user", content: userText },
+    { role: "user", content: userContent },
   ];
 
   for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
