@@ -23,6 +23,7 @@ import Relationships from "@/pages/Relationships";
 import Conversations from "@/pages/Conversations";
 import Groups from "@/pages/Groups";
 import TelegramMini from "@/pages/TelegramMini";
+import PublicChat from "@/pages/PublicChat";
 import Automations from "@/pages/Automations";
 import NotFound from "@/pages/NotFound";
 
@@ -38,6 +39,7 @@ const App = () => (
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/mini" element={<TelegramMini />} />
+          <Route path="/chat" element={<PublicChat />} />
           <Route element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
             <Route index element={<Chat />} />
             <Route path="lovable-chat" element={<LovableChat />} />
