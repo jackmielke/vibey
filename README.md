@@ -24,33 +24,64 @@ The result is an AI that feels less like a chatbot and more like a free spirit �
 
 ## What's in this repo
 
-This repo is the **admin dashboard + brain** for Vibey. It's where Vibey's soul lives, where community members can peek inside its mind, and where conversations across surfaces flow through.
+This repo is the **admin dashboard + brain** for Vibey: soul, memory, surfaces, and the edge functions that power conversations.
 
-- **`src/pages/`** — the admin UI
-  - `Chat` — talk to Vibey directly
-  - `Soul` / `Identity` — who Vibey is
-  - `Memory` — what Vibey remembers
-  - `Relationships` — per-person context
-  - `Conversations` / `Groups` — threads across surfaces
-  - `Interfaces` — the surfaces Vibey lives on (Telegram, website, X, robot)
-  - `Media` / `Dashboard`
-- **`supabase/functions/chat-with-vibey/`** — the edge function that actually runs a conversation
-- **`supabase/migrations/`** — the schema for the Vibe community database (shared across Vibe projects, so tread carefully)
+### Web app (`src/`)
+
+| Area | Purpose |
+|------|---------|
+| **`pages/Chat`** | Main chat with Vibey (edge: `chat-with-vibey`) |
+| **`pages/LovableChat`** | Alternate chat path via `lovable-chat` function |
+| **`pages/Login`** | Auth gate for admins |
+| **`pages/MissionControl`** | Routed at `/dashboard` — mission-style overview |
+| **`pages/Dashboard`** | Routed at `/sections` — section overview |
+| **`pages/Soul`**, **`Identity`**, **`Memory`**, **`Media`** | Persona and recall |
+| **`pages/Tools`**, **`Skills`** | Tooling and skill configuration |
+| **`pages/Relationships`**, **`Conversations`**, **`Groups`** | People and threads |
+| **`pages/Interfaces`** | Surfaces Vibey runs on |
+| **`pages/Automations`** | Automation runs and wiring |
+| **`pages/TelegramMini`** | Telegram mini-app surface (`/mini`) |
+
+Protected routes sit behind **`RequireAdmin`** + **`AdminLayout`** (see `src/App.tsx`).
+
+### Backend (`supabase/`)
+
+- **`functions/`** — Edge Functions (e.g. `chat-with-vibey`, `telegram-webhook`, `lovable-chat`, automations, voice, daily recap). Shared agent logic lives under **`functions/_shared/`**.
+- **`migrations/`** — Database schema for the shared Vibe community project (**coordinate changes** with other Vibe repos).
 
 ## Tech stack
 
-Vite · React · TypeScript · Tailwind · shadcn/ui · TanStack Query · React Router · Supabase (shared Vibe community project) · Vitest
+Vite · React · TypeScript · Tailwind · shadcn/ui · TanStack Query · React Router · Supabase · Vitest
+
+## Environment variables
+
+Configuration uses **Vite** env vars (must be prefixed with `VITE_`).
+
+1. Copy **`.env.example`** → **`.env`**.
+2. In the Supabase dashboard: **Project Settings → API**, copy:
+   - **Project URL** → `VITE_SUPABASE_URL`
+   - **anon public** key → `VITE_SUPABASE_PUBLISHABLE_KEY`
+   - **Project ref** (matches the subdomain) → `VITE_SUPABASE_PROJECT_ID`
+
+Never commit **`.env`**. The publishable key is the **anon** client key; real access control is enforced with **Row Level Security** in Supabase. Do **not** put the **service_role** secret in any `VITE_*` variable — it would ship in the browser bundle.
+
+## Security note (Git history)
+
+If **`.env` was ever pushed to GitHub**, assume those values appeared in git history until removed. After untracking `.env`:
+
+- **Future pushes** no longer add the file if you keep `.gitignore` as above.
+- **Past commits** may still contain old values; consider **rotating** the anon key in Supabase if the repo was public or widely cloned, and use history rewriting (e.g. `git filter-repo`) only if your team is comfortable force-pushing shared branches.
 
 ## Running locally
 
 ```bash
 bun install
-bun dev        # http://localhost:5173
+bun dev        # http://localhost:8080 (see vite.config.ts)
 bun test       # vitest
 bun run build
 ```
 
-Supabase credentials live in the environment — ask Jack if you need access to the shared Vibe project.
+Shared Supabase project access is by invitation — ping Jack if you need credentials for the Vibe org project.
 
 ## Where it's going
 
