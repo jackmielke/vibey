@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import vibeySplash from "@/assets/vibey-splash.png";
 
 export default function RequireAdmin({ children }: { children: React.ReactNode }) {
-  const { session, isAdmin, loading, checkingAdmin } = useAuth();
+  const { session, isAdmin, loading, checkingAdmin, authError } = useAuth();
 
   if (loading || (session && checkingAdmin)) {
     return (
@@ -17,6 +17,26 @@ export default function RequireAdmin({ children }: { children: React.ReactNode }
   }
 
   if (!session) return <Navigate to="/login" replace />;
+
+  if (authError) {
+    return (
+      <div className="min-h-safe-screen flex items-center justify-center px-6 bg-background">
+        <div className="w-full max-w-md text-center space-y-6">
+          <img src={vibeySplash} alt="Vibey" className="w-32 h-32 mx-auto opacity-60" />
+          <div className="space-y-2">
+            <p className="font-mono text-xs uppercase tracking-[0.3em] text-muted-foreground">
+              Admin check failed
+            </p>
+            <p className="text-lg">{authError}</p>
+            <p className="text-sm text-muted-foreground">
+              Refresh the page to retry, or sign out and sign in again.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => signOut()}>Sign out</Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return (

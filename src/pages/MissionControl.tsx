@@ -94,7 +94,7 @@ const SHORTCUTS = [
 ];
 
 export default function MissionControl() {
-  const { loading, stats, recent, runs } = useMissionControl();
+  const { loading, error, stats, recent, runs } = useMissionControl();
   const { agent } = useVibeyAgent();
 
   const lastRun = runs[0];
@@ -126,6 +126,12 @@ export default function MissionControl() {
           </div>
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error} Refresh to try again.
+        </div>
+      )}
 
       {/* Quick edit shortcuts — pinned to the top, Notion-style tab strip */}
       <div>
@@ -169,7 +175,7 @@ export default function MissionControl() {
           <Label>Tokens 24h</Label>
           <div className="mt-2">
             <StatNumber
-              value={loading ? 0 : (stats!.tokensToday > 999 ? `${(stats!.tokensToday / 1000).toFixed(1)}k` : stats!.tokensToday)}
+              value={stats?.tokensToday && stats.tokensToday > 999 ? `${(stats.tokensToday / 1000).toFixed(1)}k` : stats?.tokensToday ?? 0}
               loading={loading}
             />
           </div>

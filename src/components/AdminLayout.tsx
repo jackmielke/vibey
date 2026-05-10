@@ -1,15 +1,13 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LayoutDashboard, LogOut, X } from "lucide-react";
+import { Columns2, LayoutDashboard, LogOut, Maximize2, X } from "lucide-react";
 import { signOut } from "@/hooks/useAuth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useIsStandalone } from "@/hooks/use-pwa";
 import Chat from "@/pages/Chat";
-import Dashboard from "@/pages/Dashboard";
 import { cn } from "@/lib/utils";
 
 export default function AdminLayout() {
@@ -23,8 +21,11 @@ export default function AdminLayout() {
   const isControlRoute = controlRoutes.some((r) => location.pathname.startsWith(r));
   const isChatRoute = location.pathname === "/";
 
-  // Control panel open state — driven by route so sidebar links still work.
-  const [controlOpen, setControlOpen] = useState(isControlRoute);
+  // Optional side-by-side mode: control routes are full-width by default.
+  const [splitChatOpen, setSplitChatOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("vibey-split-chat") === "true";
+  });
 
   // Resizable Vibey Control panel width (desktop/tablet only).
   const MIN_W = 320;
@@ -48,7 +49,9 @@ export default function AdminLayout() {
       setIsResizing(false);
       try {
         window.localStorage.setItem("vibey-control-width", String(panelWidth));
-      } catch {}
+      } catch {
+        // Ignore private browsing / storage quota failures.
+      }
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -67,10 +70,13 @@ export default function AdminLayout() {
     setIsResizing(true);
   }, []);
 
-
   useEffect(() => {
-    if (isControlRoute) setControlOpen(true);
-  }, [location.pathname, isControlRoute]);
+    try {
+      window.localStorage.setItem("vibey-split-chat", String(splitChatOpen));
+    } catch {
+      // Non-critical preference persistence.
+    }
+  }, [splitChatOpen]);
 
   // PWA: when launched as an installed app on mobile, land on Vibey Control instead of chat.
   const didAutoLand = useRef(false);
@@ -82,27 +88,23 @@ export default function AdminLayout() {
     }
   }, [isStandalone, isMobile, location.pathname, navigate]);
 
-  const toggleControl = () => {
-    if (controlOpen) {
-      setControlOpen(false);
-      // If we're sitting on a control route, return to chat when closing.
-      if (isControlRoute) navigate("/");
-    } else {
-      setControlOpen(true);
-      if (!isControlRoute) navigate("/dashboard");
+  const handleControlButton = () => {
+    if (isControlRoute) {
+      setSplitChatOpen((open) => !open);
+      return;
     }
+    navigate("/dashboard");
   };
 
-  const closeControl = () => {
-    setControlOpen(false);
-    if (isControlRoute) navigate("/");
+  const closeSplitChat = () => {
+    setSplitChatOpen(false);
   };
 
-  // On mobile, control panel uses a Sheet. On tablet/desktop, it's an inline side column.
-  const showInlineControl = !isMobile && controlOpen;
+  // On tablet/desktop, split mode keeps chat open beside the selected control route.
+  const showInlineControl = !isMobile && isControlRoute && splitChatOpen;
+  const mainShowsChat = isChatRoute || showInlineControl;
   // Tailwind `lg` = 1024px, but useIsMobile flips at 768px — use md+ classes so the panel shows on tablets too.
-  // The <Outlet /> only renders for non-control routes (i.e. chat / not-found edge cases).
-  // For control routes we render Dashboard/Outlet inside the side panel instead.
+  // Control routes render full-width unless split mode is enabled, in which case chat stays on the left.
 
   return (
     <SidebarProvider>
@@ -115,14 +117,26 @@ export default function AdminLayout() {
               <span className="text-label">Vibey</span>
               <div className="ml-auto flex items-center gap-2">
                 <Button
-                  onClick={toggleControl}
+                  onClick={handleControlButton}
                   size="sm"
-                  variant={controlOpen ? "default" : "outline"}
+                  variant={showInlineControl ? "default" : "outline"}
                   className="h-8 gap-1.5"
                 >
-                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  {isControlRoute ? (
+                    showInlineControl ? (
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <Columns2 className="h-3.5 w-3.5" />
+                    )
+                  ) : (
+                    <LayoutDashboard className="h-3.5 w-3.5" />
+                  )}
                   <span className="font-mono text-xs uppercase tracking-wider">
-                    Vibey Control
+                    {isControlRoute
+                      ? showInlineControl
+                        ? "Full Page"
+                        : "Split Chat"
+                      : "Vibey Control"}
                   </span>
                 </Button>
                 <Button
@@ -145,11 +159,11 @@ export default function AdminLayout() {
               className={cn(
                 "flex-1 min-w-0 min-h-0 flex flex-col",
                 // Chat owns its own internal scroll; other routes can scroll the main area.
-                isChatRoute || isControlRoute ? "overflow-hidden" : "overflow-auto",
+                mainShowsChat ? "overflow-hidden" : "overflow-auto",
                 showInlineControl && "md:border-r md:border-border"
               )}
             >
-              {isChatRoute || isControlRoute ? <Chat /> : <Outlet />}
+              {mainShowsChat ? <Chat /> : <Outlet />}
             </main>
 
             {/* Tablet/desktop inline control panel */}
@@ -177,34 +191,20 @@ export default function AdminLayout() {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={closeControl}
-                      aria-label="Close Vibey Control"
+                      onClick={closeSplitChat}
+                      aria-label="Close split chat"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
                 <div className="flex-1 overflow-auto">
-                  {isControlRoute ? <Outlet /> : <Dashboard />}
+                  <Outlet />
                 </div>
               </aside>
             )}
           </div>
         </div>
-
-        {/* Mobile control panel as a sheet */}
-        <Sheet open={isMobile && controlOpen} onOpenChange={(o) => !o && closeControl()}>
-          <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
-            <div className="pt-safe border-b border-border shrink-0">
-              <div className="h-12 flex items-center px-4 pr-12">
-                <span className="text-label">Vibey Control</span>
-              </div>
-            </div>
-            <div className="flex-1 overflow-auto pb-safe">
-              {isControlRoute ? <Outlet /> : <Dashboard />}
-            </div>
-          </SheetContent>
-        </Sheet>
       </div>
     </SidebarProvider>
   );

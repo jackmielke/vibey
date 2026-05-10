@@ -267,7 +267,7 @@ export default function Chat() {
         {showEmptyState ? (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4">
             <div className="w-20 h-20 rounded-2xl overflow-hidden ring-1 ring-primary/20">
-              <img src={agent?.avatar_url || vibeyAvatar} alt="Vibey" className="w-full h-full object-cover" />
+              <img src={vibeyAvatar} alt="Vibey" className="w-full h-full object-cover" />
             </div>
             <div>
               <h2 className="text-xl font-semibold">Talk to {agent?.name ?? "Vibey"}</h2>
@@ -286,7 +286,7 @@ export default function Chat() {
             >
               {msg.role === "assistant" && (
                 <div className="w-7 h-7 rounded-lg overflow-hidden ring-1 ring-primary/20 shrink-0 mt-1">
-                  <img src={agent?.avatar_url || vibeyAvatar} alt="Vibey" className="w-full h-full object-cover" />
+                  <img src={vibeyAvatar} alt="Vibey" className="w-full h-full object-cover" />
                 </div>
               )}
               <div className={`max-w-[70%] flex flex-col gap-2 ${msg.role === "user" ? "items-end" : "items-start"}`}>

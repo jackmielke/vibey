@@ -294,7 +294,7 @@ export default function TelegramMini() {
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
         <div className="w-8 h-8 rounded-lg overflow-hidden ring-1 ring-primary/30">
           <img
-            src={agent?.avatar_url || vibeyAvatar}
+            src={vibeyAvatar}
             alt="Vibey"
             className="w-full h-full object-cover"
           />
