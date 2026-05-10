@@ -11,7 +11,7 @@ function withTimeout<T>(promise: PromiseLike<T>, label: string): Promise<T> {
       reject(new Error(`${label} timed out`));
     }, ADMIN_CHECK_TIMEOUT_MS);
 
-    promise.then(
+    Promise.resolve(promise).then(
       (value) => {
         window.clearTimeout(timeout);
         resolve(value);
