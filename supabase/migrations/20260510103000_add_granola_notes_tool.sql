@@ -12,7 +12,7 @@ VALUES (
   'Granola Notes',
   'Searches meeting notes shared with Vibey via the vibey@vibeventures.studio Granola account.',
   'web',
-  ARRAY['LOVABLE_API_KEY', 'GRANOLA_API_KEY'],
+  ARRAY['GRANOLA_API_KEY'],
   true,
   60
 )

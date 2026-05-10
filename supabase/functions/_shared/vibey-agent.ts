@@ -201,7 +201,6 @@ export async function loadEnabledToolNames(
   const hasGranolaRegistryRow = rows.some((r) => r.name === "granola_notes");
   if (
     !hasGranolaRegistryRow &&
-    Deno.env.get("LOVABLE_API_KEY") &&
     Deno.env.get("GRANOLA_API_KEY")
   ) {
     enabled.add("granola_notes");
@@ -457,22 +456,32 @@ const GRANOLA_ACCOUNT_EMAIL = "vibey@vibeventures.studio";
 type GranolaNote = {
   id?: string;
   title?: string;
+  owner?: { name?: string; email?: string };
   created_at?: string;
   updated_at?: string;
+  summary_text?: string;
+  summary_markdown?: string | null;
   summary?: string;
   text?: string;
   content?: string;
-  transcript?: string;
+  transcript?: string | Array<{ text?: string; speaker?: { source?: string; diarization_label?: string } }>;
   url?: string;
+  web_url?: string;
 };
 
 function compactGranolaText(note: GranolaNote): string {
+  const transcript = Array.isArray(note.transcript)
+    ? note.transcript.map((item) => item.text).filter(Boolean).join("\n")
+    : note.transcript;
+
   return [
     note.title,
+    note.summary_text,
+    note.summary_markdown ?? undefined,
     note.summary,
     note.text,
     note.content,
-    note.transcript,
+    transcript,
   ]
     .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
     .join("\n\n")
@@ -486,35 +495,28 @@ async function fetchGranolaNotes(args: {
   created_after?: string;
   created_before?: string;
 }): Promise<string> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   const GRANOLA_API_KEY = Deno.env.get("GRANOLA_API_KEY");
-  if (!LOVABLE_API_KEY || !GRANOLA_API_KEY) {
-    const missing = [
-      !LOVABLE_API_KEY ? "LOVABLE_API_KEY" : null,
-      !GRANOLA_API_KEY ? "GRANOLA_API_KEY" : null,
-    ].filter(Boolean);
+  if (!GRANOLA_API_KEY) {
     return JSON.stringify({
       ok: false,
-      error: `Granola notes are not configured. Missing ${missing.join(", ")}.`,
+      error: "Granola notes are not configured. Missing GRANOLA_API_KEY.",
       account_email: GRANOLA_ACCOUNT_EMAIL,
     });
   }
 
   const requestedLimit = Math.max(1, Math.min(25, Number(args?.limit) || 10));
   const query = (args?.query ?? "").trim().toLowerCase();
-  const fetchLimit = query ? Math.max(requestedLimit, 50) : requestedLimit;
-  const params = new URLSearchParams({ limit: String(fetchLimit) });
+  const fetchLimit = query ? 30 : Math.min(30, requestedLimit);
+  const params = new URLSearchParams({ page_size: String(fetchLimit) });
   if (args?.created_after) params.set("created_after", args.created_after);
   if (args?.created_before) params.set("created_before", args.created_before);
 
   try {
     const resp = await fetch(
-      `https://connector-gateway.lovable.dev/granola/v1/notes?${params.toString()}`,
+      `https://public-api.granola.ai/v1/notes?${params.toString()}`,
       {
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "X-Connection-Api-Key": GRANOLA_API_KEY,
-          "X-Connection-Email": GRANOLA_ACCOUNT_EMAIL,
+          Authorization: `Bearer ${GRANOLA_API_KEY}`,
         },
       }
     );
@@ -529,7 +531,23 @@ async function fetchGranolaNotes(args: {
     }
 
     const json = await resp.json();
-    const rawNotes = (Array.isArray(json?.notes) ? json.notes : []) as GranolaNote[];
+    const listedNotes = (Array.isArray(json?.notes) ? json.notes : []) as GranolaNote[];
+    const rawNotes = await Promise.all(
+      listedNotes.map(async (note) => {
+        if (!note.id) return note;
+        const detailResp = await fetch(
+          `https://public-api.granola.ai/v1/notes/${encodeURIComponent(note.id)}?include=transcript`,
+          {
+            headers: {
+              Authorization: `Bearer ${GRANOLA_API_KEY}`,
+            },
+          }
+        );
+        if (!detailResp.ok) return note;
+        return (await detailResp.json()) as GranolaNote;
+      })
+    );
+
     const matchingNotes = query
       ? rawNotes.filter((note) => compactGranolaText(note).toLowerCase().includes(query))
       : rawNotes;
@@ -539,11 +557,12 @@ async function fetchGranolaNotes(args: {
       return {
         id: note.id ?? null,
         title: note.title ?? "Untitled Granola note",
+        owner: note.owner ?? null,
         created_at: note.created_at ?? null,
         updated_at: note.updated_at ?? null,
-        summary: note.summary ?? null,
+        summary: note.summary_text ?? note.summary_markdown ?? note.summary ?? null,
         snippet: body.slice(0, 1200),
-        url: note.url ?? null,
+        url: note.web_url ?? note.url ?? null,
       };
     });
 
