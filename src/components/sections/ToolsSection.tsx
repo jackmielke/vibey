@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Wrench, Loader2, Brain, Globe, Link2, Sparkles, Send, CheckCircle2, AlertTriangle, Clock, Pencil, PowerOff } from "lucide-react";
+import { Wrench, Loader2, Brain, Globe, Link2, Sparkles, Send, CheckCircle2, AlertTriangle, Clock, Pencil, PowerOff, NotebookText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ const ICONS: Record<string, typeof Brain> = {
   update_memory: Brain,
   web_search: Globe,
   fetch_url: Link2,
+  granola_notes: NotebookText,
   recall_memories: Sparkles,
   send_telegram: Send,
 };

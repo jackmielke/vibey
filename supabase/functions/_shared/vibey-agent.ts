@@ -142,6 +142,40 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "granola_notes",
+      description:
+        "Search Vibey's Granola meeting notes for community context. Use when the user asks about meeting notes, calls, workshops, decisions, action items, or anything they say they sent/shared to Vibey via Granola. This reads notes available to vibey@vibeventures.studio. Returns matching note titles, timestamps, summaries, and snippets.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "Optional search text to match against note title, summary, transcript, or content.",
+          },
+          limit: {
+            type: "integer",
+            description: "Maximum number of notes to return. Default 10, max 25.",
+            minimum: 1,
+            maximum: 25,
+          },
+          created_after: {
+            type: "string",
+            description:
+              "Optional ISO timestamp. Only return notes created after this time.",
+          },
+          created_before: {
+            type: "string",
+            description:
+              "Optional ISO timestamp. Only return notes created before this time.",
+          },
+        },
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
@@ -158,7 +192,22 @@ export async function loadEnabledToolNames(
     // fall back to allowing all built-in tools
     return new Set(TOOLS.map((t) => t.function.name));
   }
-  return new Set((data ?? []).map((r: { name: string }) => r.name));
+  const rows = (data ?? []) as Array<{ name: string; is_enabled?: boolean }>;
+  const enabled = new Set(rows.map((r) => r.name));
+
+  // The remote migration history for this project can lag behind the deployed
+  // function code. Let Granola work as soon as its secrets exist, while still
+  // respecting the DB toggle once the `agent_tools` row has been inserted.
+  const hasGranolaRegistryRow = rows.some((r) => r.name === "granola_notes");
+  if (
+    !hasGranolaRegistryRow &&
+    Deno.env.get("LOVABLE_API_KEY") &&
+    Deno.env.get("GRANOLA_API_KEY")
+  ) {
+    enabled.add("granola_notes");
+  }
+
+  return enabled;
 }
 
 export function filterToolsByEnabled(enabled: Set<string>) {
@@ -401,6 +450,120 @@ async function fetchUrl(args: { url: string }): Promise<string> {
   }
 }
 
+// ── Granola notes tool ───────────────────────────────────────────────────────
+
+const GRANOLA_ACCOUNT_EMAIL = "vibey@vibeventures.studio";
+
+type GranolaNote = {
+  id?: string;
+  title?: string;
+  created_at?: string;
+  updated_at?: string;
+  summary?: string;
+  text?: string;
+  content?: string;
+  transcript?: string;
+  url?: string;
+};
+
+function compactGranolaText(note: GranolaNote): string {
+  return [
+    note.title,
+    note.summary,
+    note.text,
+    note.content,
+    note.transcript,
+  ]
+    .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+    .join("\n\n")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function fetchGranolaNotes(args: {
+  query?: string;
+  limit?: number;
+  created_after?: string;
+  created_before?: string;
+}): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  const GRANOLA_API_KEY = Deno.env.get("GRANOLA_API_KEY");
+  if (!LOVABLE_API_KEY || !GRANOLA_API_KEY) {
+    const missing = [
+      !LOVABLE_API_KEY ? "LOVABLE_API_KEY" : null,
+      !GRANOLA_API_KEY ? "GRANOLA_API_KEY" : null,
+    ].filter(Boolean);
+    return JSON.stringify({
+      ok: false,
+      error: `Granola notes are not configured. Missing ${missing.join(", ")}.`,
+      account_email: GRANOLA_ACCOUNT_EMAIL,
+    });
+  }
+
+  const requestedLimit = Math.max(1, Math.min(25, Number(args?.limit) || 10));
+  const query = (args?.query ?? "").trim().toLowerCase();
+  const fetchLimit = query ? Math.max(requestedLimit, 50) : requestedLimit;
+  const params = new URLSearchParams({ limit: String(fetchLimit) });
+  if (args?.created_after) params.set("created_after", args.created_after);
+  if (args?.created_before) params.set("created_before", args.created_before);
+
+  try {
+    const resp = await fetch(
+      `https://connector-gateway.lovable.dev/granola/v1/notes?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "X-Connection-Api-Key": GRANOLA_API_KEY,
+          "X-Connection-Email": GRANOLA_ACCOUNT_EMAIL,
+        },
+      }
+    );
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      return JSON.stringify({
+        ok: false,
+        error: `Granola ${resp.status}: ${text.slice(0, 300)}`,
+        account_email: GRANOLA_ACCOUNT_EMAIL,
+      });
+    }
+
+    const json = await resp.json();
+    const rawNotes = (Array.isArray(json?.notes) ? json.notes : []) as GranolaNote[];
+    const matchingNotes = query
+      ? rawNotes.filter((note) => compactGranolaText(note).toLowerCase().includes(query))
+      : rawNotes;
+
+    const notes = matchingNotes.slice(0, requestedLimit).map((note) => {
+      const body = compactGranolaText(note);
+      return {
+        id: note.id ?? null,
+        title: note.title ?? "Untitled Granola note",
+        created_at: note.created_at ?? null,
+        updated_at: note.updated_at ?? null,
+        summary: note.summary ?? null,
+        snippet: body.slice(0, 1200),
+        url: note.url ?? null,
+      };
+    });
+
+    return JSON.stringify({
+      ok: true,
+      account_email: GRANOLA_ACCOUNT_EMAIL,
+      query: query || null,
+      count: notes.length,
+      fetched_count: rawNotes.length,
+      notes,
+    });
+  } catch (e) {
+    return JSON.stringify({
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+      account_email: GRANOLA_ACCOUNT_EMAIL,
+    });
+  }
+}
+
 // ── VIBE pricing tool (GeckoTerminal) ────────────────────────────────────────
 
 const VIBE_POOL_URL =
@@ -484,6 +647,13 @@ async function executeToolCall(
       return await webSearch(parsed as { query: string; count?: number });
     case "fetch_url":
       return await fetchUrl(parsed as { url: string });
+    case "granola_notes":
+      return await fetchGranolaNotes(parsed as {
+        query?: string;
+        limit?: number;
+        created_after?: string;
+        created_before?: string;
+      });
     case "get_vibe_price":
       return await getVibePrice(parsed as { usd?: number; vibe?: number });
     default:
@@ -538,6 +708,12 @@ You have access to these tools:
 - **fetch_url(url)** — fetch the readable text of a specific web page.
   Use after web_search, or when the user gives you a URL. Returns up to ~6000 chars of clean text.
   Don't use for social media or paywalled sites — won't work well.
+
+- **granola_notes(query?, limit?, created_after?, created_before?)** — search meeting notes shared with
+  Vibey's Granola account (${GRANOLA_ACCOUNT_EMAIL}).
+  Use when the user asks about Granola notes, meeting/call/workshop context, decisions, action items,
+  or says they sent/shared something to Vibey through Granola. Keep retrieved notes private to the
+  current conversation; summarize only the relevant parts.
 
 - **get_vibe_price(usd?, vibe?)** — fetch the LIVE price of VibeCoin (VIBE on Base) from GeckoTerminal.
   Call this ANY time the user mentions VIBE, VibeCoin, "vibes" as a token, sending VibeCoin,
@@ -828,6 +1004,10 @@ function describeToolStart(name: string, args: Record<string, unknown>): string 
       try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* ignore */ }
       return `🌐 reading ${host}…`;
     }
+    case "granola_notes": {
+      const q = String(args?.query ?? "").trim();
+      return q ? `📝 searching Granola for "${q.slice(0, 80)}"…` : "📝 checking Granola notes…";
+    }
     case "save_memory":
       return "🧠 jotting this one down…";
     case "update_memory":
@@ -862,6 +1042,17 @@ function describeToolDone(
       let host = url;
       try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* ignore */ }
       return { label: `📖 read ${host}` };
+    }
+    case "granola_notes": {
+      if (result?.ok === false) {
+        return { label: `📝 Granola needs setup`, details: result?.error };
+      }
+      const n = Number(result?.count ?? 0);
+      const email = result?.account_email ? ` from ${result.account_email}` : "";
+      return {
+        label: n > 0 ? `📝 found ${n} Granola note${n === 1 ? "" : "s"}` : `📝 no matching Granola notes`,
+        details: `searched${email}`,
+      };
     }
     case "save_memory":
       return { label: result?.ok ? `✨ memory saved` : `🤔 couldn't save that one` };
