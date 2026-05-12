@@ -6,11 +6,15 @@ const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 const ADMIN_CHECK_TIMEOUT_MS = 12000;
 const SESSION_RESTORE_TIMEOUT_MS = 6000;
 
-function withTimeout<T>(promise: PromiseLike<T>, label: string): Promise<T> {
+function withTimeout<T>(
+  promise: PromiseLike<T>,
+  label: string,
+  timeoutMs = ADMIN_CHECK_TIMEOUT_MS
+): Promise<T> {
   return new Promise((resolve, reject) => {
     const timeout = window.setTimeout(() => {
       reject(new Error(`${label} timed out`));
-    }, ADMIN_CHECK_TIMEOUT_MS);
+    }, timeoutMs);
 
     Promise.resolve(promise).then(
       (value) => {
