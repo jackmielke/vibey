@@ -3014,6 +3014,39 @@ export type Database = {
           },
         ]
       }
+      vibey_journal_entries: {
+        Row: {
+          body: string
+          community_id: string
+          created_at: string
+          id: string
+          message_count: number | null
+          mood: string | null
+          reflection_seed: Json | null
+          source_summary: string | null
+        }
+        Insert: {
+          body: string
+          community_id: string
+          created_at?: string
+          id?: string
+          message_count?: number | null
+          mood?: string | null
+          reflection_seed?: Json | null
+          source_summary?: string | null
+        }
+        Update: {
+          body?: string
+          community_id?: string
+          created_at?: string
+          id?: string
+          message_count?: number | null
+          mood?: string | null
+          reflection_seed?: Json | null
+          source_summary?: string | null
+        }
+        Relationships: []
+      }
       vibey_relationships: {
         Row: {
           agent_id: string
