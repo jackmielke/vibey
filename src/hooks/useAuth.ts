@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 const ADMIN_CHECK_TIMEOUT_MS = 12000;
+const SESSION_RESTORE_TIMEOUT_MS = 6000;
 
 function withTimeout<T>(promise: PromiseLike<T>, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -50,8 +51,11 @@ export function useAuth(): AuthState {
     });
 
     // Then fetch existing session
-    supabase.auth
-      .getSession()
+    withTimeout(
+      supabase.auth.getSession(),
+      "Session restore",
+      SESSION_RESTORE_TIMEOUT_MS
+    )
       .then(({ data }) => {
         setAuthError(null);
         setSession(data.session);
