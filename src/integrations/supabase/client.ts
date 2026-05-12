@@ -5,12 +5,25 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+const safeAuthStorage: Storage | undefined = (() => {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const key = "vibey-storage-check";
+    window.localStorage.setItem(key, key);
+    window.localStorage.removeItem(key);
+    return window.localStorage;
+  } catch {
+    console.warn("localStorage is unavailable; Supabase auth will use in-memory session state.");
+    return undefined;
+  }
+})();
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
+    storage: safeAuthStorage,
     persistSession: true,
     autoRefreshToken: true,
   }
