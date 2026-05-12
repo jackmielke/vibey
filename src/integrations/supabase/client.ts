@@ -18,12 +18,25 @@ const safeAuthStorage: Storage | undefined = (() => {
   }
 })();
 
+const memoryAuthStorage = (() => {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+  };
+})();
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: safeAuthStorage,
+    storage: safeAuthStorage ?? memoryAuthStorage,
     persistSession: true,
     autoRefreshToken: true,
   }
