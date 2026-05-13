@@ -682,7 +682,7 @@ Deno.serve(async (req) => {
       display_name: msg.from?.first_name ?? null,
       telegram_username: msg.from?.username ?? null,
     });
-    const isAdmin = userId != null && (await import("../_shared/vibey-agent.ts")).isAdminTelegramUser(userId);
+    const isAdmin = isAdminTelegramUser(userId);
     const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId, isAdmin)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
     const reply = await runAgentLoop({
