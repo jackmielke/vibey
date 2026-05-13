@@ -1217,7 +1217,7 @@ export async function runAgentLoop(opts: {
         temperature,
         max_tokens: maxTokens,
         stream: false,
-        tools: filterToolsByEnabled(await loadEnabledToolNames(supabase)),
+        tools: filterTools(await loadEnabledToolNames(supabase), isAdmin),
         messages,
       }),
     });
