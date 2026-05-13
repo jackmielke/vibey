@@ -1397,6 +1397,7 @@ export async function runAgentLoopStreaming(opts: {
   userText: string;
   toolMetadata?: Record<string, unknown>;
   callerVibeUserId?: string | null;
+  isAdmin?: boolean;
   referer?: string;
   title?: string;
 }): Promise<Response> {
@@ -1411,6 +1412,7 @@ export async function runAgentLoopStreaming(opts: {
     userText,
     toolMetadata = {},
     callerVibeUserId = null,
+    isAdmin = false,
     referer = "https://community-vibes-ai.lovable.app",
     title = "Vibey",
   } = opts;
