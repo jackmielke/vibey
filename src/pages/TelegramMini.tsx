@@ -8,9 +8,28 @@ import { useVibeyAgent } from "@/hooks/useVibeyAgent";
 import { VIBE_CODE_RESIDENCY_COMMUNITY_ID, VIBEY_COMMUNITY_ID } from "@/lib/vibey";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 
-const PREFERENCE_COMMUNITY_IDS = [
-  VIBE_CODE_RESIDENCY_COMMUNITY_ID,
-  VIBEY_COMMUNITY_ID,
+const PREFERENCE_COMMUNITIES: { community_id: string; agent_id: string; label: string }[] = [
+  {
+    community_id: VIBEY_COMMUNITY_ID,
+    agent_id: "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+    label: "with vibey",
+  },
+  {
+    community_id: VIBE_CODE_RESIDENCY_COMMUNITY_ID,
+    agent_id: "33a20660-2809-4010-87ef-9d501f9af5e3",
+    label: "in vibe code residency",
+  },
+];
+
+const PREFERENCE_COMMUNITY_IDS = PREFERENCE_COMMUNITIES.map((c) => c.community_id);
+
+const PREFERENCE_SUGGESTIONS = [
+  "please call me sir",
+  "use all lowercase and be extra vibey",
+  "keep replies under 3 sentences",
+  "no emojis, ever",
+  "be brutally honest with me",
+  "match my energy — playful and curious",
 ];
 
 type MemoryRow = {
