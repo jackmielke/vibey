@@ -11,6 +11,17 @@
 type SupabaseClient = any;
 
 export const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
+export const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
+
+// Telegram user IDs that get full admin powers (edit Vibey's soul, memories,
+// skills, and tools via conversation). Standard users get read-only powers.
+export const ADMIN_TELEGRAM_USER_IDS = new Set<number>([
+  5780091237, // Jack Mielke
+]);
+
+export function isAdminTelegramUser(telegramUserId: number | null | undefined): boolean {
+  return telegramUserId != null && ADMIN_TELEGRAM_USER_IDS.has(telegramUserId);
+}
 
 // Auto-load this many recent memories into the system prompt every turn.
 // (We can swap this for a `recall_memories` tool later when the corpus grows.)
