@@ -265,17 +265,12 @@ export default function TelegramMini() {
         .from("vibey_relationships")
         .select("id, community_id, relationship_notes, display_name, updated_at")
         .in("community_id", PREFERENCE_COMMUNITY_IDS)
-        .eq("telegram_user_id", tgUserId)
-        .not("relationship_notes", "is", null);
+        .eq("telegram_user_id", tgUserId);
       if (cancelled) return;
       if (error) {
         console.error("load prefs failed", error.message);
       } else {
-        setPrefs(
-          ((data ?? []) as PreferenceRow[]).filter((p) =>
-            (p.relationship_notes ?? "").trim().length > 0,
-          ),
-        );
+        setPrefs((data ?? []) as PreferenceRow[]);
       }
       setPrefsLoading(false);
     })();
@@ -283,6 +278,55 @@ export default function TelegramMini() {
       cancelled = true;
     };
   }, [authState, tgUserId]);
+
+  // Save / upsert a preference for a given community
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
+
+  async function savePreference(community_id: string, agent_id: string, notes: string) {
+    if (!tgUserId) return;
+    setSavingId(community_id);
+    const existing = prefs.find((p) => p.community_id === community_id);
+    const trimmed = notes.trim();
+    try {
+      if (existing) {
+        const { data, error } = await supabase
+          .from("vibey_relationships")
+          .update({
+            relationship_notes: trimmed.length ? trimmed : null,
+            display_name: tgName ?? existing.display_name,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id)
+          .select("id, community_id, relationship_notes, display_name, updated_at")
+          .single();
+        if (error) throw error;
+        setPrefs((prev) => prev.map((p) => (p.id === existing.id ? (data as PreferenceRow) : p)));
+      } else {
+        const { data, error } = await supabase
+          .from("vibey_relationships")
+          .insert({
+            community_id,
+            agent_id,
+            telegram_user_id: tgUserId,
+            display_name: tgName,
+            relationship_notes: trimmed.length ? trimmed : null,
+          })
+          .select("id, community_id, relationship_notes, display_name, updated_at")
+          .single();
+        if (error) throw error;
+        setPrefs((prev) => [...prev, data as PreferenceRow]);
+      }
+      setSavedId(community_id);
+      setTimeout(() => setSavedId((v) => (v === community_id ? null : v)), 1500);
+    } catch (e) {
+      console.error("save preference failed", e);
+      alert(e instanceof Error ? e.message : "Couldn't save preferences.");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
 
   // ===== Render =====
   if (authState === "loading") {
