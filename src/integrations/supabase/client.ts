@@ -4,12 +4,12 @@ import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const FALLBACK_SUPABASE_URL = "https://missing-supabase-url.supabase.co";
-const FALLBACK_SUPABASE_KEY = "missing-supabase-publishable-key";
+const FALLBACK_SUPABASE_URL = "https://efdqqnubowgwsnwvlalp.supabase.co";
+const FALLBACK_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmZHFxbnVib3dnd3Nud3ZsYWxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwMjkxMzEsImV4cCI6MjA2NTYwNTEzMX0.VaAOevdkwQmOxd9ksOtOhnODVCITDhmtAgyE456IxbM";
 
-export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
 export const supabaseUrl = SUPABASE_URL || FALLBACK_SUPABASE_URL;
 export const supabasePublishableKey = SUPABASE_PUBLISHABLE_KEY || FALLBACK_SUPABASE_KEY;
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabasePublishableKey);
 
 const safeAuthStorage: Storage | undefined = (() => {
   if (typeof window === "undefined") return undefined;
