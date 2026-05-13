@@ -5,10 +5,11 @@ import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { supabasePublishableKey, supabaseUrl } from "@/integrations/supabase/client";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lovable-chat`;
+const CHAT_URL = `${supabaseUrl}/functions/v1/lovable-chat`;
 
 export default function LovableChat() {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -46,7 +47,7 @@ export default function LovableChat() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${supabasePublishableKey}`,
         },
         body: JSON.stringify({ messages: payload }),
       });
