@@ -191,6 +191,111 @@ export const TOOLS = [
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
 
+// ── Admin-only tools ────────────────────────────────────────────────────────
+// These let trusted callers (admins) edit Vibey's own soul, memories, skills,
+// and tool registry through conversation. They are NEVER exposed to the model
+// when the caller is not an admin (filterTools strips them).
+
+export const ADMIN_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_update_soul",
+      description:
+        "ADMIN ONLY. Edit Vibey's own soul — system prompt, model, sampling settings. Use when an admin asks you to change your personality, tone defaults, instructions, or which model you run on. Pass only the fields you want to change. Be careful: this rewrites the LIVE prompt for everyone, immediately.",
+      parameters: {
+        type: "object",
+        properties: {
+          system_prompt: { type: "string", description: "Full new system prompt (replaces current)." },
+          model: { type: "string", description: "OpenRouter model id, e.g. 'google/gemini-2.5-flash' or 'anthropic/claude-sonnet-4'." },
+          temperature: { type: "number", description: "Sampling temperature 0-2." },
+          max_tokens: { type: "integer", description: "Max output tokens per reply." },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_delete_memory",
+      description: "ADMIN ONLY. Permanently delete a memory by id. Use when an admin says 'forget X' or 'delete that memory'.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string", description: "Memory UUID from the memory list." } },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_update_any_memory",
+      description: "ADMIN ONLY. Update any memory regardless of who created it. Pass full new content.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          content: { type: "string" },
+          tags: { type: "array", items: { type: "string" } },
+        },
+        required: ["id", "content"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_upsert_skill",
+      description:
+        "ADMIN ONLY. Create or update a Vibey skill (a named playbook injected into the system prompt). Use when an admin says 'add a skill for X' or 'change the X skill'. Name must be a stable lowercase slug (e.g. 'crypto_pricing').",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Stable lowercase slug, unique." },
+          label: { type: "string", description: "Human-readable name shown in admin UI." },
+          description: { type: "string", description: "When to use this skill (one sentence)." },
+          prompt: { type: "string", description: "The playbook itself — what to do when the skill applies." },
+          category: { type: "string", description: "Optional grouping (default 'general')." },
+          is_enabled: { type: "boolean", description: "Whether to enable immediately (default true)." },
+        },
+        required: ["name", "label", "description", "prompt"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_toggle_skill",
+      description: "ADMIN ONLY. Enable or disable an existing skill by name.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          is_enabled: { type: "boolean" },
+        },
+        required: ["name", "is_enabled"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_toggle_tool",
+      description: "ADMIN ONLY. Enable or disable a built-in tool by name (e.g. 'web_search', 'granola_notes'). Tools you can toggle: web_search, fetch_url, granola_notes, get_vibe_price, save_memory, update_memory.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          is_enabled: { type: "boolean" },
+        },
+        required: ["name", "is_enabled"],
+      },
+    },
+  },
+];
+
+// ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
+
 export async function loadEnabledToolNames(
   supabase: SupabaseClient
 ): Promise<Set<string>> {
@@ -220,8 +325,14 @@ export async function loadEnabledToolNames(
   return enabled;
 }
 
+export function filterTools(enabled: Set<string>, isAdmin: boolean) {
+  const base = TOOLS.filter((t) => enabled.has(t.function.name));
+  return isAdmin ? [...base, ...ADMIN_TOOLS] : base;
+}
+
+// Back-compat alias for any external callers — defaults to non-admin.
 export function filterToolsByEnabled(enabled: Set<string>) {
-  return TOOLS.filter((t) => enabled.has(t.function.name));
+  return filterTools(enabled, false);
 }
 
 // ── Skills (DB-backed prompt playbooks) ─────────────────────────────────────
