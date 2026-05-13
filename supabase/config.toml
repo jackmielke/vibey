@@ -2,3 +2,9 @@ project_id = "efdqqnubowgwsnwvlalp"
 
 [functions.lovable-chat]
 verify_jwt = false
+
+[functions.telegram-webhook]
+verify_jwt = false
+
+[functions.chat-with-vibey]
+verify_jwt = false
