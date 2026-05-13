@@ -28,6 +28,48 @@ import {
 } from "../_shared/vibey-agent.ts";
 
 const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
+
+// Convert markdown (as written by the LLM) to a subset of HTML that Telegram
+// accepts with parse_mode=HTML. Supports: bold, italic, inline code, code
+// blocks, links, strikethrough, headings (as bold), bullets.
+function mdToTelegramHtml(input: string): string {
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const blocks: string[] = [];
+  let text = input.replace(/```(\w*)\n?([\s\S]*?)```/g, (_m, lang, code) => {
+    const idx = blocks.length;
+    const langAttr = lang ? ` class="language-${escapeHtml(lang)}"` : "";
+    blocks.push(`<pre><code${langAttr}>${escapeHtml(code.replace(/\n$/, ""))}</code></pre>`);
+    return `\u0000BLOCK${idx}\u0000`;
+  });
+
+  const inlines: string[] = [];
+  text = text.replace(/`([^`\n]+)`/g, (_m, code) => {
+    const idx = inlines.length;
+    inlines.push(`<code>${escapeHtml(code)}</code>`);
+    return `\u0000INLINE${idx}\u0000`;
+  });
+
+  text = escapeHtml(text);
+
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, url) =>
+    `<a href="${url}">${label}</a>`,
+  );
+
+  text = text.replace(/\*\*([^*\n]+?)\*\*/g, "<b>$1</b>");
+  text = text.replace(/__([^_\n]+?)__/g, "<b>$1</b>");
+  text = text.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>");
+  text = text.replace(/(^|[^_\w])_([^_\n]+?)_(?!_)/g, "$1<i>$2</i>");
+  text = text.replace(/~~([^~\n]+?)~~/g, "<s>$1</s>");
+  text = text.replace(/^#{1,6}\s+(.+)$/gm, "<b>$1</b>");
+  text = text.replace(/^[ \t]*[-*]\s+/gm, "• ");
+
+  text = text.replace(/\u0000INLINE(\d+)\u0000/g, (_m, i) => inlines[Number(i)] ?? "");
+  text = text.replace(/\u0000BLOCK(\d+)\u0000/g, (_m, i) => blocks[Number(i)] ?? "");
+
+  return text;
+}
 const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 const BOT_USERNAME = "vibey_ai_bot"; // without @
 
