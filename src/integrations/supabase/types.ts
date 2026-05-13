@@ -3116,6 +3116,126 @@ export type Database = {
           },
         ]
       }
+      vibey_research_log: {
+        Row: {
+          community_id: string
+          error: string | null
+          excerpt: string | null
+          fetched_at: string
+          id: string
+          ok: boolean
+          source_label: string
+          summary: string
+          title: string | null
+          url: string
+        }
+        Insert: {
+          community_id: string
+          error?: string | null
+          excerpt?: string | null
+          fetched_at?: string
+          id?: string
+          ok?: boolean
+          source_label: string
+          summary: string
+          title?: string | null
+          url: string
+        }
+        Update: {
+          community_id?: string
+          error?: string | null
+          excerpt?: string | null
+          fetched_at?: string
+          id?: string
+          ok?: boolean
+          source_label?: string
+          summary?: string
+          title?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
+      vibey_seeds: {
+        Row: {
+          author_name: string | null
+          author_user_id: string | null
+          community_id: string
+          consumed_at: string | null
+          consumed_entry_id: string | null
+          created_at: string
+          id: string
+          status: string
+          text: string
+        }
+        Insert: {
+          author_name?: string | null
+          author_user_id?: string | null
+          community_id: string
+          consumed_at?: string | null
+          consumed_entry_id?: string | null
+          created_at?: string
+          id?: string
+          status?: string
+          text: string
+        }
+        Update: {
+          author_name?: string | null
+          author_user_id?: string | null
+          community_id?: string
+          consumed_at?: string | null
+          consumed_entry_id?: string | null
+          created_at?: string
+          id?: string
+          status?: string
+          text?: string
+        }
+        Relationships: []
+      }
+      vibey_soul_drafts: {
+        Row: {
+          agent_id: string | null
+          community_id: string
+          created_at: string
+          diff_summary: string | null
+          id: string
+          proposed_addition: string | null
+          proposed_replacement: string | null
+          reasoning: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_entry_id: string | null
+          status: string
+        }
+        Insert: {
+          agent_id?: string | null
+          community_id: string
+          created_at?: string
+          diff_summary?: string | null
+          id?: string
+          proposed_addition?: string | null
+          proposed_replacement?: string | null
+          reasoning?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_entry_id?: string | null
+          status?: string
+        }
+        Update: {
+          agent_id?: string | null
+          community_id?: string
+          created_at?: string
+          diff_summary?: string | null
+          id?: string
+          proposed_addition?: string | null
+          proposed_replacement?: string | null
+          reasoning?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_entry_id?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       world_objects: {
         Row: {
           community_id: string
