@@ -131,6 +131,125 @@ function MemoryCard({ m, highlight }: { m: MemoryRow; highlight?: boolean }) {
   );
 }
 
+function PreferenceEditor({
+  community_id,
+  agent_id,
+  label,
+  existing,
+  saving,
+  saved,
+  onSave,
+}: {
+  community_id: string;
+  agent_id: string;
+  label: string;
+  existing: PreferenceRow | null;
+  saving: boolean;
+  saved: boolean;
+  onSave: (notes: string) => void;
+}) {
+  const initial = existing?.relationship_notes ?? "";
+  const [value, setValue] = useState(initial);
+  const [editing, setEditing] = useState(!initial);
+
+  // Re-sync when underlying row changes (e.g. after save)
+  useEffect(() => {
+    setValue(existing?.relationship_notes ?? "");
+  }, [existing?.id, existing?.relationship_notes]);
+
+  const dirty = value.trim() !== (existing?.relationship_notes ?? "").trim();
+  const isEmpty = !(existing?.relationship_notes ?? "").trim();
+
+  return (
+    <div className="p-3 rounded-lg bg-card border border-primary/30 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          {label}
+        </p>
+        {!editing && !isEmpty && (
+          <button
+            onClick={() => setEditing(true)}
+            className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground hover:text-primary flex items-center gap-1"
+          >
+            <Pencil className="w-3 h-3" /> edit
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <>
+          <textarea
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="e.g. call me sir, keep it short, no emojis"
+            rows={3}
+            className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60 resize-y font-sans"
+          />
+
+          {!value.trim() && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                try one
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {PREFERENCE_SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setValue(s)}
+                    className="text-[11px] px-2 py-1 rounded-full bg-muted hover:bg-primary/10 hover:text-primary border border-transparent hover:border-primary/30 transition-colors"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <p className="text-[10px] text-muted-foreground font-mono">
+              {existing?.updated_at
+                ? `updated ${formatDistanceToNow(new Date(existing.updated_at), { addSuffix: true })}`
+                : "not set yet"}
+            </p>
+            <div className="flex items-center gap-2">
+              {!isEmpty && (
+                <button
+                  onClick={() => {
+                    setValue(existing?.relationship_notes ?? "");
+                    setEditing(false);
+                  }}
+                  className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                >
+                  cancel
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  onSave(value);
+                  setEditing(false);
+                }}
+                disabled={saving || !dirty}
+                className="text-[11px] font-mono uppercase tracking-widest px-3 py-1 rounded bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                {saving ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : saved ? (
+                  <Check className="w-3 h-3" />
+                ) : null}
+                save
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <p className="text-sm whitespace-pre-wrap">
+          {existing?.relationship_notes}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function TelegramMini() {
   const { agent } = useVibeyAgent();
   const [authState, setAuthState] = useState<AuthState>("loading");
