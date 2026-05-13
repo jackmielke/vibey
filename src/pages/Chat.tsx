@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, supabasePublishableKey, supabaseUrl } from "@/integrations/supabase/client";
 import { VoiceMode } from "@/components/VoiceMode";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
@@ -33,7 +33,7 @@ interface Message {
   tools?: ToolEvent[];
 }
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-with-vibey`;
+const CHAT_URL = `${supabaseUrl}/functions/v1/chat-with-vibey`;
 
 export default function Chat() {
   const { agent } = useVibeyAgent();
@@ -129,13 +129,12 @@ export default function Chat() {
     try {
       // Use the signed-in user's JWT when available so the edge function can
       // identify them and persist the conversation under their unified key.
-      const accessToken =
-        session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const accessToken = session?.access_token ?? supabasePublishableKey;
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          apikey: supabasePublishableKey,
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ messages: payloadMessages }),
