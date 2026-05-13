@@ -1247,7 +1247,7 @@ export async function runAgentLoop(opts: {
     });
 
     for (const call of toolCalls) {
-      const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId);
+      const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId, isAdmin);
       messages.push({
         role: "tool",
         tool_call_id: call.id,
