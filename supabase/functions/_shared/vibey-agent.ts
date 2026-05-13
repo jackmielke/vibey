@@ -1166,6 +1166,7 @@ export async function runAgentLoop(opts: {
   images?: ImageInput[]; // optional images to attach to the user turn (vision)
   toolMetadata?: Record<string, unknown>; // attached to any saved memories
   callerVibeUserId?: string | null;
+  isAdmin?: boolean;
   referer?: string;
   title?: string;
 }): Promise<string> {
@@ -1181,6 +1182,7 @@ export async function runAgentLoop(opts: {
     images = [],
     toolMetadata = {},
     callerVibeUserId = null,
+    isAdmin = false,
     referer = "https://community-vibes-ai.lovable.app",
     title = "Vibey",
   } = opts;
