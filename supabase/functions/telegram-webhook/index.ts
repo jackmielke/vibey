@@ -711,12 +711,24 @@ Deno.serve(async (req) => {
     if (!reply) return new Response("ok", { status: 200 });
 
     const body = reply.length > 4000 ? reply.slice(0, 3997) + "..." : reply;
+    const html = mdToTelegramHtml(body);
 
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-      chat_id: chatId,
-      text: body,
-      reply_to_message_id: msg.message_id, // thread the reply
-    });
+    try {
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: html,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+        reply_to_message_id: msg.message_id, // thread the reply
+      });
+    } catch (e) {
+      console.warn("HTML send failed in group, falling back to plain:", e);
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: body,
+        reply_to_message_id: msg.message_id,
+      });
+    }
 
     // Log the exchange.
     supabase.from("agent_chat_logs").insert({
