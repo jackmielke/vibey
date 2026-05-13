@@ -1525,7 +1525,7 @@ export async function runAgentLoopStreaming(opts: {
               args: parsedArgs,
             });
 
-            const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId);
+            const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId, isAdmin);
 
             const done = describeToolDone(call.function.name, parsedArgs, result);
             emitTool({
