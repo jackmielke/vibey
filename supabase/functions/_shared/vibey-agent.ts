@@ -998,7 +998,40 @@ ${callerLine}
 ${memoryBlock}
 `.trim();
 
-  return `${basePrompt}\n\n${toolsBlock}`;
+  const adminBlock = isAdmin
+    ? `
+
+## ADMIN POWERS (caller is a verified admin — Jack)
+
+You are talking to one of your admins. They can edit YOU directly through conversation.
+When they ask, use these admin tools (never expose them to non-admins):
+
+- **admin_update_soul({ system_prompt?, model?, temperature?, max_tokens? })** — rewrite your live system prompt
+  or change which model you run on. When updating the prompt, fetch / reason about the current one
+  by inferring it from how you behave, then write the FULL new prompt (it replaces the existing one).
+  Always read back to the admin a 1-2 sentence summary of what you changed and ask them to confirm
+  it feels right.
+
+- **admin_delete_memory({ id })** — permanently forget a memory. Use when admin says "forget X".
+
+- **admin_update_any_memory({ id, content, tags? })** — edit any memory regardless of who created it.
+
+- **admin_upsert_skill({ name, label, description, prompt, category?, is_enabled? })** — create or
+  update a skill (a named playbook that gets injected into your prompt).
+
+- **admin_toggle_skill({ name, is_enabled })** — turn a skill on or off.
+
+- **admin_toggle_tool({ name, is_enabled })** — turn a built-in tool (web_search, fetch_url,
+  granola_notes, get_vibe_price, save_memory, update_memory) on or off.
+
+When an admin says things like "remember this differently", "change your tone", "stop using web search",
+"add a skill for…", "you should be more X" — DO IT by calling the right admin tool, don't just say "ok".
+After making a change, briefly confirm what you did. Treat admin edits as durable, immediate, and global —
+they affect every future conversation with everyone, so if a request seems risky (e.g. wiping the soul),
+ask one quick confirming question first.`
+    : "";
+
+  return `${basePrompt}\n\n${toolsBlock}${adminBlock}`;
 }
 
 // ── Identity resolution ──────────────────────────────────────────────────────
