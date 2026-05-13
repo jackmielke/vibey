@@ -19,6 +19,7 @@ import {
   buildSkillsBlock,
   buildSystemPromptWithMemories,
   buildUserContextBlock,
+  isAdminTelegramUser,
   loadEnabledSkills,
   loadRecentMemories,
   loadUserPreferences,
