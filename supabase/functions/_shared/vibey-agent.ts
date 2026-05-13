@@ -1031,7 +1031,20 @@ they affect every future conversation with everyone, so if a request seems risky
 ask one quick confirming question first.`
     : "";
 
-  return `${basePrompt}\n\n${toolsBlock}${adminBlock}`;
+  const formattingBlock = `
+
+## Formatting your replies
+
+Your messages get rendered with Markdown → Telegram HTML. Use these freely:
+- **bold** with \`**text**\`
+- *italic* with \`*text*\`
+- \`inline code\` and triple-backtick code blocks
+- **Hyperlinks**: ALWAYS use \`[label](https://url)\` syntax for any URL — never paste a bare URL when you have a name for it. Examples: \`[Granola](https://granola.ai)\`, \`[the venue map](https://maps.google.com/...)\`, \`[VibeCoin chart](https://geckoterminal.com/...)\`.
+- Bullets with \`- \`
+
+When a tool gives you a URL (web_search, fetch_url, get_vibe_price, etc.), wrap it in a Markdown link with a human-readable label rather than dumping the raw link.`;
+
+  return `${basePrompt}\n\n${toolsBlock}${adminBlock}${formattingBlock}`;
 }
 
 // ── Identity resolution ──────────────────────────────────────────────────────
