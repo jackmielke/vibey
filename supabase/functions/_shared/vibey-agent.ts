@@ -753,17 +753,126 @@ async function getVibePrice(args: { usd?: number; vibe?: number }): Promise<stri
   }
 }
 
+// ── Admin tool implementations ───────────────────────────────────────────────
+
+async function adminUpdateSoul(
+  supabase: SupabaseClient,
+  args: { system_prompt?: string; model?: string; temperature?: number; max_tokens?: number }
+): Promise<string> {
+  const patch: Record<string, unknown> = {};
+  if (typeof args.system_prompt === "string" && args.system_prompt.trim()) patch.system_prompt = args.system_prompt;
+  if (typeof args.model === "string" && args.model.trim()) patch.model = args.model;
+  if (typeof args.temperature === "number" && isFinite(args.temperature)) patch.temperature = args.temperature;
+  if (typeof args.max_tokens === "number" && isFinite(args.max_tokens)) patch.max_tokens = Math.floor(args.max_tokens);
+  if (Object.keys(patch).length === 0) {
+    return JSON.stringify({ ok: false, error: "no fields to update" });
+  }
+  const { error } = await supabase.from("agents").update(patch).eq("id", VIBEY_AGENT_ID);
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  return JSON.stringify({ ok: true, updated: Object.keys(patch) });
+}
+
+async function adminDeleteMemory(supabase: SupabaseClient, args: { id: string }): Promise<string> {
+  const id = (args?.id ?? "").trim();
+  if (!id) return JSON.stringify({ ok: false, error: "id required" });
+  const { data: existing } = await supabase
+    .from("memories").select("id, content").eq("id", id).maybeSingle();
+  if (!existing) return JSON.stringify({ ok: false, error: "memory not found" });
+  const { error } = await supabase.from("memories").delete().eq("id", id);
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  return JSON.stringify({ ok: true, id, deleted_content: existing.content });
+}
+
+async function adminUpdateAnyMemory(
+  supabase: SupabaseClient,
+  args: { id: string; content: string; tags?: string[] }
+): Promise<string> {
+  const id = (args?.id ?? "").trim();
+  const content = (args?.content ?? "").trim();
+  if (!id || !content) return JSON.stringify({ ok: false, error: "id and content required" });
+  const { data: existing } = await supabase
+    .from("memories").select("id, content, tags").eq("id", id).maybeSingle();
+  if (!existing) return JSON.stringify({ ok: false, error: "memory not found" });
+  const patch: Record<string, unknown> = { content };
+  if (Array.isArray(args.tags)) patch.tags = args.tags.filter((t) => typeof t === "string").slice(0, 6);
+  const { error } = await supabase.from("memories").update(patch).eq("id", id);
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  return JSON.stringify({
+    ok: true,
+    id,
+    before: { content: existing.content, tags: existing.tags },
+    after: { content, tags: patch.tags ?? existing.tags },
+  });
+}
+
+async function adminUpsertSkill(
+  supabase: SupabaseClient,
+  args: { name: string; label: string; description: string; prompt: string; category?: string; is_enabled?: boolean }
+): Promise<string> {
+  const name = (args?.name ?? "").trim().toLowerCase();
+  if (!name) return JSON.stringify({ ok: false, error: "name required" });
+  const row = {
+    name,
+    label: args.label,
+    description: args.description,
+    prompt: args.prompt,
+    category: args.category || "general",
+    is_enabled: args.is_enabled ?? true,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("agent_skills").upsert(row, { onConflict: "name" });
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  return JSON.stringify({ ok: true, name, is_enabled: row.is_enabled });
+}
+
+async function adminToggleSkill(
+  supabase: SupabaseClient,
+  args: { name: string; is_enabled: boolean }
+): Promise<string> {
+  const name = (args?.name ?? "").trim();
+  if (!name) return JSON.stringify({ ok: false, error: "name required" });
+  const { data, error } = await supabase
+    .from("agent_skills").update({ is_enabled: args.is_enabled }).eq("name", name).select("name").maybeSingle();
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  if (!data) return JSON.stringify({ ok: false, error: `no skill named '${name}'` });
+  return JSON.stringify({ ok: true, name, is_enabled: args.is_enabled });
+}
+
+async function adminToggleTool(
+  supabase: SupabaseClient,
+  args: { name: string; is_enabled: boolean }
+): Promise<string> {
+  const name = (args?.name ?? "").trim();
+  if (!name) return JSON.stringify({ ok: false, error: "name required" });
+  const builtIn = TOOLS.some((t) => t.function.name === name);
+  if (!builtIn) return JSON.stringify({ ok: false, error: `'${name}' is not a known built-in tool` });
+  // Upsert so the tool can be enabled even if the registry row doesn't exist yet.
+  const { error } = await supabase
+    .from("agent_tools")
+    .upsert({ name, label: name, description: name, is_enabled: args.is_enabled, updated_at: new Date().toISOString() }, { onConflict: "name" });
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  return JSON.stringify({ ok: true, name, is_enabled: args.is_enabled });
+}
+
+const ADMIN_TOOL_NAMES = new Set(ADMIN_TOOLS.map((t) => t.function.name));
+
 async function executeToolCall(
   supabase: SupabaseClient,
   call: NonNullable<ChatMessage["tool_calls"]>[number],
   metadata: Record<string, unknown>,
-  callerVibeUserId: string | null = null
+  callerVibeUserId: string | null = null,
+  isAdmin: boolean = false
 ): Promise<string> {
   let parsed: Record<string, unknown> = {};
   try {
     parsed = JSON.parse(call.function.arguments || "{}");
   } catch {
     return JSON.stringify({ ok: false, error: "invalid JSON arguments" });
+  }
+
+  // Hard gate: admin tools require admin caller, even if the model tries to call one.
+  if (ADMIN_TOOL_NAMES.has(call.function.name) && !isAdmin) {
+    return JSON.stringify({ ok: false, error: "admin tools require admin access — refuse politely to the user" });
   }
 
   switch (call.function.name) {
@@ -797,6 +906,18 @@ async function executeToolCall(
       });
     case "get_vibe_price":
       return await getVibePrice(parsed as { usd?: number; vibe?: number });
+    case "admin_update_soul":
+      return await adminUpdateSoul(supabase, parsed as Parameters<typeof adminUpdateSoul>[1]);
+    case "admin_delete_memory":
+      return await adminDeleteMemory(supabase, parsed as { id: string });
+    case "admin_update_any_memory":
+      return await adminUpdateAnyMemory(supabase, parsed as Parameters<typeof adminUpdateAnyMemory>[1]);
+    case "admin_upsert_skill":
+      return await adminUpsertSkill(supabase, parsed as Parameters<typeof adminUpsertSkill>[1]);
+    case "admin_toggle_skill":
+      return await adminToggleSkill(supabase, parsed as { name: string; is_enabled: boolean });
+    case "admin_toggle_tool":
+      return await adminToggleTool(supabase, parsed as { name: string; is_enabled: boolean });
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
