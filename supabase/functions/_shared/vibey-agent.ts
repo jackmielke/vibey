@@ -928,7 +928,8 @@ async function executeToolCall(
 export function buildSystemPromptWithMemories(
   basePrompt: string,
   memories: Memory[],
-  callerVibeUserId: string | null = null
+  callerVibeUserId: string | null = null,
+  isAdmin: boolean = false
 ): string {
   const memoryBlock =
     memories.length === 0
