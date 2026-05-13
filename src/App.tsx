@@ -27,8 +27,27 @@ import PublicChat from "@/pages/PublicChat";
 import PublicDocs from "@/pages/PublicDocs";
 import Automations from "@/pages/Automations";
 import NotFound from "@/pages/NotFound";
+import { isSupabaseConfigured } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient();
+
+const MissingSupabaseConfig = () => (
+  <main className="min-h-safe-screen flex items-center justify-center bg-background px-6 text-foreground">
+    <section className="w-full max-w-xl space-y-5 border border-border bg-card p-6 shadow-glow-sm">
+      <div className="space-y-2">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-muted-foreground">
+          Deployment config missing
+        </p>
+        <h1 className="text-2xl font-light tracking-tight">Supabase environment variables are not set.</h1>
+      </div>
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        This build is missing <span className="font-mono text-foreground">VITE_SUPABASE_URL</span> and/or{" "}
+        <span className="font-mono text-foreground">VITE_SUPABASE_PUBLISHABLE_KEY</span>. Add them to the Lovable
+        project environment, then publish/update the app again.
+      </p>
+    </section>
+  </main>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -36,7 +55,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      {isSupabaseConfigured ? <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/mini" element={<TelegramMini />} />
@@ -61,7 +80,7 @@ const App = () => (
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </BrowserRouter>
+      </BrowserRouter> : <MissingSupabaseConfig />}
     </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
