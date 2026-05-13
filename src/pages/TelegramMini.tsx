@@ -14,11 +14,6 @@ const PREFERENCE_COMMUNITIES: { community_id: string; agent_id: string; label: s
     agent_id: "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
     label: "with vibey",
   },
-  {
-    community_id: VIBE_CODE_RESIDENCY_COMMUNITY_ID,
-    agent_id: "33a20660-2809-4010-87ef-9d501f9af5e3",
-    label: "in vibe code residency",
-  },
 ];
 
 const PREFERENCE_COMMUNITY_IDS = PREFERENCE_COMMUNITIES.map((c) => c.community_id);
