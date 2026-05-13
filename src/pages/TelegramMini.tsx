@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Brain, Tag, Share2, Heart, Sparkles, Filter } from "lucide-react";
+import { Loader2, Brain, Tag, Share2, Heart, Sparkles, Filter, Check, Pencil } from "lucide-react";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,9 +8,28 @@ import { useVibeyAgent } from "@/hooks/useVibeyAgent";
 import { VIBE_CODE_RESIDENCY_COMMUNITY_ID, VIBEY_COMMUNITY_ID } from "@/lib/vibey";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 
-const PREFERENCE_COMMUNITY_IDS = [
-  VIBE_CODE_RESIDENCY_COMMUNITY_ID,
-  VIBEY_COMMUNITY_ID,
+const PREFERENCE_COMMUNITIES: { community_id: string; agent_id: string; label: string }[] = [
+  {
+    community_id: VIBEY_COMMUNITY_ID,
+    agent_id: "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+    label: "with vibey",
+  },
+  {
+    community_id: VIBE_CODE_RESIDENCY_COMMUNITY_ID,
+    agent_id: "33a20660-2809-4010-87ef-9d501f9af5e3",
+    label: "in vibe code residency",
+  },
+];
+
+const PREFERENCE_COMMUNITY_IDS = PREFERENCE_COMMUNITIES.map((c) => c.community_id);
+
+const PREFERENCE_SUGGESTIONS = [
+  "please call me sir",
+  "use all lowercase and be extra vibey",
+  "keep replies under 3 sentences",
+  "no emojis, ever",
+  "be brutally honest with me",
+  "match my energy — playful and curious",
 ];
 
 type MemoryRow = {
@@ -109,6 +128,125 @@ function MemoryCard({ m, highlight }: { m: MemoryRow; highlight?: boolean }) {
         )}
       </div>
     </motion.div>
+  );
+}
+
+function PreferenceEditor({
+  community_id,
+  agent_id,
+  label,
+  existing,
+  saving,
+  saved,
+  onSave,
+}: {
+  community_id: string;
+  agent_id: string;
+  label: string;
+  existing: PreferenceRow | null;
+  saving: boolean;
+  saved: boolean;
+  onSave: (notes: string) => void;
+}) {
+  const initial = existing?.relationship_notes ?? "";
+  const [value, setValue] = useState(initial);
+  const [editing, setEditing] = useState(!initial);
+
+  // Re-sync when underlying row changes (e.g. after save)
+  useEffect(() => {
+    setValue(existing?.relationship_notes ?? "");
+  }, [existing?.id, existing?.relationship_notes]);
+
+  const dirty = value.trim() !== (existing?.relationship_notes ?? "").trim();
+  const isEmpty = !(existing?.relationship_notes ?? "").trim();
+
+  return (
+    <div className="p-3 rounded-lg bg-card border border-primary/30 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          {label}
+        </p>
+        {!editing && !isEmpty && (
+          <button
+            onClick={() => setEditing(true)}
+            className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground hover:text-primary flex items-center gap-1"
+          >
+            <Pencil className="w-3 h-3" /> edit
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <>
+          <textarea
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="e.g. call me sir, keep it short, no emojis"
+            rows={3}
+            className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60 resize-y font-sans"
+          />
+
+          {!value.trim() && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                try one
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {PREFERENCE_SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setValue(s)}
+                    className="text-[11px] px-2 py-1 rounded-full bg-muted hover:bg-primary/10 hover:text-primary border border-transparent hover:border-primary/30 transition-colors"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <p className="text-[10px] text-muted-foreground font-mono">
+              {existing?.updated_at
+                ? `updated ${formatDistanceToNow(new Date(existing.updated_at), { addSuffix: true })}`
+                : "not set yet"}
+            </p>
+            <div className="flex items-center gap-2">
+              {!isEmpty && (
+                <button
+                  onClick={() => {
+                    setValue(existing?.relationship_notes ?? "");
+                    setEditing(false);
+                  }}
+                  className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                >
+                  cancel
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  onSave(value);
+                  setEditing(false);
+                }}
+                disabled={saving || !dirty}
+                className="text-[11px] font-mono uppercase tracking-widest px-3 py-1 rounded bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                {saving ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : saved ? (
+                  <Check className="w-3 h-3" />
+                ) : null}
+                save
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <p className="text-sm whitespace-pre-wrap">
+          {existing?.relationship_notes}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -246,17 +384,12 @@ export default function TelegramMini() {
         .from("vibey_relationships")
         .select("id, community_id, relationship_notes, display_name, updated_at")
         .in("community_id", PREFERENCE_COMMUNITY_IDS)
-        .eq("telegram_user_id", tgUserId)
-        .not("relationship_notes", "is", null);
+        .eq("telegram_user_id", tgUserId);
       if (cancelled) return;
       if (error) {
         console.error("load prefs failed", error.message);
       } else {
-        setPrefs(
-          ((data ?? []) as PreferenceRow[]).filter((p) =>
-            (p.relationship_notes ?? "").trim().length > 0,
-          ),
-        );
+        setPrefs((data ?? []) as PreferenceRow[]);
       }
       setPrefsLoading(false);
     })();
@@ -264,6 +397,55 @@ export default function TelegramMini() {
       cancelled = true;
     };
   }, [authState, tgUserId]);
+
+  // Save / upsert a preference for a given community
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
+
+  async function savePreference(community_id: string, agent_id: string, notes: string) {
+    if (!tgUserId) return;
+    setSavingId(community_id);
+    const existing = prefs.find((p) => p.community_id === community_id);
+    const trimmed = notes.trim();
+    try {
+      if (existing) {
+        const { data, error } = await supabase
+          .from("vibey_relationships")
+          .update({
+            relationship_notes: trimmed.length ? trimmed : null,
+            display_name: tgName ?? existing.display_name,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id)
+          .select("id, community_id, relationship_notes, display_name, updated_at")
+          .single();
+        if (error) throw error;
+        setPrefs((prev) => prev.map((p) => (p.id === existing.id ? (data as PreferenceRow) : p)));
+      } else {
+        const { data, error } = await supabase
+          .from("vibey_relationships")
+          .insert({
+            community_id,
+            agent_id,
+            telegram_user_id: tgUserId,
+            display_name: tgName,
+            relationship_notes: trimmed.length ? trimmed : null,
+          })
+          .select("id, community_id, relationship_notes, display_name, updated_at")
+          .single();
+        if (error) throw error;
+        setPrefs((prev) => [...prev, data as PreferenceRow]);
+      }
+      setSavedId(community_id);
+      setTimeout(() => setSavedId((v) => (v === community_id ? null : v)), 1500);
+    } catch (e) {
+      console.error("save preference failed", e);
+      alert(e instanceof Error ? e.message : "Couldn't save preferences.");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
 
   // ===== Render =====
   if (authState === "loading") {
@@ -314,39 +496,32 @@ export default function TelegramMini() {
 
       {/* Stream */}
       <div className="flex-1 overflow-auto px-4 py-3 space-y-5">
-        {/* Preferences (from vibey_relationships) — what Vibey personally knows about you */}
-        <section className="space-y-2">
+        {/* Preferences (vibey_relationships) — editable per community */}
+        <section className="space-y-3">
           <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
             <Heart className="w-3 h-3" />
-            your preferences{prefs.length ? ` · ${prefs.length}` : ""}
+            your preferences
           </h2>
-          {prefsLoading ? (
+          <p className="text-[11px] text-muted-foreground px-0.5 leading-relaxed">
+            tell vibey how you want to be talked to. this shapes every reply
+            you'll get — tone, length, nicknames, vibe.
+          </p>
+          {prefsLoading || !tgUserId ? (
             <div className="flex items-center py-4">
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
             </div>
-          ) : prefs.length === 0 ? (
-            <p className="text-xs text-muted-foreground px-1">
-              vibey hasn't noted any preferences for you yet. dm vibey something
-              like "remember i prefer lowercase" or "call me sir."
-            </p>
           ) : (
-            prefs.map((p) => (
-              <div
-                key={p.id}
-                className="p-3 rounded-lg bg-card border border-primary/40"
-              >
-                <p className="text-sm whitespace-pre-wrap">
-                  {p.relationship_notes}
-                </p>
-                {p.updated_at && (
-                  <p className="text-[10px] text-muted-foreground font-mono mt-2">
-                    updated{" "}
-                    {formatDistanceToNow(new Date(p.updated_at), {
-                      addSuffix: true,
-                    })}
-                  </p>
-                )}
-              </div>
+            PREFERENCE_COMMUNITIES.map((c) => (
+              <PreferenceEditor
+                key={c.community_id}
+                community_id={c.community_id}
+                agent_id={c.agent_id}
+                label={c.label}
+                existing={prefs.find((p) => p.community_id === c.community_id) ?? null}
+                saving={savingId === c.community_id}
+                saved={savedId === c.community_id}
+                onSave={(notes) => savePreference(c.community_id, c.agent_id, notes)}
+              />
             ))
           )}
         </section>
