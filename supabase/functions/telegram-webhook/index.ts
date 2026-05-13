@@ -19,6 +19,7 @@ import {
   buildSkillsBlock,
   buildSystemPromptWithMemories,
   buildUserContextBlock,
+  isAdminTelegramUser,
   loadEnabledSkills,
   loadRecentMemories,
   loadUserPreferences,
@@ -681,7 +682,8 @@ Deno.serve(async (req) => {
       display_name: msg.from?.first_name ?? null,
       telegram_username: msg.from?.username ?? null,
     });
-    const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId)}\n\n${userContext}${buildSkillsBlock(skills)}`;
+    const isAdmin = isAdminTelegramUser(userId);
+    const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId, isAdmin)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
     const reply = await runAgentLoop({
       supabase,
@@ -701,6 +703,7 @@ Deno.serve(async (req) => {
         telegram_username: username,
       },
       callerVibeUserId: vibeUserId,
+      isAdmin,
       referer: "https://t.me/vibey_ai_bot",
       title: "Vibey (Telegram)",
     });
@@ -761,7 +764,8 @@ Deno.serve(async (req) => {
     display_name: msg.from?.first_name ?? null,
     telegram_username: msg.from?.username ?? null,
   });
-  const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId)}\n\n${userContext}${buildSkillsBlock(skills)}`;
+  const isAdminDm = isAdminTelegramUser(userId);
+  const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId, isAdminDm)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
   const reply = await runAgentLoop({
     supabase,
@@ -780,6 +784,7 @@ Deno.serve(async (req) => {
       telegram_username: username,
     },
     callerVibeUserId: vibeUserId,
+    isAdmin: isAdminDm,
     referer: "https://t.me/vibey_ai_bot",
     title: "Vibey (Telegram)",
   });

@@ -11,6 +11,17 @@
 type SupabaseClient = any;
 
 export const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
+export const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
+
+// Telegram user IDs that get full admin powers (edit Vibey's soul, memories,
+// skills, and tools via conversation). Standard users get read-only powers.
+export const ADMIN_TELEGRAM_USER_IDS = new Set<number>([
+  5780091237, // Jack Mielke
+]);
+
+export function isAdminTelegramUser(telegramUserId: number | null | undefined): boolean {
+  return telegramUserId != null && ADMIN_TELEGRAM_USER_IDS.has(telegramUserId);
+}
 
 // Auto-load this many recent memories into the system prompt every turn.
 // (We can swap this for a `recall_memories` tool later when the corpus grows.)
@@ -180,6 +191,111 @@ export const TOOLS = [
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
 
+// ── Admin-only tools ────────────────────────────────────────────────────────
+// These let trusted callers (admins) edit Vibey's own soul, memories, skills,
+// and tool registry through conversation. They are NEVER exposed to the model
+// when the caller is not an admin (filterTools strips them).
+
+export const ADMIN_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_update_soul",
+      description:
+        "ADMIN ONLY. Edit Vibey's own soul — system prompt, model, sampling settings. Use when an admin asks you to change your personality, tone defaults, instructions, or which model you run on. Pass only the fields you want to change. Be careful: this rewrites the LIVE prompt for everyone, immediately.",
+      parameters: {
+        type: "object",
+        properties: {
+          system_prompt: { type: "string", description: "Full new system prompt (replaces current)." },
+          model: { type: "string", description: "OpenRouter model id, e.g. 'google/gemini-2.5-flash' or 'anthropic/claude-sonnet-4'." },
+          temperature: { type: "number", description: "Sampling temperature 0-2." },
+          max_tokens: { type: "integer", description: "Max output tokens per reply." },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_delete_memory",
+      description: "ADMIN ONLY. Permanently delete a memory by id. Use when an admin says 'forget X' or 'delete that memory'.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string", description: "Memory UUID from the memory list." } },
+        required: ["id"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_update_any_memory",
+      description: "ADMIN ONLY. Update any memory regardless of who created it. Pass full new content.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          content: { type: "string" },
+          tags: { type: "array", items: { type: "string" } },
+        },
+        required: ["id", "content"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_upsert_skill",
+      description:
+        "ADMIN ONLY. Create or update a Vibey skill (a named playbook injected into the system prompt). Use when an admin says 'add a skill for X' or 'change the X skill'. Name must be a stable lowercase slug (e.g. 'crypto_pricing').",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Stable lowercase slug, unique." },
+          label: { type: "string", description: "Human-readable name shown in admin UI." },
+          description: { type: "string", description: "When to use this skill (one sentence)." },
+          prompt: { type: "string", description: "The playbook itself — what to do when the skill applies." },
+          category: { type: "string", description: "Optional grouping (default 'general')." },
+          is_enabled: { type: "boolean", description: "Whether to enable immediately (default true)." },
+        },
+        required: ["name", "label", "description", "prompt"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_toggle_skill",
+      description: "ADMIN ONLY. Enable or disable an existing skill by name.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          is_enabled: { type: "boolean" },
+        },
+        required: ["name", "is_enabled"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_toggle_tool",
+      description: "ADMIN ONLY. Enable or disable a built-in tool by name (e.g. 'web_search', 'granola_notes'). Tools you can toggle: web_search, fetch_url, granola_notes, get_vibe_price, save_memory, update_memory.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          is_enabled: { type: "boolean" },
+        },
+        required: ["name", "is_enabled"],
+      },
+    },
+  },
+];
+
+// ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
+
 export async function loadEnabledToolNames(
   supabase: SupabaseClient
 ): Promise<Set<string>> {
@@ -209,8 +325,14 @@ export async function loadEnabledToolNames(
   return enabled;
 }
 
+export function filterTools(enabled: Set<string>, isAdmin: boolean) {
+  const base = TOOLS.filter((t) => enabled.has(t.function.name));
+  return isAdmin ? [...base, ...ADMIN_TOOLS] : base;
+}
+
+// Back-compat alias for any external callers — defaults to non-admin.
 export function filterToolsByEnabled(enabled: Set<string>) {
-  return TOOLS.filter((t) => enabled.has(t.function.name));
+  return filterTools(enabled, false);
 }
 
 // ── Skills (DB-backed prompt playbooks) ─────────────────────────────────────
@@ -631,17 +753,126 @@ async function getVibePrice(args: { usd?: number; vibe?: number }): Promise<stri
   }
 }
 
+// ── Admin tool implementations ───────────────────────────────────────────────
+
+async function adminUpdateSoul(
+  supabase: SupabaseClient,
+  args: { system_prompt?: string; model?: string; temperature?: number; max_tokens?: number }
+): Promise<string> {
+  const patch: Record<string, unknown> = {};
+  if (typeof args.system_prompt === "string" && args.system_prompt.trim()) patch.system_prompt = args.system_prompt;
+  if (typeof args.model === "string" && args.model.trim()) patch.model = args.model;
+  if (typeof args.temperature === "number" && isFinite(args.temperature)) patch.temperature = args.temperature;
+  if (typeof args.max_tokens === "number" && isFinite(args.max_tokens)) patch.max_tokens = Math.floor(args.max_tokens);
+  if (Object.keys(patch).length === 0) {
+    return JSON.stringify({ ok: false, error: "no fields to update" });
+  }
+  const { error } = await supabase.from("agents").update(patch).eq("id", VIBEY_AGENT_ID);
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  return JSON.stringify({ ok: true, updated: Object.keys(patch) });
+}
+
+async function adminDeleteMemory(supabase: SupabaseClient, args: { id: string }): Promise<string> {
+  const id = (args?.id ?? "").trim();
+  if (!id) return JSON.stringify({ ok: false, error: "id required" });
+  const { data: existing } = await supabase
+    .from("memories").select("id, content").eq("id", id).maybeSingle();
+  if (!existing) return JSON.stringify({ ok: false, error: "memory not found" });
+  const { error } = await supabase.from("memories").delete().eq("id", id);
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  return JSON.stringify({ ok: true, id, deleted_content: existing.content });
+}
+
+async function adminUpdateAnyMemory(
+  supabase: SupabaseClient,
+  args: { id: string; content: string; tags?: string[] }
+): Promise<string> {
+  const id = (args?.id ?? "").trim();
+  const content = (args?.content ?? "").trim();
+  if (!id || !content) return JSON.stringify({ ok: false, error: "id and content required" });
+  const { data: existing } = await supabase
+    .from("memories").select("id, content, tags").eq("id", id).maybeSingle();
+  if (!existing) return JSON.stringify({ ok: false, error: "memory not found" });
+  const patch: Record<string, unknown> = { content };
+  if (Array.isArray(args.tags)) patch.tags = args.tags.filter((t) => typeof t === "string").slice(0, 6);
+  const { error } = await supabase.from("memories").update(patch).eq("id", id);
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  return JSON.stringify({
+    ok: true,
+    id,
+    before: { content: existing.content, tags: existing.tags },
+    after: { content, tags: patch.tags ?? existing.tags },
+  });
+}
+
+async function adminUpsertSkill(
+  supabase: SupabaseClient,
+  args: { name: string; label: string; description: string; prompt: string; category?: string; is_enabled?: boolean }
+): Promise<string> {
+  const name = (args?.name ?? "").trim().toLowerCase();
+  if (!name) return JSON.stringify({ ok: false, error: "name required" });
+  const row = {
+    name,
+    label: args.label,
+    description: args.description,
+    prompt: args.prompt,
+    category: args.category || "general",
+    is_enabled: args.is_enabled ?? true,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("agent_skills").upsert(row, { onConflict: "name" });
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  return JSON.stringify({ ok: true, name, is_enabled: row.is_enabled });
+}
+
+async function adminToggleSkill(
+  supabase: SupabaseClient,
+  args: { name: string; is_enabled: boolean }
+): Promise<string> {
+  const name = (args?.name ?? "").trim();
+  if (!name) return JSON.stringify({ ok: false, error: "name required" });
+  const { data, error } = await supabase
+    .from("agent_skills").update({ is_enabled: args.is_enabled }).eq("name", name).select("name").maybeSingle();
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  if (!data) return JSON.stringify({ ok: false, error: `no skill named '${name}'` });
+  return JSON.stringify({ ok: true, name, is_enabled: args.is_enabled });
+}
+
+async function adminToggleTool(
+  supabase: SupabaseClient,
+  args: { name: string; is_enabled: boolean }
+): Promise<string> {
+  const name = (args?.name ?? "").trim();
+  if (!name) return JSON.stringify({ ok: false, error: "name required" });
+  const builtIn = TOOLS.some((t) => t.function.name === name);
+  if (!builtIn) return JSON.stringify({ ok: false, error: `'${name}' is not a known built-in tool` });
+  // Upsert so the tool can be enabled even if the registry row doesn't exist yet.
+  const { error } = await supabase
+    .from("agent_tools")
+    .upsert({ name, label: name, description: name, is_enabled: args.is_enabled, updated_at: new Date().toISOString() }, { onConflict: "name" });
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  return JSON.stringify({ ok: true, name, is_enabled: args.is_enabled });
+}
+
+const ADMIN_TOOL_NAMES = new Set(ADMIN_TOOLS.map((t) => t.function.name));
+
 async function executeToolCall(
   supabase: SupabaseClient,
   call: NonNullable<ChatMessage["tool_calls"]>[number],
   metadata: Record<string, unknown>,
-  callerVibeUserId: string | null = null
+  callerVibeUserId: string | null = null,
+  isAdmin: boolean = false
 ): Promise<string> {
   let parsed: Record<string, unknown> = {};
   try {
     parsed = JSON.parse(call.function.arguments || "{}");
   } catch {
     return JSON.stringify({ ok: false, error: "invalid JSON arguments" });
+  }
+
+  // Hard gate: admin tools require admin caller, even if the model tries to call one.
+  if (ADMIN_TOOL_NAMES.has(call.function.name) && !isAdmin) {
+    return JSON.stringify({ ok: false, error: "admin tools require admin access — refuse politely to the user" });
   }
 
   switch (call.function.name) {
@@ -675,6 +906,18 @@ async function executeToolCall(
       });
     case "get_vibe_price":
       return await getVibePrice(parsed as { usd?: number; vibe?: number });
+    case "admin_update_soul":
+      return await adminUpdateSoul(supabase, parsed as Parameters<typeof adminUpdateSoul>[1]);
+    case "admin_delete_memory":
+      return await adminDeleteMemory(supabase, parsed as { id: string });
+    case "admin_update_any_memory":
+      return await adminUpdateAnyMemory(supabase, parsed as Parameters<typeof adminUpdateAnyMemory>[1]);
+    case "admin_upsert_skill":
+      return await adminUpsertSkill(supabase, parsed as Parameters<typeof adminUpsertSkill>[1]);
+    case "admin_toggle_skill":
+      return await adminToggleSkill(supabase, parsed as { name: string; is_enabled: boolean });
+    case "admin_toggle_tool":
+      return await adminToggleTool(supabase, parsed as { name: string; is_enabled: boolean });
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
@@ -685,7 +928,8 @@ async function executeToolCall(
 export function buildSystemPromptWithMemories(
   basePrompt: string,
   memories: Memory[],
-  callerVibeUserId: string | null = null
+  callerVibeUserId: string | null = null,
+  isAdmin: boolean = false
 ): string {
   const memoryBlock =
     memories.length === 0
@@ -754,7 +998,40 @@ ${callerLine}
 ${memoryBlock}
 `.trim();
 
-  return `${basePrompt}\n\n${toolsBlock}`;
+  const adminBlock = isAdmin
+    ? `
+
+## ADMIN POWERS (caller is a verified admin — Jack)
+
+You are talking to one of your admins. They can edit YOU directly through conversation.
+When they ask, use these admin tools (never expose them to non-admins):
+
+- **admin_update_soul({ system_prompt?, model?, temperature?, max_tokens? })** — rewrite your live system prompt
+  or change which model you run on. When updating the prompt, fetch / reason about the current one
+  by inferring it from how you behave, then write the FULL new prompt (it replaces the existing one).
+  Always read back to the admin a 1-2 sentence summary of what you changed and ask them to confirm
+  it feels right.
+
+- **admin_delete_memory({ id })** — permanently forget a memory. Use when admin says "forget X".
+
+- **admin_update_any_memory({ id, content, tags? })** — edit any memory regardless of who created it.
+
+- **admin_upsert_skill({ name, label, description, prompt, category?, is_enabled? })** — create or
+  update a skill (a named playbook that gets injected into your prompt).
+
+- **admin_toggle_skill({ name, is_enabled })** — turn a skill on or off.
+
+- **admin_toggle_tool({ name, is_enabled })** — turn a built-in tool (web_search, fetch_url,
+  granola_notes, get_vibe_price, save_memory, update_memory) on or off.
+
+When an admin says things like "remember this differently", "change your tone", "stop using web search",
+"add a skill for…", "you should be more X" — DO IT by calling the right admin tool, don't just say "ok".
+After making a change, briefly confirm what you did. Treat admin edits as durable, immediate, and global —
+they affect every future conversation with everyone, so if a request seems risky (e.g. wiping the soul),
+ask one quick confirming question first.`
+    : "";
+
+  return `${basePrompt}\n\n${toolsBlock}${adminBlock}`;
 }
 
 // ── Identity resolution ──────────────────────────────────────────────────────
@@ -889,6 +1166,7 @@ export async function runAgentLoop(opts: {
   images?: ImageInput[]; // optional images to attach to the user turn (vision)
   toolMetadata?: Record<string, unknown>; // attached to any saved memories
   callerVibeUserId?: string | null;
+  isAdmin?: boolean;
   referer?: string;
   title?: string;
 }): Promise<string> {
@@ -904,6 +1182,7 @@ export async function runAgentLoop(opts: {
     images = [],
     toolMetadata = {},
     callerVibeUserId = null,
+    isAdmin = false,
     referer = "https://community-vibes-ai.lovable.app",
     title = "Vibey",
   } = opts;
@@ -938,7 +1217,7 @@ export async function runAgentLoop(opts: {
         temperature,
         max_tokens: maxTokens,
         stream: false,
-        tools: filterToolsByEnabled(await loadEnabledToolNames(supabase)),
+        tools: filterTools(await loadEnabledToolNames(supabase), isAdmin),
         messages,
       }),
     });
@@ -968,7 +1247,7 @@ export async function runAgentLoop(opts: {
     });
 
     for (const call of toolCalls) {
-      const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId);
+      const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId, isAdmin);
       messages.push({
         role: "tool",
         tool_call_id: call.id,
@@ -1118,6 +1397,7 @@ export async function runAgentLoopStreaming(opts: {
   userText: string;
   toolMetadata?: Record<string, unknown>;
   callerVibeUserId?: string | null;
+  isAdmin?: boolean;
   referer?: string;
   title?: string;
 }): Promise<Response> {
@@ -1132,6 +1412,7 @@ export async function runAgentLoopStreaming(opts: {
     userText,
     toolMetadata = {},
     callerVibeUserId = null,
+    isAdmin = false,
     referer = "https://community-vibes-ai.lovable.app",
     title = "Vibey",
   } = opts;
@@ -1170,7 +1451,7 @@ export async function runAgentLoopStreaming(opts: {
               temperature,
               max_tokens: maxTokens,
               stream: false,
-              tools: filterToolsByEnabled(await loadEnabledToolNames(supabase)),
+              tools: filterTools(await loadEnabledToolNames(supabase), isAdmin),
               messages,
             }),
           });
@@ -1244,7 +1525,7 @@ export async function runAgentLoopStreaming(opts: {
               args: parsedArgs,
             });
 
-            const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId);
+            const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId, isAdmin);
 
             const done = describeToolDone(call.function.name, parsedArgs, result);
             emitTool({

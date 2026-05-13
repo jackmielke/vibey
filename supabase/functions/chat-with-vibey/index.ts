@@ -12,6 +12,7 @@ import {
   buildSkillsBlock,
   buildSystemPromptWithMemories,
   buildUserContextBlock,
+  isAdminTelegramUser,
   loadEnabledSkills,
   loadRecentMemories,
   loadUserPreferences,
@@ -286,7 +287,8 @@ Deno.serve(async (req) => {
       display_name: resolvedDisplayName,
       telegram_username: resolvedTgUsername,
     });
-    const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories, vibeUserId)}\n\n${userContext}${buildSkillsBlock(skills)}`;
+    const isAdmin = isAdminTelegramUser(resolvedTgUserId);
+    const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories, vibeUserId, isAdmin)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
     // Split incoming messages into prior history + the current user turn so the
     // agent loop can run tool iterations before streaming the final reply.
@@ -314,6 +316,7 @@ Deno.serve(async (req) => {
         external_handle: context?.external_handle ?? null,
       },
       callerVibeUserId: vibeUserId,
+      isAdmin,
     });
 
     if (!orResponse.ok || !orResponse.body) {
