@@ -3,7 +3,29 @@ import { ArrowLeft, Loader2, MessagesSquare, User, Users } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { TelegramIcon } from "@/components/icons/TelegramIcon";
 import { toast } from "sonner";
+
+type UserLite = {
+  id: string;
+  name: string | null;
+  telegram_username: string | null;
+  telegram_user_id: number | null;
+  telegram_photo_url: string | null;
+  avatar_url: string | null;
+};
+
+function initialsOf(label: string) {
+  return label
+    .replace(/^@/, "")
+    .split(/[\s_·]+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
 type ChatLog = {
   id: string;
