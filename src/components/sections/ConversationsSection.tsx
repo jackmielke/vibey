@@ -288,7 +288,7 @@ export function ConversationsSection() {
                 </span>
               </div>
               <div className="flex flex-col items-start">
-                <div className="max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap bg-card border border-border">
+                <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words bg-card border border-border">
                   {m.agent_response}
                 </div>
                 <span className="text-[10px] text-muted-foreground mt-1 font-mono">vibey</span>
