@@ -230,7 +230,7 @@ export function ConversationsSection() {
   // Detail view
   if (selectedConversation) {
     return (
-      <div className="space-y-4 max-w-3xl">
+      <div className="space-y-4 max-w-3xl w-full min-w-0 overflow-hidden">
         <Button
           variant="ghost"
           size="sm"
