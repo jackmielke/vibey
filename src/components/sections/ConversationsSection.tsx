@@ -323,14 +323,6 @@ export function ConversationsSection() {
                   </AvatarFallback>
                 </Avatar>
               )}
-              {c.isTelegram && (
-                <span
-                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center text-[#229ED9]"
-                  title="From Telegram"
-                >
-                  <TelegramIcon className="w-2.5 h-2.5" />
-                </span>
-              )}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
