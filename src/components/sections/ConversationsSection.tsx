@@ -300,10 +300,40 @@ export function ConversationsSection() {
     );
   }
 
+  const visibleConversations = telegramOnly
+    ? conversations.filter((c) => c.isTelegram)
+    : conversations;
+  const telegramCount = conversations.filter((c) => c.isTelegram).length;
+
   // List view
   return (
-    <div className="space-y-2 max-w-2xl">
-      {conversations.map((c) => {
+    <div className="space-y-3 max-w-2xl">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-xs text-muted-foreground font-mono">
+          {visibleConversations.length} of {conversations.length} conversation
+          {conversations.length === 1 ? "" : "s"}
+        </p>
+        <button
+          type="button"
+          onClick={() => setTelegramOnly((v) => !v)}
+          aria-pressed={telegramOnly}
+          className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-mono transition-colors ${
+            telegramOnly
+              ? "border-primary/40 bg-primary/10 text-foreground"
+              : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary/30"
+          }`}
+        >
+          <TelegramIcon className="w-3 h-3 text-[#229ED9]" />
+          Telegram only
+          <span className="text-muted-foreground">({telegramCount})</span>
+        </button>
+      </div>
+      {visibleConversations.length === 0 && (
+        <p className="text-sm text-muted-foreground py-8 text-center">
+          No Telegram conversations yet.
+        </p>
+      )}
+      {visibleConversations.map((c) => {
         const { url, initials } = avatarFor(c);
         return (
           <button
