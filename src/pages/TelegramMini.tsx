@@ -344,7 +344,7 @@ function SoulEditor({
           disabled={saving || !dirty}
           className="text-[11px] font-mono uppercase tracking-widest px-3 py-1 rounded bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
         >
-          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <Check className="w-3 h-3" /> : null}
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
           save soul
         </button>
       </div>
