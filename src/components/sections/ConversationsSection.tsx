@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Loader2, MessagesSquare, User, Users } from "lucide-react";
+import { ArrowLeft, Loader2, MessagesSquare, Users } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
