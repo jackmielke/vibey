@@ -90,22 +90,29 @@ function conversationKey(log: ChatLog): string {
 export function ConversationsSection() {
   const [logs, setLogs] = useState<ChatLog[]>([]);
   const [groupTitles, setGroupTitles] = useState<Map<number, string>>(new Map());
+  const [usersByTgUsername, setUsersByTgUsername] = useState<Map<string, UserLite>>(new Map());
+  const [usersByTgId, setUsersByTgId] = useState<Map<number, UserLite>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [{ data: logsData, error: logsErr }, { data: groupsData }] = await Promise.all([
-        supabase
-          .from("agent_chat_logs")
-          .select(
-            "id, user_message, agent_response, created_at, session_key, telegram_chat_id, telegram_username"
-          )
-          .order("created_at", { ascending: false })
-          .limit(PAGE_SIZE),
-        supabase.from("telegram_group_settings").select("chat_id, chat_title"),
-      ]);
+      const [{ data: logsData, error: logsErr }, { data: groupsData }, { data: usersData }] =
+        await Promise.all([
+          supabase
+            .from("agent_chat_logs")
+            .select(
+              "id, user_message, agent_response, created_at, session_key, telegram_chat_id, telegram_username"
+            )
+            .order("created_at", { ascending: false })
+            .limit(PAGE_SIZE),
+          supabase.from("telegram_group_settings").select("chat_id, chat_title"),
+          supabase
+            .from("users")
+            .select("id, name, telegram_username, telegram_user_id, telegram_photo_url, avatar_url")
+            .or("telegram_username.not.is.null,telegram_user_id.not.is.null"),
+        ]);
 
       if (cancelled) return;
 
@@ -120,7 +127,16 @@ export function ConversationsSection() {
         if (g.chat_title) titleMap.set(g.chat_id, g.chat_title);
       }
 
+      const byUsername = new Map<string, UserLite>();
+      const byId = new Map<number, UserLite>();
+      for (const u of (usersData ?? []) as UserLite[]) {
+        if (u.telegram_username) byUsername.set(u.telegram_username.toLowerCase(), u);
+        if (u.telegram_user_id) byId.set(Number(u.telegram_user_id), u);
+      }
+
       setGroupTitles(titleMap);
+      setUsersByTgUsername(byUsername);
+      setUsersByTgId(byId);
       setLogs((logsData ?? []) as ChatLog[]);
       setLoading(false);
     })();
@@ -145,8 +161,12 @@ export function ConversationsSection() {
         key,
         label,
         isGroup,
+        isTelegram: log.telegram_chat_id !== null,
         chatId: log.telegram_chat_id,
         sessionKey: log.session_key,
+        telegramUsername: log.telegram_username,
+        telegramUserId:
+          log.telegram_chat_id !== null && log.telegram_chat_id > 0 ? log.telegram_chat_id : null,
         messageCount: 1,
         lastMessageAt: log.created_at,
         lastPreview: log.user_message,
@@ -156,6 +176,23 @@ export function ConversationsSection() {
       b.lastMessageAt.localeCompare(a.lastMessageAt)
     );
   }, [logs, groupTitles]);
+
+  function lookupUser(c: Conversation): UserLite | null {
+    if (c.telegramUserId && usersByTgId.has(c.telegramUserId)) {
+      return usersByTgId.get(c.telegramUserId)!;
+    }
+    if (c.telegramUsername) {
+      return usersByTgUsername.get(c.telegramUsername.toLowerCase()) ?? null;
+    }
+    return null;
+  }
+
+  function avatarFor(c: Conversation): { url?: string; initials: string } {
+    const u = lookupUser(c);
+    const url = u?.telegram_photo_url || u?.avatar_url || undefined;
+    const initials = initialsOf(u?.name || c.label || "?");
+    return { url, initials };
+  }
 
   const selectedConversation = useMemo(
     () => conversations.find((c) => c.key === selectedKey) ?? null,
