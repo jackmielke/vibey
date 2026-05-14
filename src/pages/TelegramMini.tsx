@@ -654,9 +654,10 @@ export default function TelegramMini() {
       }
       setSavedId(community_id);
       setTimeout(() => setSavedId((v) => (v === community_id ? null : v)), 1500);
+      toast.success("Preferences saved");
     } catch (e) {
       console.error("save preference failed", e);
-      alert(e instanceof Error ? e.message : "Couldn't save preferences.");
+      toast.error("Couldn't save preferences", { description: e instanceof Error ? e.message : undefined });
     } finally {
       setSavingId(null);
     }
