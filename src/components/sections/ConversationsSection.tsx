@@ -94,6 +94,7 @@ export function ConversationsSection() {
   const [usersByTgId, setUsersByTgId] = useState<Map<number, UserLite>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [telegramOnly, setTelegramOnly] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
