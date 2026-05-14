@@ -311,7 +311,6 @@ function SoulEditor({
 }) {
   const [value, setValue] = useState(initial);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   useEffect(() => setValue(initial), [initial]);
   const dirty = value !== initial;
 
@@ -323,10 +322,9 @@ function SoulEditor({
         .update({ system_prompt: value, updated_at: new Date().toISOString() })
         .eq("id", agentId);
       if (error) throw error;
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1500);
+      toast.success("Soul saved");
     } catch (e) {
-      alert(e instanceof Error ? e.message : "couldn't save soul");
+      toast.error("Couldn't save soul", { description: e instanceof Error ? e.message : undefined });
     } finally {
       setSaving(false);
     }
