@@ -307,7 +307,7 @@ export function ConversationsSection() {
 
   // List view
   return (
-    <div className="space-y-3 max-w-2xl">
+    <div className="space-y-3 max-w-2xl w-full min-w-0 overflow-hidden">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-muted-foreground font-mono">
           {visibleConversations.length} of {conversations.length} conversation
