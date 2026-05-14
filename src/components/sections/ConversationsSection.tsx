@@ -1,9 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Loader2, MessagesSquare, User, Users } from "lucide-react";
+import { ArrowLeft, Loader2, MessagesSquare, Users } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { TelegramIcon } from "@/components/icons/TelegramIcon";
 import { toast } from "sonner";
+
+type UserLite = {
+  id: string;
+  name: string | null;
+  telegram_username: string | null;
+  telegram_user_id: number | null;
+  telegram_photo_url: string | null;
+  avatar_url: string | null;
+};
+
+function initialsOf(label: string) {
+  return label
+    .replace(/^@/, "")
+    .split(/[\s_·]+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
 type ChatLog = {
   id: string;
@@ -24,8 +46,11 @@ type Conversation = {
   key: string; // unique grouping key
   label: string;
   isGroup: boolean;
+  isTelegram: boolean;
   chatId: number | null;
   sessionKey: string | null;
+  telegramUsername: string | null;
+  telegramUserId: number | null;
   messageCount: number;
   lastMessageAt: string;
   lastPreview: string;
@@ -65,22 +90,29 @@ function conversationKey(log: ChatLog): string {
 export function ConversationsSection() {
   const [logs, setLogs] = useState<ChatLog[]>([]);
   const [groupTitles, setGroupTitles] = useState<Map<number, string>>(new Map());
+  const [usersByTgUsername, setUsersByTgUsername] = useState<Map<string, UserLite>>(new Map());
+  const [usersByTgId, setUsersByTgId] = useState<Map<number, UserLite>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [{ data: logsData, error: logsErr }, { data: groupsData }] = await Promise.all([
-        supabase
-          .from("agent_chat_logs")
-          .select(
-            "id, user_message, agent_response, created_at, session_key, telegram_chat_id, telegram_username"
-          )
-          .order("created_at", { ascending: false })
-          .limit(PAGE_SIZE),
-        supabase.from("telegram_group_settings").select("chat_id, chat_title"),
-      ]);
+      const [{ data: logsData, error: logsErr }, { data: groupsData }, { data: usersData }] =
+        await Promise.all([
+          supabase
+            .from("agent_chat_logs")
+            .select(
+              "id, user_message, agent_response, created_at, session_key, telegram_chat_id, telegram_username"
+            )
+            .order("created_at", { ascending: false })
+            .limit(PAGE_SIZE),
+          supabase.from("telegram_group_settings").select("chat_id, chat_title"),
+          supabase
+            .from("users")
+            .select("id, name, telegram_username, telegram_user_id, telegram_photo_url, avatar_url")
+            .or("telegram_username.not.is.null,telegram_user_id.not.is.null"),
+        ]);
 
       if (cancelled) return;
 
@@ -95,7 +127,16 @@ export function ConversationsSection() {
         if (g.chat_title) titleMap.set(g.chat_id, g.chat_title);
       }
 
+      const byUsername = new Map<string, UserLite>();
+      const byId = new Map<number, UserLite>();
+      for (const u of (usersData ?? []) as UserLite[]) {
+        if (u.telegram_username) byUsername.set(u.telegram_username.toLowerCase(), u);
+        if (u.telegram_user_id) byId.set(Number(u.telegram_user_id), u);
+      }
+
       setGroupTitles(titleMap);
+      setUsersByTgUsername(byUsername);
+      setUsersByTgId(byId);
       setLogs((logsData ?? []) as ChatLog[]);
       setLoading(false);
     })();
@@ -120,8 +161,12 @@ export function ConversationsSection() {
         key,
         label,
         isGroup,
+        isTelegram: log.telegram_chat_id !== null,
         chatId: log.telegram_chat_id,
         sessionKey: log.session_key,
+        telegramUsername: log.telegram_username,
+        telegramUserId:
+          log.telegram_chat_id !== null && log.telegram_chat_id > 0 ? log.telegram_chat_id : null,
         messageCount: 1,
         lastMessageAt: log.created_at,
         lastPreview: log.user_message,
@@ -131,6 +176,23 @@ export function ConversationsSection() {
       b.lastMessageAt.localeCompare(a.lastMessageAt)
     );
   }, [logs, groupTitles]);
+
+  function lookupUser(c: Conversation): UserLite | null {
+    if (c.telegramUserId && usersByTgId.has(c.telegramUserId)) {
+      return usersByTgId.get(c.telegramUserId)!;
+    }
+    if (c.telegramUsername) {
+      return usersByTgUsername.get(c.telegramUsername.toLowerCase()) ?? null;
+    }
+    return null;
+  }
+
+  function avatarFor(c: Conversation): { url?: string; initials: string } {
+    const u = lookupUser(c);
+    const url = u?.telegram_photo_url || u?.avatar_url || undefined;
+    const initials = initialsOf(u?.name || c.label || "?");
+    return { url, initials };
+  }
 
   const selectedConversation = useMemo(
     () => conversations.find((c) => c.key === selectedKey) ?? null,
@@ -179,18 +241,43 @@ export function ConversationsSection() {
         </Button>
 
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            {selectedConversation.isGroup ? (
-              <Users className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <User className="w-4 h-4 text-muted-foreground" />
-            )}
-          </div>
+          {(() => {
+            const { url, initials } = avatarFor(selectedConversation);
+            return (
+              <div className="relative shrink-0">
+                {selectedConversation.isGroup ? (
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                ) : (
+                  <Avatar className="h-10 w-10 rounded-lg ring-1 ring-border">
+                    {url && <AvatarImage src={url} alt={selectedConversation.label} />}
+                    <AvatarFallback className="rounded-lg text-[11px] font-mono">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+                {selectedConversation.isTelegram && (
+                  <span
+                    className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center text-[#229ED9]"
+                    title="Telegram"
+                  >
+                    <TelegramIcon className="w-2.5 h-2.5" />
+                  </span>
+                )}
+              </div>
+            );
+          })()}
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{selectedConversation.label}</p>
-            <p className="text-xs text-muted-foreground font-mono">
-              {selectedConversation.chatId ?? selectedConversation.sessionKey} ·{" "}
-              {selectedConversation.messageCount} messages
+            <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
+              {selectedConversation.isTelegram && (
+                <TelegramIcon className="w-3 h-3 text-[#229ED9]" />
+              )}
+              <span>
+                {selectedConversation.chatId ?? selectedConversation.sessionKey} ·{" "}
+                {selectedConversation.messageCount} messages
+              </span>
             </p>
           </div>
         </div>
@@ -223,33 +310,55 @@ export function ConversationsSection() {
   // List view
   return (
     <div className="space-y-2 max-w-2xl">
-      {conversations.map((c) => (
-        <button
-          key={c.key}
-          onClick={() => setSelectedKey(c.key)}
-          className="w-full flex items-center gap-3 p-3 rounded-lg bg-card border border-border hover:border-primary/40 transition-colors text-left"
-        >
-          <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            {c.isGroup ? (
-              <Users className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <User className="w-4 h-4 text-muted-foreground" />
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium truncate">{c.label}</p>
-              <span className="text-[10px] text-muted-foreground font-mono shrink-0">
-                {formatDistanceToNow(new Date(c.lastMessageAt), { addSuffix: true })}
-              </span>
+      {conversations.map((c) => {
+        const { url, initials } = avatarFor(c);
+        return (
+          <button
+            key={c.key}
+            onClick={() => setSelectedKey(c.key)}
+            className="w-full flex items-center gap-3 p-3 rounded-lg bg-card border border-border hover:border-primary/40 transition-colors text-left"
+          >
+            <div className="relative shrink-0">
+              {c.isGroup ? (
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                </div>
+              ) : (
+                <Avatar className="h-10 w-10 rounded-lg ring-1 ring-border">
+                  {url && <AvatarImage src={url} alt={c.label} />}
+                  <AvatarFallback className="rounded-lg text-[11px] font-mono">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              {c.isTelegram && (
+                <span
+                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center text-[#229ED9]"
+                  title="From Telegram"
+                >
+                  <TelegramIcon className="w-2.5 h-2.5" />
+                </span>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground truncate mt-0.5">{c.lastPreview}</p>
-            <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
-              {c.messageCount} message{c.messageCount === 1 ? "" : "s"}
-            </p>
-          </div>
-        </button>
-      ))}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium truncate">{c.label}</p>
+                <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+                  {formatDistanceToNow(new Date(c.lastMessageAt), { addSuffix: true })}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{c.lastPreview}</p>
+              <p className="text-[10px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1">
+                {c.isTelegram && <TelegramIcon className="w-2.5 h-2.5 text-[#229ED9]" />}
+                <span>
+                  {c.isTelegram ? "Telegram · " : ""}
+                  {c.messageCount} message{c.messageCount === 1 ? "" : "s"}
+                </span>
+              </p>
+            </div>
+          </button>
+        );
+      })}
       {logs.length === PAGE_SIZE && (
         <p className="text-xs text-muted-foreground pt-2">
           Showing the most recent {PAGE_SIZE} messages.
