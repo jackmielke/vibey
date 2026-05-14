@@ -20,6 +20,7 @@ import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
 import { VIBEY_COMMUNITY_ID } from "@/lib/vibey";
+import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 
 const PREFERENCE_COMMUNITIES: { community_id: string; agent_id: string; label: string }[] = [
@@ -310,7 +311,6 @@ function SoulEditor({
 }) {
   const [value, setValue] = useState(initial);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   useEffect(() => setValue(initial), [initial]);
   const dirty = value !== initial;
 
@@ -322,10 +322,9 @@ function SoulEditor({
         .update({ system_prompt: value, updated_at: new Date().toISOString() })
         .eq("id", agentId);
       if (error) throw error;
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1500);
+      toast.success("Soul saved");
     } catch (e) {
-      alert(e instanceof Error ? e.message : "couldn't save soul");
+      toast.error("Couldn't save soul", { description: e instanceof Error ? e.message : undefined });
     } finally {
       setSaving(false);
     }
@@ -345,7 +344,7 @@ function SoulEditor({
           disabled={saving || !dirty}
           className="text-[11px] font-mono uppercase tracking-widest px-3 py-1 rounded bg-primary text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
         >
-          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : saved ? <Check className="w-3 h-3" /> : null}
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
           save soul
         </button>
       </div>
@@ -381,10 +380,11 @@ function MemoryEditModal({
         .select("id, content, tags, created_at, metadata")
         .single();
       if (error) throw error;
+      toast.success("Memory saved");
       onSaved(data as MemoryRow);
       onClose();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "couldn't save");
+      toast.error("Couldn't save memory", { description: e instanceof Error ? e.message : undefined });
     } finally {
       setSaving(false);
     }
@@ -654,9 +654,10 @@ export default function TelegramMini() {
       }
       setSavedId(community_id);
       setTimeout(() => setSavedId((v) => (v === community_id ? null : v)), 1500);
+      toast.success("Preferences saved");
     } catch (e) {
       console.error("save preference failed", e);
-      alert(e instanceof Error ? e.message : "Couldn't save preferences.");
+      toast.error("Couldn't save preferences", { description: e instanceof Error ? e.message : undefined });
     } finally {
       setSavingId(null);
     }
@@ -666,9 +667,10 @@ export default function TelegramMini() {
     if (!confirm("delete this memory? this can't be undone.")) return;
     const { error } = await supabase.from("memories").delete().eq("id", m.id);
     if (error) {
-      alert(error.message);
+      toast.error("Couldn't delete memory", { description: error.message });
       return;
     }
+    toast.success("Memory deleted");
     setMemories((prev) => prev.filter((x) => x.id !== m.id));
   }
 
