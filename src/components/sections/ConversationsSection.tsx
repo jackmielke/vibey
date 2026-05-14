@@ -279,7 +279,7 @@ export function ConversationsSection() {
           {selectedMessages.map((m) => (
             <div key={m.id} className="space-y-2">
               <div className="flex flex-col items-end">
-                <div className="max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap bg-primary/10 border border-primary/20">
+                <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words bg-primary/10 border border-primary/20">
                   {m.user_message}
                 </div>
                 <span className="text-[10px] text-muted-foreground mt-1 font-mono">
