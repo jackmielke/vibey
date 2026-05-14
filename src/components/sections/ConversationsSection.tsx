@@ -261,13 +261,13 @@ export function ConversationsSection() {
               </div>
             );
           })()}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-medium truncate">{selectedConversation.label}</p>
-            <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
+            <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5 min-w-0">
               {selectedConversation.isTelegram && (
-                <TelegramIcon className="w-3 h-3 text-[#229ED9]" />
+                <TelegramIcon className="w-3 h-3 text-[#229ED9] shrink-0" />
               )}
-              <span>
+              <span className="truncate">
                 {selectedConversation.chatId ?? selectedConversation.sessionKey} ·{" "}
                 {selectedConversation.messageCount} messages
               </span>
