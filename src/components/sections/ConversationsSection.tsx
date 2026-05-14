@@ -230,7 +230,7 @@ export function ConversationsSection() {
   // Detail view
   if (selectedConversation) {
     return (
-      <div className="space-y-4 max-w-3xl">
+      <div className="space-y-4 max-w-3xl w-full min-w-0 overflow-hidden">
         <Button
           variant="ghost"
           size="sm"
@@ -261,13 +261,13 @@ export function ConversationsSection() {
               </div>
             );
           })()}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-medium truncate">{selectedConversation.label}</p>
-            <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
+            <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5 min-w-0">
               {selectedConversation.isTelegram && (
-                <TelegramIcon className="w-3 h-3 text-[#229ED9]" />
+                <TelegramIcon className="w-3 h-3 text-[#229ED9] shrink-0" />
               )}
-              <span>
+              <span className="truncate">
                 {selectedConversation.chatId ?? selectedConversation.sessionKey} ·{" "}
                 {selectedConversation.messageCount} messages
               </span>
@@ -279,7 +279,7 @@ export function ConversationsSection() {
           {selectedMessages.map((m) => (
             <div key={m.id} className="space-y-2">
               <div className="flex flex-col items-end">
-                <div className="max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap bg-primary/10 border border-primary/20">
+                <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words bg-primary/10 border border-primary/20">
                   {m.user_message}
                 </div>
                 <span className="text-[10px] text-muted-foreground mt-1 font-mono">
@@ -288,7 +288,7 @@ export function ConversationsSection() {
                 </span>
               </div>
               <div className="flex flex-col items-start">
-                <div className="max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap bg-card border border-border">
+                <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words bg-card border border-border">
                   {m.agent_response}
                 </div>
                 <span className="text-[10px] text-muted-foreground mt-1 font-mono">vibey</span>
@@ -307,7 +307,7 @@ export function ConversationsSection() {
 
   // List view
   return (
-    <div className="space-y-3 max-w-2xl">
+    <div className="space-y-3 max-w-2xl w-full min-w-0 overflow-hidden">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-muted-foreground font-mono">
           {visibleConversations.length} of {conversations.length} conversation
