@@ -46,8 +46,11 @@ type Conversation = {
   key: string; // unique grouping key
   label: string;
   isGroup: boolean;
+  isTelegram: boolean;
   chatId: number | null;
   sessionKey: string | null;
+  telegramUsername: string | null;
+  telegramUserId: number | null;
   messageCount: number;
   lastMessageAt: string;
   lastPreview: string;
