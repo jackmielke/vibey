@@ -310,33 +310,55 @@ export function ConversationsSection() {
   // List view
   return (
     <div className="space-y-2 max-w-2xl">
-      {conversations.map((c) => (
-        <button
-          key={c.key}
-          onClick={() => setSelectedKey(c.key)}
-          className="w-full flex items-center gap-3 p-3 rounded-lg bg-card border border-border hover:border-primary/40 transition-colors text-left"
-        >
-          <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            {c.isGroup ? (
-              <Users className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <User className="w-4 h-4 text-muted-foreground" />
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium truncate">{c.label}</p>
-              <span className="text-[10px] text-muted-foreground font-mono shrink-0">
-                {formatDistanceToNow(new Date(c.lastMessageAt), { addSuffix: true })}
-              </span>
+      {conversations.map((c) => {
+        const { url, initials } = avatarFor(c);
+        return (
+          <button
+            key={c.key}
+            onClick={() => setSelectedKey(c.key)}
+            className="w-full flex items-center gap-3 p-3 rounded-lg bg-card border border-border hover:border-primary/40 transition-colors text-left"
+          >
+            <div className="relative shrink-0">
+              {c.isGroup ? (
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                </div>
+              ) : (
+                <Avatar className="h-10 w-10 rounded-lg ring-1 ring-border">
+                  {url && <AvatarImage src={url} alt={c.label} />}
+                  <AvatarFallback className="rounded-lg text-[11px] font-mono">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              {c.isTelegram && (
+                <span
+                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center text-[#229ED9]"
+                  title="From Telegram"
+                >
+                  <TelegramIcon className="w-2.5 h-2.5" />
+                </span>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground truncate mt-0.5">{c.lastPreview}</p>
-            <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
-              {c.messageCount} message{c.messageCount === 1 ? "" : "s"}
-            </p>
-          </div>
-        </button>
-      ))}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium truncate">{c.label}</p>
+                <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+                  {formatDistanceToNow(new Date(c.lastMessageAt), { addSuffix: true })}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{c.lastPreview}</p>
+              <p className="text-[10px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1">
+                {c.isTelegram && <TelegramIcon className="w-2.5 h-2.5 text-[#229ED9]" />}
+                <span>
+                  {c.isTelegram ? "Telegram · " : ""}
+                  {c.messageCount} message{c.messageCount === 1 ? "" : "s"}
+                </span>
+              </p>
+            </div>
+          </button>
+        );
+      })}
       {logs.length === PAGE_SIZE && (
         <p className="text-xs text-muted-foreground pt-2">
           Showing the most recent {PAGE_SIZE} messages.
