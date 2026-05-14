@@ -380,10 +380,11 @@ function MemoryEditModal({
         .select("id, content, tags, created_at, metadata")
         .single();
       if (error) throw error;
+      toast.success("Memory saved");
       onSaved(data as MemoryRow);
       onClose();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "couldn't save");
+      toast.error("Couldn't save memory", { description: e instanceof Error ? e.message : undefined });
     } finally {
       setSaving(false);
     }
