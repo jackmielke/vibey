@@ -241,18 +241,43 @@ export function ConversationsSection() {
         </Button>
 
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            {selectedConversation.isGroup ? (
-              <Users className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <User className="w-4 h-4 text-muted-foreground" />
-            )}
-          </div>
+          {(() => {
+            const { url, initials } = avatarFor(selectedConversation);
+            return (
+              <div className="relative shrink-0">
+                {selectedConversation.isGroup ? (
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                ) : (
+                  <Avatar className="h-10 w-10 rounded-lg ring-1 ring-border">
+                    {url && <AvatarImage src={url} alt={selectedConversation.label} />}
+                    <AvatarFallback className="rounded-lg text-[11px] font-mono">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+                {selectedConversation.isTelegram && (
+                  <span
+                    className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center text-[#229ED9]"
+                    title="Telegram"
+                  >
+                    <TelegramIcon className="w-2.5 h-2.5" />
+                  </span>
+                )}
+              </div>
+            );
+          })()}
           <div className="min-w-0">
             <p className="text-sm font-medium truncate">{selectedConversation.label}</p>
-            <p className="text-xs text-muted-foreground font-mono">
-              {selectedConversation.chatId ?? selectedConversation.sessionKey} ·{" "}
-              {selectedConversation.messageCount} messages
+            <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5">
+              {selectedConversation.isTelegram && (
+                <TelegramIcon className="w-3 h-3 text-[#229ED9]" />
+              )}
+              <span>
+                {selectedConversation.chatId ?? selectedConversation.sessionKey} ·{" "}
+                {selectedConversation.messageCount} messages
+              </span>
             </p>
           </div>
         </div>
