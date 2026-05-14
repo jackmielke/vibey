@@ -666,9 +666,10 @@ export default function TelegramMini() {
     if (!confirm("delete this memory? this can't be undone.")) return;
     const { error } = await supabase.from("memories").delete().eq("id", m.id);
     if (error) {
-      alert(error.message);
+      toast.error("Couldn't delete memory", { description: error.message });
       return;
     }
+    toast.success("Memory deleted");
     setMemories((prev) => prev.filter((x) => x.id !== m.id));
   }
 
