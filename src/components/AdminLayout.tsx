@@ -125,6 +125,7 @@ export default function AdminLayout() {
                 >
                   <ul className="flex items-center gap-1 px-1 whitespace-nowrap">
                     {[
+                      { to: "/", label: "Chat", icon: MessageCircle },
                       { to: "/memory", label: "Memory", icon: Brain },
                       { to: "/conversations", label: "Chat history", icon: MessagesSquare },
                       { to: "/skills", label: "Skills", icon: Zap },
