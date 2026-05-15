@@ -1,6 +1,6 @@
 import { Outlet, useLocation, useNavigate, NavLink } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Brain, Calendar, Columns2, LayoutDashboard, LogOut, Maximize2, MessagesSquare, X, Zap } from "lucide-react";
+import { Brain, Calendar, Columns2, LayoutDashboard, LogOut, Maximize2, MessageCircle, MessagesSquare, X, Zap } from "lucide-react";
 import { signOut } from "@/hooks/useAuth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
