@@ -258,6 +258,21 @@ export default function AdminLayout() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>sign out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You'll need to sign in again to access the admin panel.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => signOut()}>sign out</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   );
 }
