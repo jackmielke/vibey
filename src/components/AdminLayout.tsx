@@ -1,6 +1,6 @@
 import { Outlet, useLocation, useNavigate, NavLink } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Brain, Calendar, Columns2, LayoutDashboard, LogOut, Maximize2, MessagesSquare, X, Zap } from "lucide-react";
+import { Brain, Calendar, Columns2, LayoutDashboard, LogOut, Maximize2, MessageCircle, MessagesSquare, X, Zap } from "lucide-react";
 import { signOut } from "@/hooks/useAuth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -125,6 +125,7 @@ export default function AdminLayout() {
                 >
                   <ul className="flex items-center gap-1 px-1 whitespace-nowrap">
                     {[
+                      { to: "/", label: "Chat", icon: MessageCircle },
                       { to: "/memory", label: "Memory", icon: Brain },
                       { to: "/conversations", label: "Chat history", icon: MessagesSquare },
                       { to: "/skills", label: "Skills", icon: Zap },
@@ -133,6 +134,7 @@ export default function AdminLayout() {
                       <li key={to}>
                         <NavLink
                           to={to}
+                          end={to === "/"}
                           className={({ isActive }) =>
                             cn(
                               "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border font-mono text-[11px] uppercase tracking-wider transition-colors",

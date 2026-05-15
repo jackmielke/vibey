@@ -246,7 +246,7 @@ export function MemorySection() {
   }
 
   return (
-    <div className="space-y-3 max-w-2xl">
+    <div className="space-y-3 max-w-2xl w-full min-w-0 overflow-hidden">
       <div className="flex items-center justify-between">
         <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
           {loading ? "loading…" : `${memories.length} memories`}
@@ -367,7 +367,7 @@ export function MemorySection() {
                               </span>
                             )}
                           </div>
-                          <p className="text-sm whitespace-pre-wrap mt-1">{m.content}</p>
+                          <p className="text-sm whitespace-pre-wrap break-words mt-1">{m.content}</p>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <a
@@ -411,7 +411,7 @@ export function MemorySection() {
                             {m.tags.map((t) => (
                               <span
                                 key={t}
-                                className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary"
+                                className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary break-all"
                               >
                                 {t}
                               </span>
