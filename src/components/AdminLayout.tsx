@@ -141,6 +141,7 @@ export default function AdminLayout() {
                       { to: "/conversations", label: "Chat history", icon: MessagesSquare },
                       { to: "/skills", label: "Skills", icon: Zap },
                       { to: "/automations", label: "Scheduled heartbeat", icon: Calendar },
+                      { to: "/tools", label: "Tools", icon: Wrench },
                     ].map(({ to, label, icon: Icon }) => (
                       <li key={to}>
                         <NavLink
