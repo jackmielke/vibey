@@ -134,6 +134,7 @@ export default function AdminLayout() {
                       <li key={to}>
                         <NavLink
                           to={to}
+                          end={to === "/"}
                           className={({ isActive }) =>
                             cn(
                               "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border font-mono text-[11px] uppercase tracking-wider transition-colors",
