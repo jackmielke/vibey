@@ -127,8 +127,8 @@ export default function AdminLayout() {
                     {[
                       { to: "/memory", label: "Memory", icon: Brain },
                       { to: "/conversations", label: "Chat history", icon: MessagesSquare },
-                      { to: "/automations", label: "Scheduled heartbeat", icon: Calendar },
                       { to: "/skills", label: "Skills", icon: Zap },
+                      { to: "/automations", label: "Scheduled heartbeat", icon: Calendar },
                     ].map(({ to, label, icon: Icon }) => (
                       <li key={to}>
                         <NavLink
