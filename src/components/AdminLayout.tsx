@@ -1,10 +1,20 @@
 import { Outlet, useLocation, useNavigate, NavLink } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Brain, Calendar, Columns2, LayoutDashboard, LogOut, Maximize2, MessageCircle, MessagesSquare, X, Zap } from "lucide-react";
+import { Brain, Calendar, Columns2, LayoutDashboard, LogOut, Maximize2, MessageCircle, MessagesSquare, Wrench, X, Zap } from "lucide-react";
 import { signOut } from "@/hooks/useAuth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useIsStandalone } from "@/hooks/use-pwa";
 import Chat from "@/pages/Chat";
