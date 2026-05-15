@@ -192,7 +192,7 @@ export default function AdminLayout() {
                   </Button>
                 )}
                 <Button
-                  onClick={() => signOut()}
+                  onClick={() => setLogoutOpen(true)}
                   size="icon"
                   variant="ghost"
                   className="h-8 w-8"
