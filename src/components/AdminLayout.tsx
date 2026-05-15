@@ -25,6 +25,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const isStandalone = useIsStandalone();
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   // Routes that render inside the Vibey Control panel (vs. their own full page).
   const controlRoutes = ["/dashboard", "/sections", "/soul", "/identity", "/memory", "/media", "/interfaces", "/relationships", "/conversations", "/groups", "/automations"];
