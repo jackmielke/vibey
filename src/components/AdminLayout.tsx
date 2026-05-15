@@ -1,10 +1,20 @@
 import { Outlet, useLocation, useNavigate, NavLink } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Brain, Calendar, Columns2, LayoutDashboard, LogOut, Maximize2, MessageCircle, MessagesSquare, X, Zap } from "lucide-react";
+import { Brain, Calendar, Columns2, LayoutDashboard, LogOut, Maximize2, MessageCircle, MessagesSquare, Wrench, X, Zap } from "lucide-react";
 import { signOut } from "@/hooks/useAuth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useIsStandalone } from "@/hooks/use-pwa";
 import Chat from "@/pages/Chat";
@@ -15,6 +25,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const isStandalone = useIsStandalone();
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   // Routes that render inside the Vibey Control panel (vs. their own full page).
   const controlRoutes = ["/dashboard", "/sections", "/soul", "/identity", "/memory", "/media", "/interfaces", "/relationships", "/conversations", "/groups", "/automations"];
@@ -130,6 +141,7 @@ export default function AdminLayout() {
                       { to: "/conversations", label: "Chat history", icon: MessagesSquare },
                       { to: "/skills", label: "Skills", icon: Zap },
                       { to: "/automations", label: "Scheduled heartbeat", icon: Calendar },
+                      { to: "/tools", label: "Tools", icon: Wrench },
                     ].map(({ to, label, icon: Icon }) => (
                       <li key={to}>
                         <NavLink
@@ -180,7 +192,7 @@ export default function AdminLayout() {
                   </Button>
                 )}
                 <Button
-                  onClick={() => signOut()}
+                  onClick={() => setLogoutOpen(true)}
                   size="icon"
                   variant="ghost"
                   className="h-8 w-8"
@@ -246,6 +258,21 @@ export default function AdminLayout() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>sign out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You'll need to sign in again to access the admin panel.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => signOut()}>sign out</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarProvider>
   );
 }
