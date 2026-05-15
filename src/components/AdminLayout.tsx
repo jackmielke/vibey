@@ -114,31 +114,69 @@ export default function AdminLayout() {
           <header className="pt-safe shrink-0 border-b border-border">
             <div className="h-12 flex items-center px-4 gap-3">
               <SidebarTrigger />
-              <span className="text-label">Vibey</span>
-              <div className="ml-auto flex items-center gap-2">
-                <Button
-                  onClick={handleControlButton}
-                  size="sm"
-                  variant={showInlineControl ? "default" : "outline"}
-                  className="h-8 gap-1.5"
+              <span className="text-label hidden md:inline">Vibey</span>
+
+              {/* Mobile: horizontal scrolling tabs (Airtable-style) */}
+              {isMobile && (
+                <nav
+                  aria-label="Quick sections"
+                  className="flex-1 min-w-0 -mx-1 overflow-x-auto scrollbar-none"
+                  style={{ scrollbarWidth: "none" }}
                 >
-                  {isControlRoute ? (
-                    showInlineControl ? (
-                      <Maximize2 className="h-3.5 w-3.5" />
+                  <ul className="flex items-center gap-1 px-1 whitespace-nowrap">
+                    {[
+                      { to: "/memory", label: "Memory", icon: Brain },
+                      { to: "/conversations", label: "Chat history", icon: MessagesSquare },
+                      { to: "/automations", label: "Scheduled heartbeat", icon: Calendar },
+                      { to: "/skills", label: "Skills", icon: Zap },
+                    ].map(({ to, label, icon: Icon }) => (
+                      <li key={to}>
+                        <NavLink
+                          to={to}
+                          className={({ isActive }) =>
+                            cn(
+                              "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border font-mono text-[11px] uppercase tracking-wider transition-colors",
+                              isActive
+                                ? "border-primary/40 bg-primary/10 text-primary"
+                                : "border-border bg-card text-muted-foreground hover:text-foreground"
+                            )
+                          }
+                        >
+                          <Icon className="h-3.5 w-3.5 shrink-0" />
+                          <span>{label}</span>
+                        </NavLink>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              )}
+
+              <div className="ml-auto flex items-center gap-2 shrink-0">
+                {!isMobile && (
+                  <Button
+                    onClick={handleControlButton}
+                    size="sm"
+                    variant={showInlineControl ? "default" : "outline"}
+                    className="h-8 gap-1.5"
+                  >
+                    {isControlRoute ? (
+                      showInlineControl ? (
+                        <Maximize2 className="h-3.5 w-3.5" />
+                      ) : (
+                        <Columns2 className="h-3.5 w-3.5" />
+                      )
                     ) : (
-                      <Columns2 className="h-3.5 w-3.5" />
-                    )
-                  ) : (
-                    <LayoutDashboard className="h-3.5 w-3.5" />
-                  )}
-                  <span className="font-mono text-xs uppercase tracking-wider">
-                    {isControlRoute
-                      ? showInlineControl
-                        ? "Full Page"
-                        : "Split Chat"
-                      : "Vibey Control"}
-                  </span>
-                </Button>
+                      <LayoutDashboard className="h-3.5 w-3.5" />
+                    )}
+                    <span className="font-mono text-xs uppercase tracking-wider">
+                      {isControlRoute
+                        ? showInlineControl
+                          ? "Full Page"
+                          : "Split Chat"
+                        : "Vibey Control"}
+                    </span>
+                  </Button>
+                )}
                 <Button
                   onClick={() => signOut()}
                   size="icon"
