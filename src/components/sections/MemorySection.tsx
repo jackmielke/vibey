@@ -246,7 +246,7 @@ export function MemorySection() {
   }
 
   return (
-    <div className="space-y-3 max-w-2xl">
+    <div className="space-y-3 max-w-2xl w-full min-w-0 overflow-hidden">
       <div className="flex items-center justify-between">
         <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
           {loading ? "loading…" : `${memories.length} memories`}
