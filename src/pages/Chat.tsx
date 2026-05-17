@@ -406,6 +406,24 @@ export default function Chat() {
             </motion.div>
           ))
         )}
+        {/* Suggestion chips — show only when intro is the sole message */}
+        {messages.length === 1 && messages[0].id === "intro" && !isStreaming && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-wrap gap-2 pl-10"
+          >
+            {STARTER_PROMPTS.map((p) => (
+              <button
+                key={p}
+                onClick={() => handleSendWith(p)}
+                className="text-xs font-mono px-3 py-1.5 rounded-full bg-card border border-border text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
+              >
+                {p}
+              </button>
+            ))}
+          </motion.div>
+        )}
       </div>
 
       {/* Input bar */}
