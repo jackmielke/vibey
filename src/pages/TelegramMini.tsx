@@ -99,6 +99,29 @@ function memorySource(metadata: Record<string, unknown> | null): string | null {
   return null;
 }
 
+const URL_REGEX = /(https?:\/\/[^\s)]+)/g;
+
+function renderWithLinks(text: string) {
+  const parts = text.split(URL_REGEX);
+  return parts.map((part, i) => {
+    if (i % 2 === 1) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-2 break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
 function MemoryCard({
   m,
   highlight,
@@ -120,12 +143,14 @@ function MemoryCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
       className={
-        "p-3 rounded-lg bg-card border " +
+        "p-3 rounded-lg bg-card border overflow-hidden " +
         (highlight ? "border-primary/40" : "border-border")
       }
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm whitespace-pre-wrap flex-1">{m.content}</p>
+      <div className="flex items-start justify-between gap-2 min-w-0">
+        <p className="text-sm whitespace-pre-wrap flex-1 min-w-0 [overflow-wrap:anywhere]">
+          {m.content ? renderWithLinks(m.content) : null}
+        </p>
         <div className="flex items-center gap-1 shrink-0">
           {adminMode && onEdit && (
             <button
@@ -741,7 +766,7 @@ export default function TelegramMini() {
                 (!adminMode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")
               }
             >
-              your view
+              standard view
             </button>
             <button
               onClick={() => setAdminMode(true)}
@@ -757,7 +782,7 @@ export default function TelegramMini() {
       )}
 
       {/* Stream */}
-      <div className="flex-1 overflow-auto px-4 py-3 space-y-5">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-5">
         {!adminMode && (
           <>
             {/* Personal preferences */}
