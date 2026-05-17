@@ -379,12 +379,11 @@ export default function Automations() {
                   </div>
                 </div>
 
-                {a.prompt && (
-                  <details className="text-xs">
-                    <summary className="cursor-pointer font-mono uppercase tracking-wider text-muted-foreground">Prompt</summary>
-                    <pre className="mt-2 p-3 bg-muted/50 rounded text-xs whitespace-pre-wrap font-mono">{a.prompt}</pre>
-                  </details>
-                )}
+                <EditablePrompt
+                  automationId={a.id}
+                  initial={a.prompt ?? ""}
+                  onSaved={(p) => setAutomations((prev) => prev.map((x) => x.id === a.id ? { ...x, prompt: p } : x))}
+                />
 
                 {a.last_run_error && (
                   <div className="text-xs text-destructive font-mono p-2 bg-destructive/10 rounded">
