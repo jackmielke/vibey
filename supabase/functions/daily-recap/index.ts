@@ -135,15 +135,17 @@ Deno.serve(async (req) => {
     let hours = Math.max(1, Math.min(72, Number(body.hours) || 24));
     const dryRun = body.dry_run === true;
 
+    let customPrompt: string | null = null;
     if (body.automation_id) {
       const { data: auto, error: autoErr } = await supabase
         .from("automations")
-        .select("id, config")
+        .select("id, config, prompt")
         .eq("id", body.automation_id)
         .maybeSingle();
       if (autoErr || !auto) throw new Error(`automation load: ${autoErr?.message ?? "not found"}`);
       const cfgHours = Number((auto.config as Record<string, unknown> | null)?.hours);
       if (Number.isFinite(cfgHours) && cfgHours > 0) hours = Math.max(1, Math.min(72, cfgHours));
+      customPrompt = (auto.prompt ?? "").trim() || null;
 
       const { data: recs, error: recErr } = await supabase
         .from("automation_recipients")
