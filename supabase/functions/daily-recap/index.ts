@@ -243,24 +243,16 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (agentErr || !agent) throw new Error(`agent load: ${agentErr?.message ?? "not found"}`);
 
-    const systemPrompt = `${agent.system_prompt}\n\nYou are now writing a DAILY BRIEF for Jack, the residency host, before his daily community call. Stay in your voice but be concise and useful. This is internal — Jack is the only reader.`;
+    const systemPrompt = `${agent.system_prompt}\n\nYou're texting Jack (residency host) a quick heads-up before his daily community call. This is a TEXT MESSAGE from you to him — casual, lowercase-ish, like you'd actually text a friend. No markdown headers, no bullet lists with bold labels, no "TL;DR" / "Themes" / "Suggested talking points" structure. Just talk to him. Short paragraphs or a couple of dashes if you need them. Drop names naturally. It's fine to be a little loose and funny if the vibe calls for it. Keep it under ~200 words unless there's genuinely a lot going on.`;
 
     const userPrompt = allLogs.length === 0 && granolaNotes.length === 0
-      ? `It's quiet — no chats with you and no Granola meeting notes in the last ${hours}h. Write a brief 2-3 sentence note acknowledging the quiet window and suggesting one thing Jack might bring to the call to spark conversation.`
-      : `Here's the last ${hours}h of context for the Vibey community: ${allLogs.length} chat exchanges with you and ${granolaNotes.length} Granola meeting notes. Write Jack a pre-call brief in markdown. Structure:
+      ? `quiet last ${hours}h — nothing in chat with you, no granola notes. text jack 1-2 sentences acknowledging the quiet and toss out one thing he could bring up on the call to get people talking.`
+      : `here's the last ${hours}h: ${allLogs.length} chat exchanges with you, ${granolaNotes.length} granola meeting notes. text jack a casual rundown — what people are talking about, anyone he should check in with by name, anything from meetings worth remembering, and maybe one or two things he could raise on the call. sound like a friend texting, not a report. no headers, no bold labels, no bullet structure unless it actually reads natural.
 
-**TL;DR** — 1-2 sentence vibe check.
-**Themes** — bullet list of 2-5 recurring topics or notable threads (weave in meeting topics where relevant).
-**People** — anyone worth checking in with by name + why.
-**From meetings** — 1-3 highlights from Granola notes that Jack should remember (skip if no notes).
-**Suggested talking points** — 2-4 things Jack could raise on the call.
-
-Keep it under 450 words. Be specific (quote briefly when useful). No fluff.
-
---- CHAT TRANSCRIPT ---
+--- chat transcript ---
 ${transcript}
 
---- GRANOLA MEETING NOTES ---
+--- granola meeting notes ---
 ${granolaBlock}
 ---`;
 
@@ -275,7 +267,7 @@ ${granolaBlock}
     if (!brief) throw new Error("model returned empty brief");
 
     // Compose final message.
-    const header = `🌀 *Vibey Daily Brief* — last ${hours}h\n_${windowStart.toISOString().slice(0, 16).replace("T", " ")} → ${windowEnd.toISOString().slice(0, 16).replace("T", " ")} UTC_\n\n`;
+    const header = "";
     const fullMessage = header + brief;
 
     let deliveryStatus = "skipped";
