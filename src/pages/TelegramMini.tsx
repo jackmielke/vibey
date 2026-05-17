@@ -480,30 +480,55 @@ export default function TelegramMini() {
   const [chatLogs, setChatLogs] = useState<ChatLogRow[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
 
-  // 1. Telegram WebApp + auth
+  // 1. Telegram WebApp + auth (with preview/mock fallback)
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
-    if (!tg) {
-      setAuthState("error");
-      setAuthError("Open this page from inside Telegram.");
-      return;
-    }
-    tg.ready();
-    tg.expand();
-    setTgName(tg.initDataUnsafe?.user?.first_name ?? null);
-    setTgUserId(tg.initDataUnsafe?.user?.id ?? null);
+    const params = new URLSearchParams(window.location.search);
+    const isPreviewHost =
+      window.location.hostname.includes("lovable.app") &&
+      window.location.hostname.includes("preview");
+    const mockMode =
+      params.get("mock") === "1" ||
+      (!tg && (isPreviewHost || window.location.hostname === "localhost"));
 
-    const initData = tg.initData;
-    if (!initData) {
+    if (!tg && !mockMode) {
       setAuthState("error");
-      setAuthError("No Telegram initData — try reopening the mini app.");
+      setAuthError("Open this page from inside Telegram (or add ?mock=1 to preview).");
       return;
     }
+
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      setTgName(tg.initDataUnsafe?.user?.first_name ?? null);
+      setTgUserId(tg.initDataUnsafe?.user?.id ?? null);
+    }
+
+    const initData = tg?.initData;
 
     (async () => {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData.session) {
+
+        if (mockMode) {
+          // Preview mode: rely on an existing Supabase session (admin login).
+          if (!sessionData.session) {
+            throw new Error(
+              "Preview mode needs a Supabase session. Sign in at /login first, then return here.",
+            );
+          }
+          const u = sessionData.session.user;
+          setTgName(
+            (u.user_metadata?.name as string) ??
+              u.email?.split("@")[0] ??
+              "Preview",
+          );
+          // Stable fake telegram_user_id derived from auth uid so "mine" filter works.
+          let hash = 0;
+          for (const ch of u.id) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+          setTgUserId(Math.abs(hash) || 1);
+        } else if (!sessionData.session) {
+          if (!initData) throw new Error("No Telegram initData — try reopening the mini app.");
           const { data, error } = await supabase.functions.invoke(
             "telegram-mini-auth",
             { body: { initData } },
