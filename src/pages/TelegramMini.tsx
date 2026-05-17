@@ -766,7 +766,7 @@ export default function TelegramMini() {
                 (!adminMode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")
               }
             >
-              your view
+              standard view
             </button>
             <button
               onClick={() => setAdminMode(true)}
