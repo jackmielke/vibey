@@ -379,12 +379,11 @@ export default function Automations() {
                   </div>
                 </div>
 
-                {a.prompt && (
-                  <details className="text-xs">
-                    <summary className="cursor-pointer font-mono uppercase tracking-wider text-muted-foreground">Prompt</summary>
-                    <pre className="mt-2 p-3 bg-muted/50 rounded text-xs whitespace-pre-wrap font-mono">{a.prompt}</pre>
-                  </details>
-                )}
+                <EditablePrompt
+                  automationId={a.id}
+                  initial={a.prompt ?? ""}
+                  onSaved={(p) => setAutomations((prev) => prev.map((x) => x.id === a.id ? { ...x, prompt: p } : x))}
+                />
 
                 {a.last_run_error && (
                   <div className="text-xs text-destructive font-mono p-2 bg-destructive/10 rounded">
@@ -440,3 +439,55 @@ export default function Automations() {
     </PageShell>
   );
 }
+
+function EditablePrompt({ automationId, initial, onSaved }: {
+  automationId: string;
+  initial: string;
+  onSaved: (p: string | null) => void;
+}) {
+  const [open, setOpen] = useState(Boolean(initial));
+  const [value, setValue] = useState(initial);
+  const [saving, setSaving] = useState(false);
+  const dirty = value !== initial;
+
+  const save = async () => {
+    setSaving(true);
+    const next = value.trim() || null;
+    const { error } = await supabase.from("automations").update({ prompt: next }).eq("id", automationId);
+    setSaving(false);
+    if (error) { toast.error("Save failed", { description: error.message }); return; }
+    toast.success("Prompt saved");
+    onSaved(next);
+  };
+
+  if (!open) {
+    return (
+      <Button size="sm" variant="ghost" className="text-xs font-mono uppercase tracking-wider text-muted-foreground h-7 px-2" onClick={() => setOpen(true)}>
+        + Add prompt
+      </Button>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-label">Prompt</Label>
+      <Textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        rows={6}
+        className="font-mono text-xs"
+        placeholder="Instructions for this heartbeat…"
+      />
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] text-muted-foreground font-mono">
+          Used as the system instructions on top of Vibey's soul.
+        </p>
+        <Button size="sm" onClick={save} disabled={!dirty || saving} className="gap-1.5">
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+          Save
+        </Button>
+      </div>
+    </div>
+  );
+}
+

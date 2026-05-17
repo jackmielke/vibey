@@ -135,15 +135,17 @@ Deno.serve(async (req) => {
     let hours = Math.max(1, Math.min(72, Number(body.hours) || 24));
     const dryRun = body.dry_run === true;
 
+    let customPrompt: string | null = null;
     if (body.automation_id) {
       const { data: auto, error: autoErr } = await supabase
         .from("automations")
-        .select("id, config")
+        .select("id, config, prompt")
         .eq("id", body.automation_id)
         .maybeSingle();
       if (autoErr || !auto) throw new Error(`automation load: ${autoErr?.message ?? "not found"}`);
       const cfgHours = Number((auto.config as Record<string, unknown> | null)?.hours);
       if (Number.isFinite(cfgHours) && cfgHours > 0) hours = Math.max(1, Math.min(72, cfgHours));
+      customPrompt = (auto.prompt ?? "").trim() || null;
 
       const { data: recs, error: recErr } = await supabase
         .from("automation_recipients")
@@ -243,7 +245,8 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (agentErr || !agent) throw new Error(`agent load: ${agentErr?.message ?? "not found"}`);
 
-    const systemPrompt = `${agent.system_prompt}\n\nYou're texting Jack (residency host) a quick heads-up before his daily community call. This is a TEXT MESSAGE from you to him — casual, lowercase-ish, like you'd actually text a friend. No markdown headers, no bullet lists with bold labels, no "TL;DR" / "Themes" / "Suggested talking points" structure. Just talk to him. Short paragraphs or a couple of dashes if you need them. Drop names naturally. It's fine to be a little loose and funny if the vibe calls for it. Keep it under ~200 words unless there's genuinely a lot going on.`;
+    const defaultInstructions = `You're texting Jack (residency host) a quick heads-up before his daily community call. This is a TEXT MESSAGE from you to him — casual, lowercase-ish, like you'd actually text a friend. No markdown headers, no bullet lists with bold labels, no "TL;DR" / "Themes" / "Suggested talking points" structure. Just talk to him. Short paragraphs or a couple of dashes if you need them. Drop names naturally. It's fine to be a little loose and funny if the vibe calls for it. Keep it under ~200 words unless there's genuinely a lot going on.`;
+    const systemPrompt = `${agent.system_prompt}\n\n${customPrompt ?? defaultInstructions}`;
 
     const userPrompt = allLogs.length === 0 && granolaNotes.length === 0
       ? `quiet last ${hours}h — nothing in chat with you, no granola notes. text jack 1-2 sentences acknowledging the quiet and toss out one thing he could bring up on the call to get people talking.`
