@@ -81,10 +81,11 @@ export default function Chat() {
   // Load prior unified-conversation history (web + Telegram) for signed-in users.
   useEffect(() => {
     if (historyLoaded) return;
+    const intro = buildIntro(firstName(session));
     if (!session?.user) {
-      // Anonymous: just show the intro message once the agent loads.
-      if (agent?.intro_message && messages.length === 0) {
-        setMessages([{ id: "intro", role: "assistant", content: agent.intro_message }]);
+      // Anonymous: show personalized intro once.
+      if (messages.length === 0) {
+        setMessages([{ id: "intro", role: "assistant", content: intro }]);
       }
       return;
     }
@@ -107,10 +108,9 @@ export default function Chat() {
         .order("created_at", { ascending: true })
         .limit(50);
       if (cancelled) return;
-      const hydrated: Message[] = [];
-      if (agent?.intro_message) {
-        hydrated.push({ id: "intro", role: "assistant", content: agent.intro_message });
-      }
+      const hydrated: Message[] = [
+        { id: "intro", role: "assistant", content: intro },
+      ];
       for (const row of logs ?? []) {
         hydrated.push({ id: `u-${row.id}`, role: "user", content: row.user_message });
         hydrated.push({ id: `a-${row.id}`, role: "assistant", content: row.agent_response });
@@ -126,7 +126,7 @@ export default function Chat() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id, agent?.intro_message, historyLoaded]);
+  }, [session?.user?.id, historyLoaded]);
 
 
   useEffect(() => {
@@ -135,8 +135,18 @@ export default function Chat() {
     el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  const handleSend = async () => {
-    const text = input.trim();
+  const sendText = (text: string) => {
+    setInput(text);
+    // Defer to next tick so the input value is set before send.
+    setTimeout(() => {
+      const fakeEvent = new Event("submit");
+      void fakeEvent;
+      handleSendWith(text);
+    }, 0);
+  };
+
+  const handleSendWith = async (textOverride?: string) => {
+    const text = (textOverride ?? input).trim();
     if (!text || isStreaming) return;
 
     const userMsg: Message = { id: `u-${Date.now()}`, role: "user", content: text };
