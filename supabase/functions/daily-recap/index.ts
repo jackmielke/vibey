@@ -245,7 +245,8 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (agentErr || !agent) throw new Error(`agent load: ${agentErr?.message ?? "not found"}`);
 
-    const systemPrompt = `${agent.system_prompt}\n\nYou're texting Jack (residency host) a quick heads-up before his daily community call. This is a TEXT MESSAGE from you to him — casual, lowercase-ish, like you'd actually text a friend. No markdown headers, no bullet lists with bold labels, no "TL;DR" / "Themes" / "Suggested talking points" structure. Just talk to him. Short paragraphs or a couple of dashes if you need them. Drop names naturally. It's fine to be a little loose and funny if the vibe calls for it. Keep it under ~200 words unless there's genuinely a lot going on.`;
+    const defaultInstructions = `You're texting Jack (residency host) a quick heads-up before his daily community call. This is a TEXT MESSAGE from you to him — casual, lowercase-ish, like you'd actually text a friend. No markdown headers, no bullet lists with bold labels, no "TL;DR" / "Themes" / "Suggested talking points" structure. Just talk to him. Short paragraphs or a couple of dashes if you need them. Drop names naturally. It's fine to be a little loose and funny if the vibe calls for it. Keep it under ~200 words unless there's genuinely a lot going on.`;
+    const systemPrompt = `${agent.system_prompt}\n\n${customPrompt ?? defaultInstructions}`;
 
     const userPrompt = allLogs.length === 0 && granolaNotes.length === 0
       ? `quiet last ${hours}h — nothing in chat with you, no granola notes. text jack 1-2 sentences acknowledging the quiet and toss out one thing he could bring up on the call to get people talking.`
