@@ -782,7 +782,7 @@ export default function TelegramMini() {
       )}
 
       {/* Stream */}
-      <div className="flex-1 overflow-auto px-4 py-3 space-y-5">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-5">
         {!adminMode && (
           <>
             {/* Personal preferences */}
