@@ -267,7 +267,7 @@ ${granolaBlock}
     if (!brief) throw new Error("model returned empty brief");
 
     // Compose final message.
-    const header = `🌀 *Vibey Daily Brief* — last ${hours}h\n_${windowStart.toISOString().slice(0, 16).replace("T", " ")} → ${windowEnd.toISOString().slice(0, 16).replace("T", " ")} UTC_\n\n`;
+    const header = "";
     const fullMessage = header + brief;
 
     let deliveryStatus = "skipped";
