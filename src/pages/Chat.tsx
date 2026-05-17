@@ -413,7 +413,7 @@ export default function Chat() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            handleSend();
+            handleSendWith();
           }}
           className="flex gap-2 max-w-3xl mx-auto"
         >
