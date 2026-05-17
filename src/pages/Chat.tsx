@@ -35,6 +35,31 @@ interface Message {
 
 const CHAT_URL = `${supabaseUrl}/functions/v1/chat-with-vibey`;
 
+const STARTER_PROMPTS = [
+  "what's happening this week?",
+  "who should i meet?",
+  "remember that i…",
+  "what can you do?",
+];
+
+function buildIntro(name: string | null): string {
+  const hi = name ? `hey ${name.toLowerCase()}` : "hey";
+  return `${hi} — i'm vibey, the community's resident ai. i can fill you in on what's happening, point you to people worth meeting, and remember anything you want me to. what's on your mind?`;
+}
+
+function firstName(session: ReturnType<typeof useAuth>["session"]): string | null {
+  const u = session?.user;
+  if (!u) return null;
+  const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+  const raw =
+    (meta.first_name as string) ||
+    (meta.name as string) ||
+    (meta.full_name as string) ||
+    u.email?.split("@")[0] ||
+    "";
+  return raw ? raw.split(/[\s._-]/)[0] : null;
+}
+
 export default function Chat() {
   const { agent } = useVibeyAgent();
   const { session } = useAuth();
