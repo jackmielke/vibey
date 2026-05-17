@@ -35,6 +35,31 @@ interface Message {
 
 const CHAT_URL = `${supabaseUrl}/functions/v1/chat-with-vibey`;
 
+const STARTER_PROMPTS = [
+  "what's happening this week?",
+  "who should i meet?",
+  "remember that i…",
+  "what can you do?",
+];
+
+function buildIntro(name: string | null): string {
+  const hi = name ? `hey ${name.toLowerCase()}` : "hey";
+  return `${hi} — i'm vibey, the community's resident ai. i can fill you in on what's happening, point you to people worth meeting, and remember anything you want me to. what's on your mind?`;
+}
+
+function firstName(session: ReturnType<typeof useAuth>["session"]): string | null {
+  const u = session?.user;
+  if (!u) return null;
+  const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+  const raw =
+    (meta.first_name as string) ||
+    (meta.name as string) ||
+    (meta.full_name as string) ||
+    u.email?.split("@")[0] ||
+    "";
+  return raw ? raw.split(/[\s._-]/)[0] : null;
+}
+
 export default function Chat() {
   const { agent } = useVibeyAgent();
   const { session } = useAuth();
@@ -56,10 +81,11 @@ export default function Chat() {
   // Load prior unified-conversation history (web + Telegram) for signed-in users.
   useEffect(() => {
     if (historyLoaded) return;
+    const intro = buildIntro(firstName(session));
     if (!session?.user) {
-      // Anonymous: just show the intro message once the agent loads.
-      if (agent?.intro_message && messages.length === 0) {
-        setMessages([{ id: "intro", role: "assistant", content: agent.intro_message }]);
+      // Anonymous: show personalized intro once.
+      if (messages.length === 0) {
+        setMessages([{ id: "intro", role: "assistant", content: intro }]);
       }
       return;
     }
@@ -82,10 +108,9 @@ export default function Chat() {
         .order("created_at", { ascending: true })
         .limit(50);
       if (cancelled) return;
-      const hydrated: Message[] = [];
-      if (agent?.intro_message) {
-        hydrated.push({ id: "intro", role: "assistant", content: agent.intro_message });
-      }
+      const hydrated: Message[] = [
+        { id: "intro", role: "assistant", content: intro },
+      ];
       for (const row of logs ?? []) {
         hydrated.push({ id: `u-${row.id}`, role: "user", content: row.user_message });
         hydrated.push({ id: `a-${row.id}`, role: "assistant", content: row.agent_response });
@@ -101,7 +126,7 @@ export default function Chat() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.id, agent?.intro_message, historyLoaded]);
+  }, [session?.user?.id, historyLoaded]);
 
 
   useEffect(() => {
@@ -110,8 +135,18 @@ export default function Chat() {
     el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  const handleSend = async () => {
-    const text = input.trim();
+  const sendText = (text: string) => {
+    setInput(text);
+    // Defer to next tick so the input value is set before send.
+    setTimeout(() => {
+      const fakeEvent = new Event("submit");
+      void fakeEvent;
+      handleSendWith(text);
+    }, 0);
+  };
+
+  const handleSendWith = async (textOverride?: string) => {
+    const text = (textOverride ?? input).trim();
     if (!text || isStreaming) return;
 
     const userMsg: Message = { id: `u-${Date.now()}`, role: "user", content: text };
@@ -371,6 +406,24 @@ export default function Chat() {
             </motion.div>
           ))
         )}
+        {/* Suggestion chips — show only when intro is the sole message */}
+        {messages.length === 1 && messages[0].id === "intro" && !isStreaming && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-wrap gap-2 pl-10"
+          >
+            {STARTER_PROMPTS.map((p) => (
+              <button
+                key={p}
+                onClick={() => handleSendWith(p)}
+                className="text-xs font-mono px-3 py-1.5 rounded-full bg-card border border-border text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
+              >
+                {p}
+              </button>
+            ))}
+          </motion.div>
+        )}
       </div>
 
       {/* Input bar */}
@@ -378,7 +431,7 @@ export default function Chat() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            handleSend();
+            handleSendWith();
           }}
           className="flex gap-2 max-w-3xl mx-auto"
         >
