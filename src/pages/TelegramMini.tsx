@@ -762,6 +762,21 @@ export default function TelegramMini() {
         }
 
         setAuthState("ready");
+
+        // Load current user mini-profile for the header avatar popover.
+        try {
+          const meAuthId = (await supabase.auth.getUser()).data.user?.id;
+          if (meAuthId) {
+            const { data: meRow } = await supabase
+              .from("users")
+              .select("id, name, avatar_url, telegram_photo_url, telegram_username, headline, bio, email")
+              .eq("auth_user_id", meAuthId)
+              .maybeSingle();
+            if (meRow) setMyProfile(meRow as MyProfile);
+          }
+        } catch (e) {
+          console.warn("load my profile failed", e);
+        }
       } catch (e) {
         console.error(e);
         setAuthError(e instanceof Error ? e.message : "Auth failed");
