@@ -379,7 +379,7 @@ export async function loadRecentMemories(
 ): Promise<Memory[]> {
   const { data, error } = await supabase
     .from("memories")
-    .select("id, content, tags, created_at, created_by, metadata")
+    .select("id, title, content, tags, created_at, created_by, metadata")
     .eq("community_id", VIBEY_COMMUNITY_ID)
     .order("created_at", { ascending: false })
     .limit(limit);
