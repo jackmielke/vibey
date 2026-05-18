@@ -523,6 +523,17 @@ export default function TelegramMini() {
   };
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
+  const [directoryQuery, setDirectoryQuery] = useState("");
+
+  const filteredDirectory = useMemo(() => {
+    const q = directoryQuery.trim().toLowerCase();
+    if (!q) return directory;
+    return directory.filter((u) =>
+      [u.name, u.telegram_username, u.headline, u.bio]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q)),
+    );
+  }, [directory, directoryQuery]);
 
   // 1. Telegram WebApp + auth (with preview/mock fallback)
   useEffect(() => {
