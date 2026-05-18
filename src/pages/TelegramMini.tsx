@@ -1096,35 +1096,43 @@ export default function TelegramMini() {
 
         {/* ===== PROFILES TAB ===== */}
         {tab === "profiles" && (
-          <>
-            {/* Your preferences */}
-            <section className="space-y-3">
-              <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
-                <Heart className="w-3 h-3" />
-                your preferences
-              </h2>
-              <p className="text-[11px] text-muted-foreground px-0.5 leading-relaxed">
-                tell vibey how you want to be talked to. tone, length, nicknames, vibe.
-              </p>
-              {prefsLoading || !tgUserId ? (
-                <div className="flex items-center py-4">
-                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                PREFERENCE_COMMUNITIES.map((c) => (
-                  <PreferenceEditor
-                    key={c.community_id}
-                    community_id={c.community_id}
-                    agent_id={c.agent_id}
-                    label={c.label}
-                    existing={prefs.find((p) => p.community_id === c.community_id) ?? null}
-                    saving={savingId === c.community_id}
-                    saved={savedId === c.community_id}
-                    onSave={(notes) => savePreference(c.community_id, c.agent_id, notes)}
-                  />
-                ))
-              )}
-            </section>
+          <></>
+        )}
+
+        {/* ===== PREFERENCES (YOU) TAB ===== */}
+        {tab === "preferences" && (
+          <section className="space-y-3">
+            <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
+              <Heart className="w-3 h-3" />
+              your preferences
+            </h2>
+            <p className="text-[11px] text-muted-foreground px-0.5 leading-relaxed">
+              tell vibey how you want to be talked to. tone, length, nicknames, vibe.
+            </p>
+            {prefsLoading || !tgUserId ? (
+              <div className="flex items-center py-4">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              PREFERENCE_COMMUNITIES.map((c) => (
+                <PreferenceEditor
+                  key={c.community_id}
+                  community_id={c.community_id}
+                  agent_id={c.agent_id}
+                  label={c.label}
+                  existing={prefs.find((p) => p.community_id === c.community_id) ?? null}
+                  saving={savingId === c.community_id}
+                  saved={savedId === c.community_id}
+                  onSave={(notes) => savePreference(c.community_id, c.agent_id, notes)}
+                />
+              ))
+            )}
+          </section>
+        )}
+
+        {tab === "profiles" && (
+          <></>
+        )}
 
             {/* Directory */}
             <section className="space-y-2">
