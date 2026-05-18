@@ -694,6 +694,37 @@ export default function TelegramMini() {
       cancelled = true;
     };
   }, [authState, tgUserId]);
+  // Profiles directory (community members joined with users)
+  useEffect(() => {
+    if (authState !== "ready") return;
+    let cancelled = false;
+    (async () => {
+      setDirectoryLoading(true);
+      const { data, error } = await supabase
+        .from("community_members")
+        .select(
+          "user_id, users:users!community_members_user_id_fkey(id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, headline, bio)",
+        )
+        .eq("community_id", VIBEY_COMMUNITY_ID)
+        .order("joined_at", { ascending: true })
+        .limit(500);
+      if (cancelled) return;
+      if (error) {
+        console.error("load directory failed", error.message);
+        setDirectory([]);
+      } else {
+        const entries = (data ?? [])
+          .map((row: { users: DirectoryEntry | null }) => row.users)
+          .filter((u): u is DirectoryEntry => !!u);
+        setDirectory(entries);
+      }
+      setDirectoryLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authState]);
+
 
   // 4. Admin data — load all prefs + chat logs when admin mode is on
   useEffect(() => {
