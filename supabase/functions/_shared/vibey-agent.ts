@@ -1268,7 +1268,31 @@ export async function runAgentLoop(opts: {
     });
 
     for (const call of toolCalls) {
+      let parsedArgs: Record<string, unknown> = {};
+      try { parsedArgs = JSON.parse(call.function.arguments || "{}"); } catch { /* ignore */ }
+      if (onProgress) {
+        try {
+          await onProgress({
+            status: "start",
+            name: call.function.name,
+            args: parsedArgs,
+            label: describeToolStart(call.function.name, parsedArgs),
+          });
+        } catch (e) { console.warn("onProgress start failed:", e); }
+      }
       const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId, isAdmin);
+      if (onProgress) {
+        const done = describeToolDone(call.function.name, parsedArgs, result);
+        try {
+          await onProgress({
+            status: "done",
+            name: call.function.name,
+            args: parsedArgs,
+            label: done.label,
+            details: done.details,
+          });
+        } catch (e) { console.warn("onProgress done failed:", e); }
+      }
       messages.push({
         role: "tool",
         tool_call_id: call.id,
