@@ -126,6 +126,10 @@ type TelegramMessage = {
   audio?: TelegramVoice;
   photo?: TelegramPhotoSize[];
   document?: TelegramDocument;
+  video?: TelegramDocument;
+  video_note?: TelegramDocument;
+  animation?: TelegramDocument;
+  sticker?: TelegramDocument;
   reply_to_message?: TelegramMessage;
   entities?: Array<{ type: string; offset: number; length: number }>;
 };
@@ -357,6 +361,29 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
+// Anthropic vision (via OpenRouter) only accepts image/jpeg, image/png,
+// image/gif, image/webp. Telegram often returns content-type "image/jpg",
+// "application/octet-stream" or similar. Normalize by sniffing magic bytes,
+// then fall back to mapping known aliases.
+function normalizeImageMime(mime: string, bytes: Uint8Array): string | null {
+  // Magic-byte sniff first — most reliable.
+  if (bytes.length >= 4) {
+    if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47)
+      return "image/png";
+    if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image/gif";
+    if (
+      bytes.length >= 12 &&
+      bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+      bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+    ) return "image/webp";
+  }
+  const m = (mime || "").toLowerCase().split(";")[0].trim();
+  if (m === "image/jpeg" || m === "image/png" || m === "image/gif" || m === "image/webp") return m;
+  if (m === "image/jpg" || m === "image/pjpeg") return "image/jpeg";
+  return null;
+}
+
 async function extractPdfText(bytes: Uint8Array): Promise<string | null> {
   try {
     const { extractText, getDocumentProxy } = await import(
@@ -392,7 +419,32 @@ async function processAttachments(
     if (!file) {
       return { images, extraText, userError: "couldn't download that photo — mind resending?" };
     }
-    images.push({ url: `data:${file.mime};base64,${bytesToBase64(file.bytes)}` });
+    const normalized = normalizeImageMime(file.mime, file.bytes) ?? "image/jpeg";
+    images.push({ url: `data:${normalized};base64,${bytesToBase64(file.bytes)}` });
+  }
+
+  // Stickers — animated/video stickers we can't read; static webp stickers we can.
+  if (msg.sticker) {
+    const s = msg.sticker;
+    const file = await downloadTelegramFile(botToken, s.file_id, "image/webp");
+    if (file) {
+      const normalized = normalizeImageMime(file.mime, file.bytes);
+      if (normalized) {
+        images.push({ url: `data:${normalized};base64,${bytesToBase64(file.bytes)}` });
+      } else {
+        return { images, extraText, userError: "cute sticker, but i can only read static image stickers right now." };
+      }
+    }
+  }
+
+  // Videos / video notes / GIFs — vision models in this stack don't accept video.
+  if (msg.video || msg.video_note || msg.animation) {
+    return {
+      images,
+      extraText,
+      userError:
+        "i can't watch videos yet — only images and PDFs for now. if you grab a screenshot from it i can take a look ✌️",
+    };
   }
 
   if (msg.document) {
@@ -400,13 +452,30 @@ async function processAttachments(
     const mime = (doc.mime_type || "").toLowerCase();
     const name = doc.file_name || "file";
 
+    if (mime.startsWith("video/")) {
+      return {
+        images,
+        extraText,
+        userError:
+          "i can't watch videos yet — only images and PDFs for now. if you grab a screenshot from it i can take a look ✌️",
+      };
+    }
+
     if (mime.startsWith("image/")) {
       if ((doc.file_size ?? 0) > MAX_IMAGE_BYTES) {
         return { images, extraText, userError: `"${name}" is too big — try under ~10MB.` };
       }
       const file = await downloadTelegramFile(botToken, doc.file_id, mime);
       if (!file) return { images, extraText, userError: `couldn't download "${name}".` };
-      images.push({ url: `data:${file.mime};base64,${bytesToBase64(file.bytes)}` });
+      const normalized = normalizeImageMime(file.mime || mime, file.bytes);
+      if (!normalized) {
+        return {
+          images,
+          extraText,
+          userError: `"${name}" is an image format i can't read (need jpeg, png, gif, or webp).`,
+        };
+      }
+      images.push({ url: `data:${normalized};base64,${bytesToBase64(file.bytes)}` });
     } else if (mime === "application/pdf" || name.toLowerCase().endsWith(".pdf")) {
       if ((doc.file_size ?? 0) > MAX_PDF_BYTES) {
         return { images, extraText, userError: `"${name}" is over 20MB — too chunky for me to read.` };
@@ -654,7 +723,9 @@ Deno.serve(async (req) => {
   }
 
   // Process photo / document attachments (images, PDFs).
-  const hasAttachments = !!(msg.photo?.length || msg.document);
+  const hasAttachments = !!(
+    msg.photo?.length || msg.document || msg.video || msg.video_note || msg.animation || msg.sticker
+  );
   let attachmentImages: { url: string }[] = [];
   let attachmentExtraText: string[] = [];
   if (hasAttachments) {
