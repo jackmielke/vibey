@@ -641,6 +641,7 @@ export default function TelegramMini() {
   };
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
+  const [selectedProfile, setSelectedProfile] = useState<ProfileDetail | null>(null);
   const [directoryQuery, setDirectoryQuery] = useState("");
 
   const filteredDirectory = useMemo(() => {
