@@ -151,6 +151,76 @@ async function tg(token: string, method: string, body: unknown) {
   return res;
 }
 
+// Create a live-updating status message in Telegram. Steps are appended as
+// they happen via `update(step)`; `finalize(summary)` replaces it with a
+// compact one-line collapsed summary (or deletes it if `summary` is empty).
+function createStatusMessage(token: string, chatId: number, reply_to_message_id?: number) {
+  let messageId: number | null = null;
+  const steps: string[] = [];
+  let initPromise: Promise<void> | null = null;
+  let lastEdit: Promise<void> = Promise.resolve();
+
+  const init = async () => {
+    const res = await tg(token, "sendMessage", {
+      chat_id: chatId,
+      text: "✨ thinking…",
+      reply_to_message_id,
+      disable_notification: true,
+    });
+    try {
+      const json = await res.clone().json();
+      messageId = json?.result?.message_id ?? null;
+    } catch { /* ignore */ }
+  };
+
+  const render = () => {
+    if (steps.length === 0) return "✨ thinking…";
+    // Keep last ~12 steps so the message doesn't blow past 4096 chars.
+    const shown = steps.slice(-12);
+    return `✨ thinking…\n${shown.join("\n")}`;
+  };
+
+  const flush = () => {
+    lastEdit = lastEdit.then(async () => {
+      if (!messageId) return;
+      await tg(token, "editMessageText", {
+        chat_id: chatId,
+        message_id: messageId,
+        text: render(),
+        disable_web_page_preview: true,
+      }).catch(() => { /* ignore rate-limit / not-modified */ });
+    });
+  };
+
+  return {
+    start: () => {
+      if (!initPromise) initPromise = init();
+      return initPromise;
+    },
+    push: (line: string) => {
+      steps.push(line);
+      flush();
+    },
+    finalize: async (summary: string) => {
+      await initPromise;
+      await lastEdit;
+      if (!messageId) return;
+      if (!summary) {
+        await tg(token, "deleteMessage", { chat_id: chatId, message_id: messageId })
+          .catch(() => { /* ignore */ });
+        return;
+      }
+      await tg(token, "editMessageText", {
+        chat_id: chatId,
+        message_id: messageId,
+        text: summary,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      }).catch(() => { /* ignore */ });
+    },
+  };
+}
+
 // ── Voice transcription via OpenAI Whisper ────────────────────────────────────
 
 async function transcribeVoice(
