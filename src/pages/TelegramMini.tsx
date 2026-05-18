@@ -149,9 +149,16 @@ function MemoryCard({
       }
     >
       <div className="flex items-start justify-between gap-2 min-w-0">
-        <p className="text-sm whitespace-pre-wrap flex-1 min-w-0 [overflow-wrap:anywhere]">
-          {m.content ? renderWithLinks(m.content) : null}
-        </p>
+        <div className="flex-1 min-w-0">
+          {m.title && (
+            <p className="text-sm font-semibold mb-1 break-words [overflow-wrap:anywhere]">
+              {m.title}
+            </p>
+          )}
+          <p className="text-sm whitespace-pre-wrap [overflow-wrap:anywhere] text-muted-foreground">
+            {m.content ? renderWithLinks(m.content) : null}
+          </p>
+        </div>
         <div className="flex items-center gap-1 shrink-0">
           {adminMode && onEdit && (
             <button
