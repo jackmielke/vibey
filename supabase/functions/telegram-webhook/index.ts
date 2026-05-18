@@ -879,6 +879,10 @@ Deno.serve(async (req) => {
   const isAdminDm = isAdminTelegramUser(userId);
   const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId, isAdminDm)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
+  const dmStatus = createStatusMessage(TELEGRAM_BOT_TOKEN, chatId);
+  let dmToolCount = 0;
+  const dmCounts: Record<string, number> = {};
+
   const reply = await runAgentLoop({
     supabase,
     apiKey: OPENROUTER_API_KEY,
@@ -899,7 +903,26 @@ Deno.serve(async (req) => {
     isAdmin: isAdminDm,
     referer: "https://t.me/vibey_ai_bot",
     title: "Vibey (Telegram)",
+    onProgress: async (evt) => {
+      await dmStatus.start();
+      if (evt.status === "start") {
+        dmToolCount++;
+        dmCounts[evt.name] = (dmCounts[evt.name] ?? 0) + 1;
+        dmStatus.push(evt.label);
+      } else {
+        dmStatus.push(`  ↳ ${evt.label}`);
+      }
+    },
   });
+
+  const dmSummary = dmToolCount > 0
+    ? `<i>used ${dmToolCount} step${dmToolCount === 1 ? "" : "s"}: ${
+        Object.entries(dmCounts)
+          .map(([n, c]) => `${c}× ${n.replace(/_/g, " ")}`)
+          .join(" · ")
+      }</i>`
+    : "";
+  await dmStatus.finalize(dmSummary);
 
   if (!reply) {
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
