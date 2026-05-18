@@ -113,7 +113,7 @@ export const TOOLS = [
     function: {
       name: "web_search",
       description:
-        "Search the live web (via Brave Search) for current information. Use when the user asks about recent events, news, prices, dates, or anything you can't answer from memory or the community context. Returns up to 5 result snippets with URLs. Follow up with fetch_url if you need full content from a specific page.",
+        "Search the live web (via Firecrawl) for current information. Use when the user asks about recent events, news, prices, dates, or anything you can't answer from memory or the community context. Returns up to 10 result snippets with URLs. Follow up with fetch_url if you need full content from a specific page.",
       parameters: {
         type: "object",
         properties: {
