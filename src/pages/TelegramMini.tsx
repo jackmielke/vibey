@@ -518,6 +518,9 @@ export default function TelegramMini() {
     profile_picture_url: string | null;
     telegram_photo_url: string | null;
     telegram_username: string | null;
+    instagram_handle: string | null;
+    twitter_handle: string | null;
+    source_url: string | null;
     headline: string | null;
     bio: string | null;
   };
