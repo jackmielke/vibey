@@ -1097,7 +1097,7 @@ export default function TelegramMini() {
             admin
           </button>
         )}
-        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+        <MeButton profile={myProfile} fallbackName={tgName} />
       </div>
 
       {/* Tabs */}
