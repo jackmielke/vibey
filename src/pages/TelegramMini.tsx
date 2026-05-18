@@ -577,7 +577,7 @@ export default function TelegramMini() {
     (async () => {
       const { data, error } = await supabase
         .from("memories")
-        .select("id, content, tags, created_at, metadata")
+        .select("id, title, content, tags, created_at, metadata")
         .eq("community_id", VIBEY_COMMUNITY_ID)
         .order("created_at", { ascending: false })
         .limit(100);
