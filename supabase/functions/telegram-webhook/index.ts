@@ -546,6 +546,26 @@ Deno.serve(async (req) => {
   const msg = update.message ?? update.edited_message;
   if (!msg) return new Response("ok", { status: 200 });
 
+  // Idempotency: if Telegram retries this update (e.g. because our response
+  // took longer than its timeout), short-circuit so we don't double-reply.
+  // We do this BEFORE doing any other work.
+  const dedupClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  if (typeof update.update_id === "number") {
+    const { error: dedupError } = await dedupClient
+      .from("telegram_processed_updates")
+      .insert({ update_id: update.update_id });
+    if (dedupError) {
+      // 23505 = unique_violation → we've already handled this update.
+      // deno-lint-ignore no-explicit-any
+      if ((dedupError as any).code === "23505") {
+        console.log(`Duplicate update_id ${update.update_id} — skipping.`);
+        return new Response("ok", { status: 200 });
+      }
+      // Any other error: log but continue (don't drop real messages).
+      console.error("dedup insert failed:", dedupError);
+    }
+  }
+
   const chatId = msg.chat.id;
   const chatType = msg.chat.type;
   const userId = msg.from?.id ?? chatId;
