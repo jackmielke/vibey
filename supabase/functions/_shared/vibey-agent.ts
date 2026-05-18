@@ -1017,7 +1017,7 @@ You have access to these tools:
   You can ONLY update memories where the owner matches the current caller's vibe user id
   (marked "(yours)" in the list). For anyone else's memory, refuse politely instead of calling.
 
-- **web_search(query, count?)** — search the live web (Brave) for current info.
+- **web_search(query, count?)** — search the live web (Firecrawl) for current info.
   Use for recent events, news, prices, dates, public facts you can't answer from memory.
   Returns titles + URLs + snippets. Follow up with fetch_url if you need full content.
 
