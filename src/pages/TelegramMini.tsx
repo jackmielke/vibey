@@ -646,6 +646,19 @@ export default function TelegramMini() {
   const [selectedProfile, setSelectedProfile] = useState<ProfileDetail | null>(null);
   const [directoryQuery, setDirectoryQuery] = useState("");
 
+  // Current user mini-profile (for header avatar popover)
+  type MyProfile = {
+    id: string;
+    name: string | null;
+    avatar_url: string | null;
+    telegram_photo_url: string | null;
+    telegram_username: string | null;
+    headline: string | null;
+    bio: string | null;
+    email: string | null;
+  };
+  const [myProfile, setMyProfile] = useState<MyProfile | null>(null);
+
   const filteredDirectory = useMemo(() => {
     const q = directoryQuery.trim().toLowerCase();
     if (!q) return directory;
