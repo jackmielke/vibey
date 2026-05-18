@@ -1336,7 +1336,7 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
   }
 }
 
-function describeToolDone(
+export function describeToolDone(
   name: string,
   args: Record<string, unknown>,
   resultJson: string
