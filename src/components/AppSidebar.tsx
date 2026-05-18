@@ -39,8 +39,6 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarUserProfile } from "@/components/SidebarUserProfile";
 
 const chatItem = { title: "Talk to Vibey", url: "/", icon: MessageCircle };
-const dashboardItem = { title: "Mission Control", url: "/dashboard", icon: Gauge };
-const sectionsItem = { title: "Sections", url: "/sections", icon: LayoutDashboard };
 
 const navItems = [
   { title: "Soul", url: "/soul", icon: Sparkles },
@@ -54,6 +52,8 @@ const navItems = [
   { title: "Chat History", url: "/conversations", icon: MessagesSquare },
   { title: "Media Library", url: "/media", icon: Image },
   { title: "Group Chats", url: "/groups", icon: UsersRound },
+  { title: "Mission Control", url: "/dashboard", icon: Gauge },
+  { title: "Sections", url: "/sections", icon: LayoutDashboard },
 ];
 
 export function AppSidebar() {
@@ -101,22 +101,6 @@ export function AppSidebar() {
                   <NavLink to="/" end onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
                     <chatItem.icon className="h-4 w-4" />
                     {!collapsed && <span>{chatItem.title}</span>}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={isActive("/dashboard")}>
-                  <NavLink to="/dashboard" onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
-                    <dashboardItem.icon className="h-4 w-4" />
-                    {!collapsed && <span>{dashboardItem.title}</span>}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={isActive("/sections")}>
-                  <NavLink to="/sections" onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
-                    <sectionsItem.icon className="h-4 w-4" />
-                    {!collapsed && <span>{sectionsItem.title}</span>}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
