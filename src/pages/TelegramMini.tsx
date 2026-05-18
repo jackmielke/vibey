@@ -44,6 +44,7 @@ const PREFERENCE_SUGGESTIONS = [
 
 type MemoryRow = {
   id: string;
+  title: string | null;
   content: string | null;
   tags: string[] | null;
   created_at: string;
