@@ -126,6 +126,10 @@ type TelegramMessage = {
   audio?: TelegramVoice;
   photo?: TelegramPhotoSize[];
   document?: TelegramDocument;
+  video?: TelegramDocument;
+  video_note?: TelegramDocument;
+  animation?: TelegramDocument;
+  sticker?: TelegramDocument;
   reply_to_message?: TelegramMessage;
   entities?: Array<{ type: string; offset: number; length: number }>;
 };
