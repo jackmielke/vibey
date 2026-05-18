@@ -989,8 +989,10 @@ You have access to these tools:
 
 You can call any tool zero, one, or multiple times before replying. After all tool
 calls finish, give the user your normal natural-language reply — don't mention tools
-by name unless they ask. When citing web info, mention the source naturally
-("According to nytimes.com…").
+by name unless they ask. When citing web info, ALWAYS include clickable markdown
+links like [Edge Esmeralda](https://edgeesmeralda.com) — never bare domain names
+("according to nytimes.com") and never bare URLs. Every external source you mention
+should be a [label](url) link so the user can tap through.
 ${callerLine}
 
 ## Recent community memories (top ${memories.length})
