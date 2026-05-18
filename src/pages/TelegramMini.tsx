@@ -1288,9 +1288,11 @@ export default function TelegramMini() {
                       null;
                     const display = u.name ?? (u.telegram_username ? `@${u.telegram_username}` : "—");
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={u.id}
-                        className="p-2.5 rounded-lg bg-card border border-border flex items-center gap-2 min-w-0"
+                        onClick={() => setSelectedProfile(u)}
+                        className="p-2.5 rounded-lg bg-card border border-border flex items-center gap-2 min-w-0 text-left hover:border-primary/40 hover:bg-muted/40 transition-colors"
                       >
                         <div className="w-9 h-9 rounded-full overflow-hidden bg-muted shrink-0 ring-1 ring-border">
                           {avatar ? (
@@ -1309,7 +1311,7 @@ export default function TelegramMini() {
                             </p>
                           )}
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
