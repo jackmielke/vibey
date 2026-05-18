@@ -52,6 +52,8 @@ const navItems = [
   { title: "Chat History", url: "/conversations", icon: MessagesSquare },
   { title: "Media Library", url: "/media", icon: Image },
   { title: "Group Chats", url: "/groups", icon: UsersRound },
+  { title: "Mission Control", url: "/dashboard", icon: Gauge },
+  { title: "Sections", url: "/sections", icon: LayoutDashboard },
 ];
 
 export function AppSidebar() {
