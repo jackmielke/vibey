@@ -388,7 +388,10 @@ export function MemorySection() {
                               </span>
                             )}
                           </div>
-                          <p className="text-sm whitespace-pre-wrap break-words mt-1">{m.content}</p>
+                          {m.title && (
+                            <p className="text-sm font-semibold mt-1 break-words">{m.title}</p>
+                          )}
+                          <p className="text-sm whitespace-pre-wrap break-words mt-1 text-muted-foreground">{m.content}</p>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <a
