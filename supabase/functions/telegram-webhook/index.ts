@@ -136,6 +136,42 @@ type TelegramUpdate = {
   edited_message?: TelegramMessage;
 };
 
+// Telegram update_ids are scoped per bot. If multiple bots in the same group
+// point at this function, the same human message arrives with different
+// update_ids. Add a second idempotency key based on chat_id + message_id so
+// only one invocation can answer that shared group message.
+function telegramMessageDedupKey(chatId: number, messageId: number): string {
+  const input = `${chatId}:${messageId}`;
+  let hash = 1469598103934665603n;
+  const prime = 1099511628211n;
+  const mask = (1n << 62n) - 1n;
+
+  for (let i = 0; i < input.length; i++) {
+    hash ^= BigInt(input.charCodeAt(i));
+    hash = (hash * prime) & mask;
+  }
+
+  return `-${(hash || 1n).toString()}`;
+}
+
+// deno-lint-ignore no-explicit-any
+async function markTelegramDedup(supabase: any, key: number | string, label: string): Promise<"new" | "duplicate" | "error"> {
+  const { error } = await supabase
+    .from("telegram_processed_updates")
+    .insert({ update_id: key });
+
+  if (!error) return "new";
+  // 23505 = unique_violation → already handled.
+  // deno-lint-ignore no-explicit-any
+  if ((error as any).code === "23505") {
+    console.log(`Duplicate ${label} ${key} — skipping.`);
+    return "duplicate";
+  }
+
+  console.error(`${label} dedup insert failed:`, error);
+  return "error";
+}
+
 // ── Telegram API helper ───────────────────────────────────────────────────────
 
 async function tg(token: string, method: string, body: unknown) {
