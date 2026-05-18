@@ -1,0 +1,1 @@
+ALTER TABLE public.memories ADD COLUMN IF NOT EXISTS title text;
