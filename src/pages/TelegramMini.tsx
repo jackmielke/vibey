@@ -768,7 +768,7 @@ export default function TelegramMini() {
   async function addMemory() {
     if (!newMemContent.trim()) return;
     setSavingMem(true);
-    const metadata: Record<string, unknown> = { source: "telegram_mini" };
+    const metadata: Record<string, string | number> = { source: "telegram_mini" };
     if (tgUserId != null) metadata.telegram_user_id = tgUserId;
     if (tgName) metadata.telegram_username = tgName;
     const { data, error } = await supabase
