@@ -575,6 +575,25 @@ export default function TelegramMini() {
         );
         if (!adminErr && adminCheck === true) setIsAdmin(true);
 
+        // Check community membership (gates the "add memory" composer)
+        const authUid = (await supabase.auth.getUser()).data.user?.id;
+        if (authUid) {
+          const { data: userRow } = await supabase
+            .from("users")
+            .select("id")
+            .eq("auth_user_id", authUid)
+            .maybeSingle();
+          if (userRow?.id) {
+            const { data: memberRow } = await supabase
+              .from("community_members")
+              .select("id")
+              .eq("community_id", VIBEY_COMMUNITY_ID)
+              .eq("user_id", userRow.id)
+              .maybeSingle();
+            if (memberRow) setIsMember(true);
+          }
+        }
+
         setAuthState("ready");
       } catch (e) {
         console.error(e);
