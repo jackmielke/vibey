@@ -765,6 +765,36 @@ export default function TelegramMini() {
     setMemories((prev) => prev.filter((x) => x.id !== m.id));
   }
 
+  async function addMemory() {
+    if (!newMemContent.trim()) return;
+    setSavingMem(true);
+    const metadata: Record<string, unknown> = { source: "telegram_mini" };
+    if (tgUserId != null) metadata.telegram_user_id = tgUserId;
+    if (tgName) metadata.telegram_username = tgName;
+    const { data, error } = await supabase
+      .from("memories")
+      .insert({
+        community_id: VIBEY_COMMUNITY_ID,
+        title: newMemTitle.trim() || null,
+        content: newMemContent.trim(),
+        metadata,
+      })
+      .select("id, title, content, tags, created_at, metadata")
+      .single();
+    setSavingMem(false);
+    if (error) {
+      toast.error("Couldn't save memory", { description: error.message });
+      return;
+    }
+    setMemories((prev) =>
+      prev.some((m) => m.id === (data as MemoryRow).id) ? prev : [data as MemoryRow, ...prev],
+    );
+    setNewMemTitle("");
+    setNewMemContent("");
+    setMemComposerOpen(false);
+    toast.success("memory saved");
+  }
+
   const isMine = (m: MemoryRow) =>
     tgUserId != null &&
     Number((m.metadata as Record<string, unknown> | null)?.telegram_user_id) === tgUserId;
