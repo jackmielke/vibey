@@ -330,6 +330,12 @@ export function MemorySection() {
               >
                 {isEditing ? (
                   <div className="space-y-2">
+                    <Input
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      placeholder="title (optional)"
+                      className="text-sm"
+                    />
                     <Textarea
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
