@@ -941,7 +941,8 @@ export function buildSystemPromptWithMemories(
             const owner = m.created_by ?? "unknown";
             const mine =
               callerVibeUserId && m.created_by === callerVibeUserId ? " (yours)" : "";
-            return `${i + 1}. id=${m.id} owner=${owner}${mine} — ${m.content}${tags}`;
+            const title = m.title ? `**${m.title}** — ` : "";
+            return `${i + 1}. id=${m.id} owner=${owner}${mine} — ${title}${m.content}${tags}`;
           })
           .join("\n");
 
