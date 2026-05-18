@@ -24,6 +24,7 @@ const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 
 type MemoryRow = {
   id: string;
+  title: string | null;
   content: string | null;
   tags: string[] | null;
   created_at: string;
@@ -58,10 +59,12 @@ export function MemorySection() {
   const [authors, setAuthors] = useState<Record<string, AuthorInfo>>({});
   const [loading, setLoading] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [newTags, setNewTags] = useState("");
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
   const [editTags, setEditTags] = useState("");
   const [editSaving, setEditSaving] = useState(false);
@@ -70,7 +73,7 @@ export function MemorySection() {
   async function loadMemories() {
     const { data, error } = await supabase
       .from("memories")
-      .select("id, content, tags, created_at, metadata, created_by")
+      .select("id, title, content, tags, created_at, metadata, created_by")
       .eq("community_id", VIBEY_COMMUNITY_ID)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -162,6 +165,7 @@ export function MemorySection() {
     const tags = newTags.split(",").map((t) => t.trim()).filter(Boolean);
     const { error } = await supabase.from("memories").insert({
       community_id: VIBEY_COMMUNITY_ID,
+      title: newTitle.trim() || null,
       content: newContent.trim(),
       tags: tags.length ? tags : null,
       metadata: { source: "admin_panel" },
@@ -171,6 +175,7 @@ export function MemorySection() {
       toast.error("Couldn't save memory", { description: error.message });
       return;
     }
+    setNewTitle("");
     setNewContent("");
     setNewTags("");
     setComposerOpen(false);
@@ -180,12 +185,14 @@ export function MemorySection() {
 
   function startEdit(m: MemoryRow) {
     setEditingId(m.id);
+    setEditTitle(m.title ?? "");
     setEditContent(m.content ?? "");
     setEditTags((m.tags ?? []).join(", "));
   }
 
   function cancelEdit() {
     setEditingId(null);
+    setEditTitle("");
     setEditContent("");
     setEditTags("");
   }
@@ -194,9 +201,11 @@ export function MemorySection() {
     if (!editingId || !editContent.trim()) return;
     setEditSaving(true);
     const tags = editTags.split(",").map((t) => t.trim()).filter(Boolean);
+    const nextTitle = editTitle.trim() || null;
     const { error } = await supabase
       .from("memories")
       .update({
+        title: nextTitle,
         content: editContent.trim(),
         tags: tags.length ? tags : null,
       })
@@ -209,7 +218,7 @@ export function MemorySection() {
     setMemories((prev) =>
       prev.map((m) =>
         m.id === editingId
-          ? { ...m, content: editContent.trim(), tags: tags.length ? tags : null }
+          ? { ...m, title: nextTitle, content: editContent.trim(), tags: tags.length ? tags : null }
           : m,
       ),
     );
@@ -263,6 +272,12 @@ export function MemorySection() {
 
       {composerOpen && (
         <div className="p-3 rounded-lg bg-card border border-border space-y-2">
+          <Input
+            placeholder="title (optional, short headline)"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            className="text-sm"
+          />
           <Textarea
             placeholder="what should vibey remember?"
             value={newContent}
@@ -315,6 +330,12 @@ export function MemorySection() {
               >
                 {isEditing ? (
                   <div className="space-y-2">
+                    <Input
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      placeholder="title (optional)"
+                      className="text-sm"
+                    />
                     <Textarea
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
@@ -367,7 +388,10 @@ export function MemorySection() {
                               </span>
                             )}
                           </div>
-                          <p className="text-sm whitespace-pre-wrap break-words mt-1">{m.content}</p>
+                          {m.title && (
+                            <p className="text-sm font-semibold mt-1 break-words">{m.title}</p>
+                          )}
+                          <p className="text-sm whitespace-pre-wrap break-words mt-1 text-muted-foreground">{m.content}</p>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <a

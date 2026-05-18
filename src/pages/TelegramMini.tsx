@@ -13,6 +13,7 @@ import {
   Shield,
   Trash2,
   MessageSquare,
+  Plus,
   X,
 } from "lucide-react";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
@@ -44,6 +45,7 @@ const PREFERENCE_SUGGESTIONS = [
 
 type MemoryRow = {
   id: string;
+  title: string | null;
   content: string | null;
   tags: string[] | null;
   created_at: string;
@@ -148,9 +150,16 @@ function MemoryCard({
       }
     >
       <div className="flex items-start justify-between gap-2 min-w-0">
-        <p className="text-sm whitespace-pre-wrap flex-1 min-w-0 [overflow-wrap:anywhere]">
-          {m.content ? renderWithLinks(m.content) : null}
-        </p>
+        <div className="flex-1 min-w-0">
+          {m.title && (
+            <p className="text-sm font-semibold mb-1 break-words [overflow-wrap:anywhere]">
+              {m.title}
+            </p>
+          )}
+          <p className="text-sm whitespace-pre-wrap [overflow-wrap:anywhere] text-muted-foreground">
+            {m.content ? renderWithLinks(m.content) : null}
+          </p>
+        </div>
         <div className="flex items-center gap-1 shrink-0">
           {adminMode && onEdit && (
             <button
@@ -387,6 +396,7 @@ function MemoryEditModal({
   onClose: () => void;
   onSaved: (m: MemoryRow) => void;
 }) {
+  const [title, setTitle] = useState(memory.title ?? "");
   const [content, setContent] = useState(memory.content ?? "");
   const [tags, setTags] = useState((memory.tags ?? []).join(", "));
   const [saving, setSaving] = useState(false);
@@ -400,9 +410,9 @@ function MemoryEditModal({
         .filter(Boolean);
       const { data, error } = await supabase
         .from("memories")
-        .update({ content, tags: tagArr })
+        .update({ title: title.trim() || null, content, tags: tagArr })
         .eq("id", memory.id)
-        .select("id, content, tags, created_at, metadata")
+        .select("id, title, content, tags, created_at, metadata")
         .single();
       if (error) throw error;
       toast.success("Memory saved");
@@ -426,6 +436,12 @@ function MemoryEditModal({
             <X className="w-4 h-4" />
           </button>
         </div>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="title (optional)"
+          className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
+        />
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
@@ -471,6 +487,13 @@ export default function TelegramMini() {
   const [prefs, setPrefs] = useState<PreferenceRow[]>([]);
   const [prefsLoading, setPrefsLoading] = useState(true);
   const [memFilter, setMemFilter] = useState<"all" | "mine" | "others">("all");
+  const [isMember, setIsMember] = useState(false);
+
+  // Memory composer (member-only)
+  const [memComposerOpen, setMemComposerOpen] = useState(false);
+  const [newMemTitle, setNewMemTitle] = useState("");
+  const [newMemContent, setNewMemContent] = useState("");
+  const [savingMem, setSavingMem] = useState(false);
 
   // Admin
   const [isAdmin, setIsAdmin] = useState(false);
@@ -553,6 +576,25 @@ export default function TelegramMini() {
         );
         if (!adminErr && adminCheck === true) setIsAdmin(true);
 
+        // Check community membership (gates the "add memory" composer)
+        const authUid = (await supabase.auth.getUser()).data.user?.id;
+        if (authUid) {
+          const { data: userRow } = await supabase
+            .from("users")
+            .select("id")
+            .eq("auth_user_id", authUid)
+            .maybeSingle();
+          if (userRow?.id) {
+            const { data: memberRow } = await supabase
+              .from("community_members")
+              .select("id")
+              .eq("community_id", VIBEY_COMMUNITY_ID)
+              .eq("user_id", userRow.id)
+              .maybeSingle();
+            if (memberRow) setIsMember(true);
+          }
+        }
+
         setAuthState("ready");
       } catch (e) {
         console.error(e);
@@ -569,7 +611,7 @@ export default function TelegramMini() {
     (async () => {
       const { data, error } = await supabase
         .from("memories")
-        .select("id, content, tags, created_at, metadata")
+        .select("id, title, content, tags, created_at, metadata")
         .eq("community_id", VIBEY_COMMUNITY_ID)
         .order("created_at", { ascending: false })
         .limit(100);
@@ -724,6 +766,36 @@ export default function TelegramMini() {
     setMemories((prev) => prev.filter((x) => x.id !== m.id));
   }
 
+  async function addMemory() {
+    if (!newMemContent.trim()) return;
+    setSavingMem(true);
+    const metadata: Record<string, string | number> = { source: "telegram_mini" };
+    if (tgUserId != null) metadata.telegram_user_id = tgUserId;
+    if (tgName) metadata.telegram_username = tgName;
+    const { data, error } = await supabase
+      .from("memories")
+      .insert({
+        community_id: VIBEY_COMMUNITY_ID,
+        title: newMemTitle.trim() || null,
+        content: newMemContent.trim(),
+        metadata,
+      })
+      .select("id, title, content, tags, created_at, metadata")
+      .single();
+    setSavingMem(false);
+    if (error) {
+      toast.error("Couldn't save memory", { description: error.message });
+      return;
+    }
+    setMemories((prev) =>
+      prev.some((m) => m.id === (data as MemoryRow).id) ? prev : [data as MemoryRow, ...prev],
+    );
+    setNewMemTitle("");
+    setNewMemContent("");
+    setMemComposerOpen(false);
+    toast.success("memory saved");
+  }
+
   const isMine = (m: MemoryRow) =>
     tgUserId != null &&
     Number((m.metadata as Record<string, unknown> | null)?.telegram_user_id) === tgUserId;
@@ -841,25 +913,80 @@ export default function TelegramMini() {
             </section>
 
             {/* Memories */}
-            {memLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            <section className="space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <Brain className="w-3 h-3" />
+                  community memory · {memories.length}
+                </h2>
+                {isMember && (
+                  <button
+                    onClick={() => setMemComposerOpen((o) => !o)}
+                    className={
+                      "px-2 py-1 rounded font-mono text-[10px] uppercase tracking-widest border transition-colors flex items-center gap-1 " +
+                      (memComposerOpen
+                        ? "bg-muted text-muted-foreground border-border"
+                        : "bg-primary/15 text-primary border-primary/40 hover:bg-primary/20")
+                    }
+                  >
+                    {memComposerOpen ? (
+                      <>
+                        <X className="w-3 h-3" /> cancel
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3 h-3" /> add
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
-            ) : memories.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-                  <Brain className="w-6 h-6 text-muted-foreground" />
+
+              {isMember && memComposerOpen && (
+                <div className="p-3 rounded-lg bg-card border border-border space-y-2">
+                  <input
+                    value={newMemTitle}
+                    onChange={(e) => setNewMemTitle(e.target.value)}
+                    placeholder="title (optional, short headline)"
+                    className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
+                  />
+                  <textarea
+                    value={newMemContent}
+                    onChange={(e) => setNewMemContent(e.target.value)}
+                    rows={3}
+                    placeholder="what should vibey remember?"
+                    className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60 resize-none"
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-mono text-[10px] text-muted-foreground">
+                      saved as {tgName ?? "you"}
+                    </p>
+                    <button
+                      onClick={addMemory}
+                      disabled={savingMem || !newMemContent.trim()}
+                      className="text-[11px] font-mono uppercase tracking-widest px-3 py-1 rounded bg-primary text-primary-foreground disabled:opacity-40 flex items-center gap-1"
+                    >
+                      {savingMem && <Loader2 className="w-3 h-3 animate-spin" />}
+                      save
+                    </button>
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground">no memories yet</p>
-              </div>
-            ) : (
-              <section className="space-y-2">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                    <Brain className="w-3 h-3" />
-                    community memory · {memories.length}
-                  </h2>
-                  <div className="flex items-center gap-1">
+              )}
+
+              {memLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : memories.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                    <Brain className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">no memories yet</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1 flex-wrap">
                     <Filter className="w-3 h-3 text-muted-foreground" />
                     {(["all", "mine", "others"] as const).map((key) => {
                       const count =
@@ -885,20 +1012,21 @@ export default function TelegramMini() {
                       );
                     })}
                   </div>
-                </div>
-                {filteredMemories.length === 0 ? (
-                  <p className="text-xs text-muted-foreground px-1 py-2">
-                    nothing here yet for this filter.
-                  </p>
-                ) : (
-                  <AnimatePresence initial={false}>
-                    {filteredMemories.map((m) => (
-                      <MemoryCard key={m.id} m={m} highlight={isMine(m)} />
-                    ))}
-                  </AnimatePresence>
-                )}
-              </section>
-            )}
+                  {filteredMemories.length === 0 ? (
+                    <p className="text-xs text-muted-foreground px-1 py-2">
+                      nothing here yet for this filter.
+                    </p>
+                  ) : (
+                    <AnimatePresence initial={false}>
+                      {filteredMemories.map((m) => (
+                        <MemoryCard key={m.id} m={m} highlight={isMine(m)} />
+                      ))}
+                    </AnimatePresence>
+                  )}
+                </>
+              )}
+            </section>
+
 
             {/* Soul (read-only) */}
             {agent?.system_prompt && (

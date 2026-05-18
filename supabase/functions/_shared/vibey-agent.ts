@@ -48,6 +48,7 @@ export type ChatMessage = {
 
 export type Memory = {
   id: string;
+  title: string | null;
   content: string | null;
   tags: string[] | null;
   created_at: string;
@@ -378,7 +379,7 @@ export async function loadRecentMemories(
 ): Promise<Memory[]> {
   const { data, error } = await supabase
     .from("memories")
-    .select("id, content, tags, created_at, created_by, metadata")
+    .select("id, title, content, tags, created_at, created_by, metadata")
     .eq("community_id", VIBEY_COMMUNITY_ID)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -940,7 +941,8 @@ export function buildSystemPromptWithMemories(
             const owner = m.created_by ?? "unknown";
             const mine =
               callerVibeUserId && m.created_by === callerVibeUserId ? " (yours)" : "";
-            return `${i + 1}. id=${m.id} owner=${owner}${mine} — ${m.content}${tags}`;
+            const title = m.title ? `**${m.title}** — ` : "";
+            return `${i + 1}. id=${m.id} owner=${owner}${mine} — ${title}${m.content}${tags}`;
           })
           .join("\n");
 
