@@ -357,6 +357,29 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
+// Anthropic vision (via OpenRouter) only accepts image/jpeg, image/png,
+// image/gif, image/webp. Telegram often returns content-type "image/jpg",
+// "application/octet-stream" or similar. Normalize by sniffing magic bytes,
+// then fall back to mapping known aliases.
+function normalizeImageMime(mime: string, bytes: Uint8Array): string | null {
+  // Magic-byte sniff first — most reliable.
+  if (bytes.length >= 4) {
+    if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47)
+      return "image/png";
+    if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image/gif";
+    if (
+      bytes.length >= 12 &&
+      bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+      bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+    ) return "image/webp";
+  }
+  const m = (mime || "").toLowerCase().split(";")[0].trim();
+  if (m === "image/jpeg" || m === "image/png" || m === "image/gif" || m === "image/webp") return m;
+  if (m === "image/jpg" || m === "image/pjpeg") return "image/jpeg";
+  return null;
+}
+
 async function extractPdfText(bytes: Uint8Array): Promise<string | null> {
   try {
     const { extractText, getDocumentProxy } = await import(
