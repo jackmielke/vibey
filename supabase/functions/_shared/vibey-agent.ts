@@ -946,7 +946,7 @@ async function executeToolCall(
       return JSON.stringify(result);
     }
     case "web_search":
-      return await webSearch(parsed as { query: string; count?: number });
+      return await webSearchFirecrawl(parsed as { query: string; count?: number });
     case "fetch_url":
       return await fetchUrl(parsed as { url: string });
     case "granola_notes":
