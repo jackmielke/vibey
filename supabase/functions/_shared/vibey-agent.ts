@@ -1305,7 +1305,7 @@ export async function runAgentLoop(opts: {
 
 // Playful, human-readable labels for tool calls. Kept here so both the
 // "starting" chip and the "done" chip stay consistent.
-function describeToolStart(name: string, args: Record<string, unknown>): string {
+export function describeToolStart(name: string, args: Record<string, unknown>): string {
   switch (name) {
     case "web_search": {
       const q = String(args?.query ?? "").trim();
