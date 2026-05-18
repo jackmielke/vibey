@@ -506,12 +506,13 @@ export default function TelegramMini() {
   const [adminLoading, setAdminLoading] = useState(false);
 
   // Tabs
-  type Tab = "memories" | "profiles" | "events" | "soul";
+  type Tab = "memories" | "profiles" | "preferences" | "events" | "soul";
   const [tab, setTab] = useState<Tab>("memories");
 
   // Profiles directory
   type DirectoryEntry = {
     id: string;
+    auth_user_id: string | null;
     name: string | null;
     avatar_url: string | null;
     profile_picture_url: string | null;
