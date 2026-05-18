@@ -1205,6 +1205,7 @@ export async function runAgentLoop(opts: {
     isAdmin = false,
     referer = "https://community-vibes-ai.lovable.app",
     title = "Vibey",
+    onProgress,
   } = opts;
 
   const userContent: string | UserContentPart[] = images.length > 0
