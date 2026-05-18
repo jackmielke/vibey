@@ -708,7 +708,14 @@ Deno.serve(async (req) => {
       title: "Vibey (Telegram)",
     });
 
-    if (!reply) return new Response("ok", { status: 200 });
+    if (!reply) {
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: "got a little tangled up on that one — mind asking again or scoping it down?",
+        reply_to_message_id: msg.message_id,
+      });
+      return new Response("ok", { status: 200 });
+    }
 
     const body = reply.length > 4000 ? reply.slice(0, 3997) + "..." : reply;
     const html = mdToTelegramHtml(body);
@@ -801,7 +808,13 @@ Deno.serve(async (req) => {
     title: "Vibey (Telegram)",
   });
 
-  if (!reply) return new Response("ok", { status: 200 });
+  if (!reply) {
+    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+      chat_id: chatId,
+      text: "got a little tangled up on that one — mind asking again or scoping it down?",
+    });
+    return new Response("ok", { status: 200 });
+  }
 
   const body = reply.length > 4000 ? reply.slice(0, 3997) + "..." : reply;
   const html = mdToTelegramHtml(body);

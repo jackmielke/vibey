@@ -1165,7 +1165,7 @@ export function buildUserContextBlock(
 // telegram-webhook. The web chat function uses the lower-level pieces so it
 // can stream the FINAL model call back to the browser.
 
-const MAX_TOOL_ITERATIONS = 4;
+const MAX_TOOL_ITERATIONS = 10;
 
 export async function runAgentLoop(opts: {
   supabase: SupabaseClient;
