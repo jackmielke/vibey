@@ -477,6 +477,121 @@ function MemoryEditModal({
   );
 }
 
+type ProfileDetail = {
+  id: string;
+  name: string | null;
+  avatar_url: string | null;
+  profile_picture_url: string | null;
+  telegram_photo_url: string | null;
+  telegram_username: string | null;
+  instagram_handle: string | null;
+  twitter_handle: string | null;
+  source_url: string | null;
+  headline: string | null;
+  bio: string | null;
+};
+
+function ProfileDetailModal({
+  profile,
+  onClose,
+}: {
+  profile: ProfileDetail;
+  onClose: () => void;
+}) {
+  const avatar =
+    profile.avatar_url ??
+    profile.profile_picture_url ??
+    profile.telegram_photo_url ??
+    null;
+  const display = profile.name ?? (profile.telegram_username ? `@${profile.telegram_username}` : "—");
+  const initial = (display ?? "?").slice(0, 1).toUpperCase();
+
+  const stripAt = (h: string) => h.replace(/^@/, "");
+  const links: { label: string; href: string }[] = [];
+  if (profile.telegram_username)
+    links.push({ label: `telegram · @${stripAt(profile.telegram_username)}`, href: `https://t.me/${stripAt(profile.telegram_username)}` });
+  if (profile.instagram_handle)
+    links.push({ label: `instagram · @${stripAt(profile.instagram_handle)}`, href: `https://instagram.com/${stripAt(profile.instagram_handle)}` });
+  if (profile.twitter_handle)
+    links.push({ label: `x · @${stripAt(profile.twitter_handle)}`, href: `https://x.com/${stripAt(profile.twitter_handle)}` });
+  if (profile.source_url) links.push({ label: profile.source_url.replace(/^https?:\/\//, ""), href: profile.source_url });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-3"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md bg-card border border-border rounded-lg p-4 space-y-4 max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-14 h-14 rounded-full overflow-hidden bg-muted shrink-0 ring-1 ring-border">
+              {avatar ? (
+                <img src={avatar} alt={display} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-sm font-mono text-muted-foreground">
+                  {initial}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-base font-semibold truncate">{display}</p>
+              {profile.telegram_username && profile.name && (
+                <p className="text-[11px] font-mono text-muted-foreground truncate">
+                  @{stripAt(profile.telegram_username)}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground p-1 shrink-0"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {profile.headline && (
+          <p className="text-sm text-foreground/90 [overflow-wrap:anywhere]">{profile.headline}</p>
+        )}
+
+        {profile.bio && (
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">bio</p>
+            <p className="text-sm whitespace-pre-wrap [overflow-wrap:anywhere] text-foreground/90">{profile.bio}</p>
+          </div>
+        )}
+
+        {links.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">links</p>
+            <div className="flex flex-col gap-1.5">
+              {links.map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary underline underline-offset-2 break-all"
+                >
+                  {l.label}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!profile.headline && !profile.bio && links.length === 0 && (
+          <p className="text-xs text-muted-foreground italic">no profile details yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function TelegramMini() {
   const { agent } = useVibeyAgent();
   const [authState, setAuthState] = useState<AuthState>("loading");
