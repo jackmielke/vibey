@@ -13,6 +13,7 @@ import {
   Shield,
   Trash2,
   MessageSquare,
+  Plus,
   X,
 } from "lucide-react";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
