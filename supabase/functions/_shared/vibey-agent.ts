@@ -1184,6 +1184,11 @@ export async function runAgentLoop(opts: {
   isAdmin?: boolean;
   referer?: string;
   title?: string;
+  onProgress?: (
+    event:
+      | { status: "start"; name: string; args: Record<string, unknown>; label: string }
+      | { status: "done"; name: string; args: Record<string, unknown>; label: string; details?: string }
+  ) => void | Promise<void>;
 }): Promise<string> {
   const {
     supabase,
