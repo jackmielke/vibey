@@ -272,6 +272,12 @@ export function MemorySection() {
 
       {composerOpen && (
         <div className="p-3 rounded-lg bg-card border border-border space-y-2">
+          <Input
+            placeholder="title (optional, short headline)"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            className="text-sm"
+          />
           <Textarea
             placeholder="what should vibey remember?"
             value={newContent}
