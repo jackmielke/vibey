@@ -22,7 +22,7 @@ import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemor
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
-import { VIBEY_COMMUNITY_ID } from "@/lib/vibey";
+import { VIBEY_COMMUNITY_ID, VIBE_CODE_RESIDENCY_COMMUNITY_ID } from "@/lib/vibey";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 
