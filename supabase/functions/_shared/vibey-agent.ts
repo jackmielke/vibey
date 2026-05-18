@@ -485,7 +485,11 @@ async function updateMemory(
 
 // ── Web tools ────────────────────────────────────────────────────────────────
 
-async function webSearch(args: { query: string; count?: number }): Promise<string> {
+// SHELVED 2026-05-18: Brave Search was the previous web_search backend.
+// Kept in-code for fallback/reference. `web_search` now routes to Firecrawl
+// via `webSearchFirecrawl` below. To re-enable Brave, swap the call site in
+// `runToolCall` and update the tool description.
+async function webSearchBrave(args: { query: string; count?: number }): Promise<string> {
   const query = (args?.query ?? "").trim();
   if (!query) return JSON.stringify({ ok: false, error: "query is required" });
   const count = Math.max(1, Math.min(10, Number(args?.count) || 5));
@@ -512,6 +516,53 @@ async function webSearch(args: { query: string; count?: number }): Promise<strin
       url: r.url,
       description: r.description,
       age: r.age,
+    }));
+    return JSON.stringify({ ok: true, query, results });
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+}
+
+// ACTIVE web_search backend: Firecrawl v2 /search.
+// Returns title/url/description in the same shape as the old Brave wrapper so
+// the agent loop and `describeToolDone` keep working unchanged.
+async function webSearchFirecrawl(args: { query: string; count?: number }): Promise<string> {
+  const query = (args?.query ?? "").trim();
+  if (!query) return JSON.stringify({ ok: false, error: "query is required" });
+  const count = Math.max(1, Math.min(10, Number(args?.count) || 5));
+
+  const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!apiKey) return JSON.stringify({ ok: false, error: "FIRECRAWL_API_KEY not configured" });
+
+  try {
+    const resp = await fetch("https://api.firecrawl.dev/v2/search", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query, limit: count }),
+    });
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => "");
+      return JSON.stringify({ ok: false, error: `Firecrawl ${resp.status}: ${txt.slice(0, 200)}` });
+    }
+    const json = await resp.json();
+    // v2 returns { success, data: { web: [{ url, title, description }, ...] } }
+    // Older shapes may put results directly under `data`. Handle both.
+    // deno-lint-ignore no-explicit-any
+    const raw: any[] = Array.isArray(json?.data?.web)
+      ? json.data.web
+      : Array.isArray(json?.data)
+        ? json.data
+        : Array.isArray(json?.web)
+          ? json.web
+          : [];
+    // deno-lint-ignore no-explicit-any
+    const results = raw.slice(0, count).map((r: any) => ({
+      title: r.title ?? r.metadata?.title ?? "",
+      url: r.url ?? r.metadata?.sourceURL ?? "",
+      description: r.description ?? r.snippet ?? r.metadata?.description ?? "",
     }));
     return JSON.stringify({ ok: true, query, results });
   } catch (e) {
