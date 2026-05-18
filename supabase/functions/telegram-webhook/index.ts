@@ -419,7 +419,32 @@ async function processAttachments(
     if (!file) {
       return { images, extraText, userError: "couldn't download that photo — mind resending?" };
     }
-    images.push({ url: `data:${file.mime};base64,${bytesToBase64(file.bytes)}` });
+    const normalized = normalizeImageMime(file.mime, file.bytes) ?? "image/jpeg";
+    images.push({ url: `data:${normalized};base64,${bytesToBase64(file.bytes)}` });
+  }
+
+  // Stickers — animated/video stickers we can't read; static webp stickers we can.
+  if (msg.sticker) {
+    const s = msg.sticker;
+    const file = await downloadTelegramFile(botToken, s.file_id, "image/webp");
+    if (file) {
+      const normalized = normalizeImageMime(file.mime, file.bytes);
+      if (normalized) {
+        images.push({ url: `data:${normalized};base64,${bytesToBase64(file.bytes)}` });
+      } else {
+        return { images, extraText, userError: "cute sticker, but i can only read static image stickers right now." };
+      }
+    }
+  }
+
+  // Videos / video notes / GIFs — vision models in this stack don't accept video.
+  if (msg.video || msg.video_note || msg.animation) {
+    return {
+      images,
+      extraText,
+      userError:
+        "i can't watch videos yet — only images and PDFs for now. if you grab a screenshot from it i can take a look ✌️",
+    };
   }
 
   if (msg.document) {
@@ -427,13 +452,30 @@ async function processAttachments(
     const mime = (doc.mime_type || "").toLowerCase();
     const name = doc.file_name || "file";
 
+    if (mime.startsWith("video/")) {
+      return {
+        images,
+        extraText,
+        userError:
+          "i can't watch videos yet — only images and PDFs for now. if you grab a screenshot from it i can take a look ✌️",
+      };
+    }
+
     if (mime.startsWith("image/")) {
       if ((doc.file_size ?? 0) > MAX_IMAGE_BYTES) {
         return { images, extraText, userError: `"${name}" is too big — try under ~10MB.` };
       }
       const file = await downloadTelegramFile(botToken, doc.file_id, mime);
       if (!file) return { images, extraText, userError: `couldn't download "${name}".` };
-      images.push({ url: `data:${file.mime};base64,${bytesToBase64(file.bytes)}` });
+      const normalized = normalizeImageMime(file.mime || mime, file.bytes);
+      if (!normalized) {
+        return {
+          images,
+          extraText,
+          userError: `"${name}" is an image format i can't read (need jpeg, png, gif, or webp).`,
+        };
+      }
+      images.push({ url: `data:${normalized};base64,${bytesToBase64(file.bytes)}` });
     } else if (mime === "application/pdf" || name.toLowerCase().endsWith(".pdf")) {
       if ((doc.file_size ?? 0) > MAX_PDF_BYTES) {
         return { images, extraText, userError: `"${name}" is over 20MB — too chunky for me to read.` };
