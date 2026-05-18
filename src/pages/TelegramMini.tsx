@@ -1094,11 +1094,6 @@ export default function TelegramMini() {
           </section>
         )}
 
-        {/* ===== PROFILES TAB ===== */}
-        {tab === "profiles" && (
-          <></>
-        )}
-
         {/* ===== PREFERENCES (YOU) TAB ===== */}
         {tab === "preferences" && (
           <section className="space-y-3">
@@ -1130,10 +1125,9 @@ export default function TelegramMini() {
           </section>
         )}
 
+        {/* ===== PROFILES TAB ===== */}
         {tab === "profiles" && (
-          <></>
-        )}
-
+          <>
             {/* Directory */}
             <section className="space-y-2">
               <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
