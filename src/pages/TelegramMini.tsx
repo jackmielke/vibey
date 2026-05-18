@@ -523,6 +523,17 @@ export default function TelegramMini() {
   };
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
+  const [directoryQuery, setDirectoryQuery] = useState("");
+
+  const filteredDirectory = useMemo(() => {
+    const q = directoryQuery.trim().toLowerCase();
+    if (!q) return directory;
+    return directory.filter((u) =>
+      [u.name, u.telegram_username, u.headline, u.bio]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q)),
+    );
+  }, [directory, directoryQuery]);
 
   // 1. Telegram WebApp + auth (with preview/mock fallback)
   useEffect(() => {
@@ -1132,17 +1143,25 @@ export default function TelegramMini() {
             <section className="space-y-2">
               <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
                 <UsersIcon className="w-3 h-3" />
-                community · {directory.length}
+                community · {directoryQuery ? `${filteredDirectory.length} / ${directory.length}` : directory.length}
               </h2>
+              <input
+                value={directoryQuery}
+                onChange={(e) => setDirectoryQuery(e.target.value)}
+                placeholder="search name, @handle, headline…"
+                className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
+              />
               {directoryLoading ? (
                 <div className="flex items-center py-6">
                   <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 </div>
               ) : directory.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-2">no profiles loaded.</p>
+              ) : filteredDirectory.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2">no matches.</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
-                  {directory.map((u) => {
+                  {filteredDirectory.map((u) => {
                     const avatar =
                       u.avatar_url ??
                       u.profile_picture_url ??
