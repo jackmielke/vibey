@@ -22,7 +22,7 @@ import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemor
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
-import { VIBEY_COMMUNITY_ID } from "@/lib/vibey";
+import { VIBEY_COMMUNITY_ID, VIBE_CODE_RESIDENCY_COMMUNITY_ID } from "@/lib/vibey";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 
@@ -506,12 +506,13 @@ export default function TelegramMini() {
   const [adminLoading, setAdminLoading] = useState(false);
 
   // Tabs
-  type Tab = "memories" | "profiles" | "events" | "soul";
+  type Tab = "memories" | "profiles" | "preferences" | "events" | "soul";
   const [tab, setTab] = useState<Tab>("memories");
 
   // Profiles directory
   type DirectoryEntry = {
     id: string;
+    auth_user_id: string | null;
     name: string | null;
     avatar_url: string | null;
     profile_picture_url: string | null;
@@ -694,7 +695,7 @@ export default function TelegramMini() {
       cancelled = true;
     };
   }, [authState, tgUserId]);
-  // Profiles directory (community members joined with users)
+  // Profiles directory (community members joined with users) — Vibe Code Residency
   useEffect(() => {
     if (authState !== "ready") return;
     let cancelled = false;
@@ -703,19 +704,36 @@ export default function TelegramMini() {
       const { data, error } = await supabase
         .from("community_members")
         .select(
-          "user_id, users:users!community_members_user_id_fkey(id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, headline, bio)",
+          "user_id, users:users!community_members_user_id_fkey(id, auth_user_id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, headline, bio)",
         )
-        .eq("community_id", VIBEY_COMMUNITY_ID)
+        .eq("community_id", VIBE_CODE_RESIDENCY_COMMUNITY_ID)
         .order("joined_at", { ascending: true })
-        .limit(500);
+        .limit(1000);
       if (cancelled) return;
       if (error) {
         console.error("load directory failed", error.message);
         setDirectory([]);
       } else {
-        const entries = (data ?? [])
+        const raw = (data ?? [])
           .map((row: { users: DirectoryEntry | null }) => row.users)
           .filter((u): u is DirectoryEntry => !!u);
+
+        // Dedupe by auth_user_id (when present) else by id. Prefer the row with the
+        // most complete profile (avatar, headline, telegram_username).
+        const score = (u: DirectoryEntry) =>
+          (u.avatar_url || u.profile_picture_url || u.telegram_photo_url ? 4 : 0) +
+          (u.telegram_username ? 2 : 0) +
+          (u.headline ? 1 : 0) +
+          (u.bio ? 1 : 0);
+        const byKey = new Map<string, DirectoryEntry>();
+        for (const u of raw) {
+          const key = u.auth_user_id ?? u.id;
+          const existing = byKey.get(key);
+          if (!existing || score(u) > score(existing)) byKey.set(key, u);
+        }
+        const entries = Array.from(byKey.values()).sort((a, b) =>
+          (a.name ?? "~").localeCompare(b.name ?? "~"),
+        );
         setDirectory(entries);
       }
       setDirectoryLoading(false);
@@ -884,6 +902,7 @@ export default function TelegramMini() {
   const TABS: { id: Tab; label: string; icon: typeof Brain }[] = [
     { id: "memories", label: "memories", icon: Brain },
     { id: "profiles", label: "profiles", icon: UsersIcon },
+    { id: "preferences", label: "you", icon: Heart },
     { id: "events", label: "events", icon: Calendar },
     { id: "soul", label: "soul", icon: Sparkles },
   ];
@@ -1075,38 +1094,40 @@ export default function TelegramMini() {
           </section>
         )}
 
+        {/* ===== PREFERENCES (YOU) TAB ===== */}
+        {tab === "preferences" && (
+          <section className="space-y-3">
+            <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
+              <Heart className="w-3 h-3" />
+              your preferences
+            </h2>
+            <p className="text-[11px] text-muted-foreground px-0.5 leading-relaxed">
+              tell vibey how you want to be talked to. tone, length, nicknames, vibe.
+            </p>
+            {prefsLoading || !tgUserId ? (
+              <div className="flex items-center py-4">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              PREFERENCE_COMMUNITIES.map((c) => (
+                <PreferenceEditor
+                  key={c.community_id}
+                  community_id={c.community_id}
+                  agent_id={c.agent_id}
+                  label={c.label}
+                  existing={prefs.find((p) => p.community_id === c.community_id) ?? null}
+                  saving={savingId === c.community_id}
+                  saved={savedId === c.community_id}
+                  onSave={(notes) => savePreference(c.community_id, c.agent_id, notes)}
+                />
+              ))
+            )}
+          </section>
+        )}
+
         {/* ===== PROFILES TAB ===== */}
         {tab === "profiles" && (
           <>
-            {/* Your preferences */}
-            <section className="space-y-3">
-              <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
-                <Heart className="w-3 h-3" />
-                your preferences
-              </h2>
-              <p className="text-[11px] text-muted-foreground px-0.5 leading-relaxed">
-                tell vibey how you want to be talked to. tone, length, nicknames, vibe.
-              </p>
-              {prefsLoading || !tgUserId ? (
-                <div className="flex items-center py-4">
-                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                PREFERENCE_COMMUNITIES.map((c) => (
-                  <PreferenceEditor
-                    key={c.community_id}
-                    community_id={c.community_id}
-                    agent_id={c.agent_id}
-                    label={c.label}
-                    existing={prefs.find((p) => p.community_id === c.community_id) ?? null}
-                    saving={savingId === c.community_id}
-                    saved={savedId === c.community_id}
-                    onSave={(notes) => savePreference(c.community_id, c.agent_id, notes)}
-                  />
-                ))
-              )}
-            </section>
-
             {/* Directory */}
             <section className="space-y-2">
               <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
