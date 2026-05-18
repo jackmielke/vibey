@@ -594,6 +594,90 @@ function ProfileDetailModal({
   );
 }
 
+type MeButtonProfile = {
+  id: string;
+  name: string | null;
+  avatar_url: string | null;
+  telegram_photo_url: string | null;
+  telegram_username: string | null;
+  headline: string | null;
+  bio: string | null;
+  email: string | null;
+};
+
+function MeButton({ profile, fallbackName }: { profile: MeButtonProfile | null; fallbackName: string | null }) {
+  const name = profile?.name ?? fallbackName ?? "You";
+  const handle = profile?.telegram_username ?? null;
+  const photo = profile?.avatar_url ?? profile?.telegram_photo_url ?? undefined;
+  const initials = (name || "?")
+    .split(/\s+/)
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Your profile"
+          className="rounded-full ring-1 ring-primary/40 hover:ring-primary transition-shadow"
+        >
+          <Avatar className="w-8 h-8">
+            {photo && <AvatarImage src={photo} alt={name} />}
+            <AvatarFallback className="text-[10px] font-mono">{initials}</AvatarFallback>
+          </Avatar>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-3 space-y-2">
+        <div className="flex items-center gap-3">
+          <Avatar className="w-12 h-12 ring-1 ring-border">
+            {photo && <AvatarImage src={photo} alt={name} />}
+            <AvatarFallback className="text-xs font-mono">{initials}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold truncate">{name}</p>
+            {handle && (
+              <p className="text-[10px] font-mono text-muted-foreground truncate">@{handle}</p>
+            )}
+          </div>
+        </div>
+        {profile?.headline && (
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
+              headline
+            </p>
+            <p className="text-xs">{profile.headline}</p>
+          </div>
+        )}
+        {profile?.bio && (
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
+              bio
+            </p>
+            <p className="text-xs whitespace-pre-wrap">{profile.bio}</p>
+          </div>
+        )}
+        {profile?.email && (
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
+              email
+            </p>
+            <p className="text-xs font-mono break-all">{profile.email}</p>
+          </div>
+        )}
+        {!profile && (
+          <p className="text-xs text-muted-foreground">
+            Signed in as {fallbackName ?? "you"}. No profile row yet.
+          </p>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function TelegramMini() {
   const { agent } = useVibeyAgent();
   const [authState, setAuthState] = useState<AuthState>("loading");
