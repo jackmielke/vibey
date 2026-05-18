@@ -104,22 +104,6 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={isActive("/dashboard")}>
-                  <NavLink to="/dashboard" onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
-                    <dashboardItem.icon className="h-4 w-4" />
-                    {!collapsed && <span>{dashboardItem.title}</span>}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={isActive("/sections")}>
-                  <NavLink to="/sections" onClick={handleNav} className={({ isActive }) => linkClass(isActive)}>
-                    <sectionsItem.icon className="h-4 w-4" />
-                    {!collapsed && <span>{sectionsItem.title}</span>}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
