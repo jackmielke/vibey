@@ -395,6 +395,7 @@ function MemoryEditModal({
   onClose: () => void;
   onSaved: (m: MemoryRow) => void;
 }) {
+  const [title, setTitle] = useState(memory.title ?? "");
   const [content, setContent] = useState(memory.content ?? "");
   const [tags, setTags] = useState((memory.tags ?? []).join(", "));
   const [saving, setSaving] = useState(false);
@@ -408,9 +409,9 @@ function MemoryEditModal({
         .filter(Boolean);
       const { data, error } = await supabase
         .from("memories")
-        .update({ content, tags: tagArr })
+        .update({ title: title.trim() || null, content, tags: tagArr })
         .eq("id", memory.id)
-        .select("id, content, tags, created_at, metadata")
+        .select("id, title, content, tags, created_at, metadata")
         .single();
       if (error) throw error;
       toast.success("Memory saved");
@@ -434,6 +435,12 @@ function MemoryEditModal({
             <X className="w-4 h-4" />
           </button>
         </div>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="title (optional)"
+          className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
+        />
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
