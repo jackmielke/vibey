@@ -15,6 +15,8 @@ import {
   MessageSquare,
   Plus,
   X,
+  Calendar,
+  Users as UsersIcon,
 } from "lucide-react";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { formatDistanceToNow } from "date-fns";
@@ -502,6 +504,24 @@ export default function TelegramMini() {
   const [allPrefs, setAllPrefs] = useState<PreferenceRow[]>([]);
   const [chatLogs, setChatLogs] = useState<ChatLogRow[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
+
+  // Tabs
+  type Tab = "memories" | "profiles" | "events" | "soul";
+  const [tab, setTab] = useState<Tab>("memories");
+
+  // Profiles directory
+  type DirectoryEntry = {
+    id: string;
+    name: string | null;
+    avatar_url: string | null;
+    profile_picture_url: string | null;
+    telegram_photo_url: string | null;
+    telegram_username: string | null;
+    headline: string | null;
+    bio: string | null;
+  };
+  const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
+  const [directoryLoading, setDirectoryLoading] = useState(true);
 
   // 1. Telegram WebApp + auth (with preview/mock fallback)
   useEffect(() => {
