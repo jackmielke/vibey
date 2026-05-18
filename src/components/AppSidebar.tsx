@@ -39,8 +39,6 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarUserProfile } from "@/components/SidebarUserProfile";
 
 const chatItem = { title: "Talk to Vibey", url: "/", icon: MessageCircle };
-const dashboardItem = { title: "Mission Control", url: "/dashboard", icon: Gauge };
-const sectionsItem = { title: "Sections", url: "/sections", icon: LayoutDashboard };
 
 const navItems = [
   { title: "Soul", url: "/soul", icon: Sparkles },
