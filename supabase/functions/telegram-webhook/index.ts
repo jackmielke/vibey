@@ -151,6 +151,76 @@ async function tg(token: string, method: string, body: unknown) {
   return res;
 }
 
+// Create a live-updating status message in Telegram. Steps are appended as
+// they happen via `update(step)`; `finalize(summary)` replaces it with a
+// compact one-line collapsed summary (or deletes it if `summary` is empty).
+function createStatusMessage(token: string, chatId: number, reply_to_message_id?: number) {
+  let messageId: number | null = null;
+  const steps: string[] = [];
+  let initPromise: Promise<void> | null = null;
+  let lastEdit: Promise<void> = Promise.resolve();
+
+  const init = async () => {
+    const res = await tg(token, "sendMessage", {
+      chat_id: chatId,
+      text: "✨ thinking…",
+      reply_to_message_id,
+      disable_notification: true,
+    });
+    try {
+      const json = await res.clone().json();
+      messageId = json?.result?.message_id ?? null;
+    } catch { /* ignore */ }
+  };
+
+  const render = () => {
+    if (steps.length === 0) return "✨ thinking…";
+    // Keep last ~12 steps so the message doesn't blow past 4096 chars.
+    const shown = steps.slice(-12);
+    return `✨ thinking…\n${shown.join("\n")}`;
+  };
+
+  const flush = () => {
+    lastEdit = lastEdit.then(async () => {
+      if (!messageId) return;
+      await tg(token, "editMessageText", {
+        chat_id: chatId,
+        message_id: messageId,
+        text: render(),
+        disable_web_page_preview: true,
+      }).catch(() => { /* ignore rate-limit / not-modified */ });
+    });
+  };
+
+  return {
+    start: () => {
+      if (!initPromise) initPromise = init();
+      return initPromise;
+    },
+    push: (line: string) => {
+      steps.push(line);
+      flush();
+    },
+    finalize: async (summary: string) => {
+      await initPromise;
+      await lastEdit;
+      if (!messageId) return;
+      if (!summary) {
+        await tg(token, "deleteMessage", { chat_id: chatId, message_id: messageId })
+          .catch(() => { /* ignore */ });
+        return;
+      }
+      await tg(token, "editMessageText", {
+        chat_id: chatId,
+        message_id: messageId,
+        text: summary,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      }).catch(() => { /* ignore */ });
+    },
+  };
+}
+
 // ── Voice transcription via OpenAI Whisper ────────────────────────────────────
 
 async function transcribeVoice(
@@ -685,6 +755,10 @@ Deno.serve(async (req) => {
     const isAdmin = isAdminTelegramUser(userId);
     const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId, isAdmin)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
+    const status = createStatusMessage(TELEGRAM_BOT_TOKEN, chatId, msg.message_id);
+    let toolCount = 0;
+    const counts: Record<string, number> = {};
+
     const reply = await runAgentLoop({
       supabase,
       apiKey: OPENROUTER_API_KEY,
@@ -706,7 +780,26 @@ Deno.serve(async (req) => {
       isAdmin,
       referer: "https://t.me/vibey_ai_bot",
       title: "Vibey (Telegram)",
+      onProgress: async (evt) => {
+        await status.start();
+        if (evt.status === "start") {
+          toolCount++;
+          counts[evt.name] = (counts[evt.name] ?? 0) + 1;
+          status.push(evt.label);
+        } else {
+          status.push(`  ↳ ${evt.label}`);
+        }
+      },
     });
+
+    const summary = toolCount > 0
+      ? `<i>used ${toolCount} step${toolCount === 1 ? "" : "s"}: ${
+          Object.entries(counts)
+            .map(([n, c]) => `${c}× ${n.replace(/_/g, " ")}`)
+            .join(" · ")
+        }</i>`
+      : "";
+    await status.finalize(summary);
 
     if (!reply) {
       await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
@@ -786,6 +879,10 @@ Deno.serve(async (req) => {
   const isAdminDm = isAdminTelegramUser(userId);
   const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId, isAdminDm)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
+  const dmStatus = createStatusMessage(TELEGRAM_BOT_TOKEN, chatId);
+  let dmToolCount = 0;
+  const dmCounts: Record<string, number> = {};
+
   const reply = await runAgentLoop({
     supabase,
     apiKey: OPENROUTER_API_KEY,
@@ -806,7 +903,26 @@ Deno.serve(async (req) => {
     isAdmin: isAdminDm,
     referer: "https://t.me/vibey_ai_bot",
     title: "Vibey (Telegram)",
+    onProgress: async (evt) => {
+      await dmStatus.start();
+      if (evt.status === "start") {
+        dmToolCount++;
+        dmCounts[evt.name] = (dmCounts[evt.name] ?? 0) + 1;
+        dmStatus.push(evt.label);
+      } else {
+        dmStatus.push(`  ↳ ${evt.label}`);
+      }
+    },
   });
+
+  const dmSummary = dmToolCount > 0
+    ? `<i>used ${dmToolCount} step${dmToolCount === 1 ? "" : "s"}: ${
+        Object.entries(dmCounts)
+          .map(([n, c]) => `${c}× ${n.replace(/_/g, " ")}`)
+          .join(" · ")
+      }</i>`
+    : "";
+  await dmStatus.finalize(dmSummary);
 
   if (!reply) {
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {

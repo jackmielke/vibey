@@ -989,8 +989,10 @@ You have access to these tools:
 
 You can call any tool zero, one, or multiple times before replying. After all tool
 calls finish, give the user your normal natural-language reply — don't mention tools
-by name unless they ask. When citing web info, mention the source naturally
-("According to nytimes.com…").
+by name unless they ask. When citing web info, ALWAYS include clickable markdown
+links like [Edge Esmeralda](https://edgeesmeralda.com) — never bare domain names
+("according to nytimes.com") and never bare URLs. Every external source you mention
+should be a [label](url) link so the user can tap through.
 ${callerLine}
 
 ## Recent community memories (top ${memories.length})
@@ -1182,6 +1184,11 @@ export async function runAgentLoop(opts: {
   isAdmin?: boolean;
   referer?: string;
   title?: string;
+  onProgress?: (
+    event:
+      | { status: "start"; name: string; args: Record<string, unknown>; label: string }
+      | { status: "done"; name: string; args: Record<string, unknown>; label: string; details?: string }
+  ) => void | Promise<void>;
 }): Promise<string> {
   const {
     supabase,
@@ -1198,6 +1205,7 @@ export async function runAgentLoop(opts: {
     isAdmin = false,
     referer = "https://community-vibes-ai.lovable.app",
     title = "Vibey",
+    onProgress,
   } = opts;
 
   const userContent: string | UserContentPart[] = images.length > 0
@@ -1260,7 +1268,31 @@ export async function runAgentLoop(opts: {
     });
 
     for (const call of toolCalls) {
+      let parsedArgs: Record<string, unknown> = {};
+      try { parsedArgs = JSON.parse(call.function.arguments || "{}"); } catch { /* ignore */ }
+      if (onProgress) {
+        try {
+          await onProgress({
+            status: "start",
+            name: call.function.name,
+            args: parsedArgs,
+            label: describeToolStart(call.function.name, parsedArgs),
+          });
+        } catch (e) { console.warn("onProgress start failed:", e); }
+      }
       const result = await executeToolCall(supabase, call, toolMetadata, callerVibeUserId, isAdmin);
+      if (onProgress) {
+        const done = describeToolDone(call.function.name, parsedArgs, result);
+        try {
+          await onProgress({
+            status: "done",
+            name: call.function.name,
+            args: parsedArgs,
+            label: done.label,
+            details: done.details,
+          });
+        } catch (e) { console.warn("onProgress done failed:", e); }
+      }
       messages.push({
         role: "tool",
         tool_call_id: call.id,
@@ -1303,7 +1335,7 @@ export async function runAgentLoop(opts: {
 
 // Playful, human-readable labels for tool calls. Kept here so both the
 // "starting" chip and the "done" chip stay consistent.
-function describeToolStart(name: string, args: Record<string, unknown>): string {
+export function describeToolStart(name: string, args: Record<string, unknown>): string {
   switch (name) {
     case "web_search": {
       const q = String(args?.query ?? "").trim();
@@ -1334,7 +1366,7 @@ function describeToolStart(name: string, args: Record<string, unknown>): string 
   }
 }
 
-function describeToolDone(
+export function describeToolDone(
   name: string,
   args: Record<string, unknown>,
   resultJson: string
