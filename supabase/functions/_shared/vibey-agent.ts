@@ -48,6 +48,7 @@ export type ChatMessage = {
 
 export type Memory = {
   id: string;
+  title: string | null;
   content: string | null;
   tags: string[] | null;
   created_at: string;
