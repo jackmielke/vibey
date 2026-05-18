@@ -486,6 +486,13 @@ export default function TelegramMini() {
   const [prefs, setPrefs] = useState<PreferenceRow[]>([]);
   const [prefsLoading, setPrefsLoading] = useState(true);
   const [memFilter, setMemFilter] = useState<"all" | "mine" | "others">("all");
+  const [isMember, setIsMember] = useState(false);
+
+  // Memory composer (member-only)
+  const [memComposerOpen, setMemComposerOpen] = useState(false);
+  const [newMemTitle, setNewMemTitle] = useState("");
+  const [newMemContent, setNewMemContent] = useState("");
+  const [savingMem, setSavingMem] = useState(false);
 
   // Admin
   const [isAdmin, setIsAdmin] = useState(false);
