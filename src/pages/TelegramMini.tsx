@@ -1447,6 +1447,13 @@ export default function TelegramMini() {
           onSaved={(m) => setMemories((prev) => prev.map((x) => (x.id === m.id ? m : x)))}
         />
       )}
+
+      {selectedProfile && (
+        <ProfileDetailModal
+          profile={selectedProfile}
+          onClose={() => setSelectedProfile(null)}
+        />
+      )}
     </div>
   );
 }
