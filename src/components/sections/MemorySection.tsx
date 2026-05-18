@@ -165,6 +165,7 @@ export function MemorySection() {
     const tags = newTags.split(",").map((t) => t.trim()).filter(Boolean);
     const { error } = await supabase.from("memories").insert({
       community_id: VIBEY_COMMUNITY_ID,
+      title: newTitle.trim() || null,
       content: newContent.trim(),
       tags: tags.length ? tags : null,
       metadata: { source: "admin_panel" },
@@ -174,6 +175,7 @@ export function MemorySection() {
       toast.error("Couldn't save memory", { description: error.message });
       return;
     }
+    setNewTitle("");
     setNewContent("");
     setNewTags("");
     setComposerOpen(false);
@@ -183,12 +185,14 @@ export function MemorySection() {
 
   function startEdit(m: MemoryRow) {
     setEditingId(m.id);
+    setEditTitle(m.title ?? "");
     setEditContent(m.content ?? "");
     setEditTags((m.tags ?? []).join(", "));
   }
 
   function cancelEdit() {
     setEditingId(null);
+    setEditTitle("");
     setEditContent("");
     setEditTags("");
   }
@@ -197,9 +201,11 @@ export function MemorySection() {
     if (!editingId || !editContent.trim()) return;
     setEditSaving(true);
     const tags = editTags.split(",").map((t) => t.trim()).filter(Boolean);
+    const nextTitle = editTitle.trim() || null;
     const { error } = await supabase
       .from("memories")
       .update({
+        title: nextTitle,
         content: editContent.trim(),
         tags: tags.length ? tags : null,
       })
@@ -212,7 +218,7 @@ export function MemorySection() {
     setMemories((prev) =>
       prev.map((m) =>
         m.id === editingId
-          ? { ...m, content: editContent.trim(), tags: tags.length ? tags : null }
+          ? { ...m, title: nextTitle, content: editContent.trim(), tags: tags.length ? tags : null }
           : m,
       ),
     );
