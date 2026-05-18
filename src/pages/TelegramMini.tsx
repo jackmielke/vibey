@@ -15,6 +15,8 @@ import {
   MessageSquare,
   Plus,
   X,
+  Calendar,
+  Users as UsersIcon,
 } from "lucide-react";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { formatDistanceToNow } from "date-fns";
@@ -503,6 +505,24 @@ export default function TelegramMini() {
   const [chatLogs, setChatLogs] = useState<ChatLogRow[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
 
+  // Tabs
+  type Tab = "memories" | "profiles" | "events" | "soul";
+  const [tab, setTab] = useState<Tab>("memories");
+
+  // Profiles directory
+  type DirectoryEntry = {
+    id: string;
+    name: string | null;
+    avatar_url: string | null;
+    profile_picture_url: string | null;
+    telegram_photo_url: string | null;
+    telegram_username: string | null;
+    headline: string | null;
+    bio: string | null;
+  };
+  const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
+  const [directoryLoading, setDirectoryLoading] = useState(true);
+
   // 1. Telegram WebApp + auth (with preview/mock fallback)
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -674,6 +694,37 @@ export default function TelegramMini() {
       cancelled = true;
     };
   }, [authState, tgUserId]);
+  // Profiles directory (community members joined with users)
+  useEffect(() => {
+    if (authState !== "ready") return;
+    let cancelled = false;
+    (async () => {
+      setDirectoryLoading(true);
+      const { data, error } = await supabase
+        .from("community_members")
+        .select(
+          "user_id, users:users!community_members_user_id_fkey(id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, headline, bio)",
+        )
+        .eq("community_id", VIBEY_COMMUNITY_ID)
+        .order("joined_at", { ascending: true })
+        .limit(500);
+      if (cancelled) return;
+      if (error) {
+        console.error("load directory failed", error.message);
+        setDirectory([]);
+      } else {
+        const entries = (data ?? [])
+          .map((row: { users: DirectoryEntry | null }) => row.users)
+          .filter((u): u is DirectoryEntry => !!u);
+        setDirectory(entries);
+      }
+      setDirectoryLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authState]);
+
 
   // 4. Admin data — load all prefs + chat logs when admin mode is on
   useEffect(() => {
@@ -830,6 +881,13 @@ export default function TelegramMini() {
     );
   }
 
+  const TABS: { id: Tab; label: string; icon: typeof Brain }[] = [
+    { id: "memories", label: "memories", icon: Brain },
+    { id: "profiles", label: "profiles", icon: UsersIcon },
+    { id: "events", label: "events", icon: Calendar },
+    { id: "soul", label: "soul", icon: Sparkles },
+  ];
+
   return (
     <div className="h-screen flex flex-col bg-background text-foreground">
       {/* Header */}
@@ -845,52 +903,189 @@ export default function TelegramMini() {
             {memLoading ? "loading…" : `${memories.length} memories${tgName ? ` · hi, ${tgName}` : ""}`}
           </p>
         </div>
+        {isAdmin && (
+          <button
+            onClick={() => setAdminMode((v) => !v)}
+            aria-label={adminMode ? "Exit admin mode" : "Enter admin mode"}
+            className={
+              "flex items-center gap-1 px-2 py-1 rounded font-mono text-[10px] uppercase tracking-widest border transition-colors " +
+              (adminMode
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-transparent text-muted-foreground border-border hover:text-primary hover:border-primary/40")
+            }
+          >
+            <Shield className="w-3 h-3" />
+            admin
+          </button>
+        )}
         <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
       </div>
 
-      {/* Admin toggle */}
-      {isAdmin && (
-        <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-border bg-card/40">
-          <div className="flex items-center gap-1.5 text-primary">
-            <Shield className="w-3 h-3" />
-            <span className="font-mono text-[10px] uppercase tracking-widest">admin</span>
-          </div>
-          <div className="flex items-center gap-1 bg-muted rounded p-0.5">
+      {/* Tabs */}
+      <div className="flex items-center gap-1 px-2 py-2 border-b border-border bg-card/40 overflow-x-auto">
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          const Icon = t.icon;
+          return (
             <button
-              onClick={() => setAdminMode(false)}
+              key={t.id}
+              onClick={() => setTab(t.id)}
               className={
-                "px-2.5 py-1 rounded font-mono text-[10px] uppercase tracking-widest transition-colors " +
-                (!adminMode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")
+                "flex items-center gap-1.5 px-3 py-1.5 rounded font-mono text-[10px] uppercase tracking-widest transition-colors whitespace-nowrap " +
+                (active
+                  ? "bg-primary/15 text-primary border border-primary/40"
+                  : "text-muted-foreground hover:text-foreground border border-transparent")
               }
             >
-              standard view
+              <Icon className="w-3 h-3" />
+              {t.label}
             </button>
-            <button
-              onClick={() => setAdminMode(true)}
-              className={
-                "px-2.5 py-1 rounded font-mono text-[10px] uppercase tracking-widest transition-colors " +
-                (adminMode ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground")
-              }
-            >
-              admin view
-            </button>
-          </div>
-        </div>
-      )}
+          );
+        })}
+      </div>
 
-      {/* Stream */}
+      {/* Body */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-5">
-        {!adminMode && (
+        {/* ===== MEMORIES TAB ===== */}
+        {tab === "memories" && (
+          <section className="space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <Brain className="w-3 h-3" />
+                community memory · {memories.length}
+              </h2>
+              {isMember && !adminMode && (
+                <button
+                  onClick={() => setMemComposerOpen((o) => !o)}
+                  className={
+                    "px-2 py-1 rounded font-mono text-[10px] uppercase tracking-widest border transition-colors flex items-center gap-1 " +
+                    (memComposerOpen
+                      ? "bg-muted text-muted-foreground border-border"
+                      : "bg-primary/15 text-primary border-primary/40 hover:bg-primary/20")
+                  }
+                >
+                  {memComposerOpen ? (
+                    <>
+                      <X className="w-3 h-3" /> cancel
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3 h-3" /> add
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {isMember && memComposerOpen && !adminMode && (
+              <div className="p-3 rounded-lg bg-card border border-border space-y-2">
+                <input
+                  value={newMemTitle}
+                  onChange={(e) => setNewMemTitle(e.target.value)}
+                  placeholder="title (optional, short headline)"
+                  className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
+                />
+                <textarea
+                  value={newMemContent}
+                  onChange={(e) => setNewMemContent(e.target.value)}
+                  rows={3}
+                  placeholder="what should vibey remember?"
+                  className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60 resize-none"
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-mono text-[10px] text-muted-foreground">
+                    saved as {tgName ?? "you"}
+                  </p>
+                  <button
+                    onClick={addMemory}
+                    disabled={savingMem || !newMemContent.trim()}
+                    className="text-[11px] font-mono uppercase tracking-widest px-3 py-1 rounded bg-primary text-primary-foreground disabled:opacity-40 flex items-center gap-1"
+                  >
+                    {savingMem && <Loader2 className="w-3 h-3 animate-spin" />}
+                    save
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {memLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : memories.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                  <Brain className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">no memories yet</p>
+              </div>
+            ) : adminMode ? (
+              <AnimatePresence initial={false}>
+                {memories.map((m) => (
+                  <MemoryCard
+                    key={m.id}
+                    m={m}
+                    adminMode
+                    onEdit={setEditingMemory}
+                    onDelete={deleteMemory}
+                  />
+                ))}
+              </AnimatePresence>
+            ) : (
+              <>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <Filter className="w-3 h-3 text-muted-foreground" />
+                  {(["all", "mine", "others"] as const).map((key) => {
+                    const count =
+                      key === "mine"
+                        ? memories.filter(isMine).length
+                        : key === "others"
+                          ? memories.filter((m) => !isMine(m)).length
+                          : memories.length;
+                    if (key === "mine" && tgUserId == null) return null;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setMemFilter(key)}
+                        className={
+                          "px-2 py-1 rounded font-mono text-[10px] uppercase tracking-widest transition-colors " +
+                          (memFilter === key
+                            ? "bg-primary/15 text-primary border border-primary/40"
+                            : "bg-muted text-muted-foreground border border-transparent hover:text-foreground")
+                        }
+                      >
+                        {key} · {count}
+                      </button>
+                    );
+                  })}
+                </div>
+                {filteredMemories.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-1 py-2">
+                    nothing here yet for this filter.
+                  </p>
+                ) : (
+                  <AnimatePresence initial={false}>
+                    {filteredMemories.map((m) => (
+                      <MemoryCard key={m.id} m={m} highlight={isMine(m)} />
+                    ))}
+                  </AnimatePresence>
+                )}
+              </>
+            )}
+          </section>
+        )}
+
+        {/* ===== PROFILES TAB ===== */}
+        {tab === "profiles" && (
           <>
-            {/* Personal preferences */}
+            {/* Your preferences */}
             <section className="space-y-3">
               <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
                 <Heart className="w-3 h-3" />
                 your preferences
               </h2>
               <p className="text-[11px] text-muted-foreground px-0.5 leading-relaxed">
-                tell vibey how you want to be talked to. this shapes every reply you'll get — tone,
-                length, nicknames, vibe.
+                tell vibey how you want to be talked to. tone, length, nicknames, vibe.
               </p>
               {prefsLoading || !tgUserId ? (
                 <div className="flex items-center py-4">
@@ -912,243 +1107,175 @@ export default function TelegramMini() {
               )}
             </section>
 
-            {/* Memories */}
+            {/* Directory */}
             <section className="space-y-2">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                  <Brain className="w-3 h-3" />
-                  community memory · {memories.length}
-                </h2>
-                {isMember && (
-                  <button
-                    onClick={() => setMemComposerOpen((o) => !o)}
-                    className={
-                      "px-2 py-1 rounded font-mono text-[10px] uppercase tracking-widest border transition-colors flex items-center gap-1 " +
-                      (memComposerOpen
-                        ? "bg-muted text-muted-foreground border-border"
-                        : "bg-primary/15 text-primary border-primary/40 hover:bg-primary/20")
-                    }
-                  >
-                    {memComposerOpen ? (
-                      <>
-                        <X className="w-3 h-3" /> cancel
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-3 h-3" /> add
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-
-              {isMember && memComposerOpen && (
-                <div className="p-3 rounded-lg bg-card border border-border space-y-2">
-                  <input
-                    value={newMemTitle}
-                    onChange={(e) => setNewMemTitle(e.target.value)}
-                    placeholder="title (optional, short headline)"
-                    className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
-                  />
-                  <textarea
-                    value={newMemContent}
-                    onChange={(e) => setNewMemContent(e.target.value)}
-                    rows={3}
-                    placeholder="what should vibey remember?"
-                    className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60 resize-none"
-                  />
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-mono text-[10px] text-muted-foreground">
-                      saved as {tgName ?? "you"}
-                    </p>
-                    <button
-                      onClick={addMemory}
-                      disabled={savingMem || !newMemContent.trim()}
-                      className="text-[11px] font-mono uppercase tracking-widest px-3 py-1 rounded bg-primary text-primary-foreground disabled:opacity-40 flex items-center gap-1"
-                    >
-                      {savingMem && <Loader2 className="w-3 h-3 animate-spin" />}
-                      save
-                    </button>
-                  </div>
+              <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <UsersIcon className="w-3 h-3" />
+                community · {directory.length}
+              </h2>
+              {directoryLoading ? (
+                <div className="flex items-center py-6">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 </div>
-              )}
-
-              {memLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : memories.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-                    <Brain className="w-6 h-6 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">no memories yet</p>
-                </div>
+              ) : directory.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2">no profiles loaded.</p>
               ) : (
-                <>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <Filter className="w-3 h-3 text-muted-foreground" />
-                    {(["all", "mine", "others"] as const).map((key) => {
-                      const count =
-                        key === "mine"
-                          ? memories.filter(isMine).length
-                          : key === "others"
-                            ? memories.filter((m) => !isMine(m)).length
-                            : memories.length;
-                      if (key === "mine" && tgUserId == null) return null;
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => setMemFilter(key)}
-                          className={
-                            "px-2 py-1 rounded font-mono text-[10px] uppercase tracking-widest transition-colors " +
-                            (memFilter === key
-                              ? "bg-primary/15 text-primary border border-primary/40"
-                              : "bg-muted text-muted-foreground border border-transparent hover:text-foreground")
-                          }
-                        >
-                          {key} · {count}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {filteredMemories.length === 0 ? (
-                    <p className="text-xs text-muted-foreground px-1 py-2">
-                      nothing here yet for this filter.
-                    </p>
-                  ) : (
-                    <AnimatePresence initial={false}>
-                      {filteredMemories.map((m) => (
-                        <MemoryCard key={m.id} m={m} highlight={isMine(m)} />
-                      ))}
-                    </AnimatePresence>
-                  )}
-                </>
+                <div className="grid grid-cols-2 gap-2">
+                  {directory.map((u) => {
+                    const avatar =
+                      u.avatar_url ??
+                      u.profile_picture_url ??
+                      u.telegram_photo_url ??
+                      null;
+                    const display = u.name ?? (u.telegram_username ? `@${u.telegram_username}` : "—");
+                    return (
+                      <div
+                        key={u.id}
+                        className="p-2.5 rounded-lg bg-card border border-border flex items-center gap-2 min-w-0"
+                      >
+                        <div className="w-9 h-9 rounded-full overflow-hidden bg-muted shrink-0 ring-1 ring-border">
+                          {avatar ? (
+                            <img src={avatar} alt={display} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-xs font-mono text-muted-foreground">
+                              {(display ?? "?").slice(0, 1).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate">{display}</p>
+                          {u.headline && (
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {u.headline}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </section>
 
+            {/* Admin: everyone's preferences + chat history */}
+            {adminMode && isAdmin && (
+              <>
+                <section className="space-y-2 pt-2">
+                  <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
+                    <Heart className="w-3 h-3" />
+                    everyone's preferences · {allPrefs.length}
+                  </h2>
+                  {adminLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  ) : allPrefs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">no preferences set yet.</p>
+                  ) : (
+                    allPrefs.map((p) => (
+                      <div key={p.id} className="p-3 rounded-lg bg-card border border-border">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <p className="text-xs font-semibold">
+                            {p.display_name ?? `tg ${p.telegram_user_id ?? "?"}`}
+                          </p>
+                          <span className="text-[10px] font-mono text-muted-foreground">
+                            {p.updated_at
+                              ? formatDistanceToNow(new Date(p.updated_at), { addSuffix: true })
+                              : ""}
+                          </span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap text-foreground/90">
+                          {p.relationship_notes ?? (
+                            <span className="text-muted-foreground italic">— empty —</span>
+                          )}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </section>
 
-            {/* Soul (read-only) */}
-            {agent?.system_prompt && (
-              <section className="space-y-2 pt-2">
-                <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3" />
-                  vibey's soul · system prompt
-                </h2>
-                <div className="p-3 rounded-lg bg-card border border-border">
-                  <pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed text-foreground/90">
-                    {agent.system_prompt}
-                  </pre>
-                  <p className="text-[10px] text-muted-foreground font-mono mt-3">
-                    read-only · this is the bones of who vibey is
-                  </p>
-                </div>
-              </section>
+                <section className="space-y-2 pt-2">
+                  <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
+                    <MessageSquare className="w-3 h-3" />
+                    recent conversations · {chatLogs.length}
+                  </h2>
+                  {adminLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  ) : chatLogs.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">no chat logs yet.</p>
+                  ) : (
+                    chatLogs.map((log) => (
+                      <div key={log.id} className="p-3 rounded-lg bg-card border border-border space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-mono text-muted-foreground">
+                            {log.telegram_username ? `@${log.telegram_username}` : `tg ${log.telegram_user_id ?? "?"}`}
+                          </span>
+                          <span className="text-[10px] font-mono text-muted-foreground">
+                            {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
+                        <div className="text-xs">
+                          <p className="text-muted-foreground font-mono text-[10px] uppercase mb-0.5">user</p>
+                          <p className="whitespace-pre-wrap">{log.user_message}</p>
+                        </div>
+                        <div className="text-xs">
+                          <p className="text-primary font-mono text-[10px] uppercase mb-0.5">vibey</p>
+                          <p className="whitespace-pre-wrap">{log.agent_response}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </section>
+              </>
             )}
           </>
         )}
 
-        {adminMode && isAdmin && (
-          <>
-            {/* Soul editor */}
-            {agent?.id && agent?.system_prompt != null && (
-              <section className="space-y-2">
-                <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3" />
-                  edit soul · system prompt
-                </h2>
-                <SoulEditor agentId={agent.id} initial={agent.system_prompt} />
-              </section>
+        {/* ===== EVENTS TAB ===== */}
+        {tab === "events" && (
+          <section className="space-y-3">
+            <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+              <Calendar className="w-3 h-3" />
+              upcoming events
+            </h2>
+            <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">no events yet</p>
+              <p className="text-[11px] text-muted-foreground max-w-xs">
+                community gatherings, dinners, and pop-ups will show up here once vibey starts
+                tracking them.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {/* ===== SOUL TAB ===== */}
+        {tab === "soul" && (
+          <section className="space-y-2">
+            <h2
+              className={
+                "font-mono text-[10px] uppercase tracking-widest flex items-center gap-1.5 " +
+                (adminMode ? "text-primary" : "text-muted-foreground")
+              }
+            >
+              <Sparkles className="w-3 h-3" />
+              vibey's soul · system prompt
+            </h2>
+            {adminMode && isAdmin && agent?.id && agent?.system_prompt != null ? (
+              <SoulEditor agentId={agent.id} initial={agent.system_prompt} />
+            ) : agent?.system_prompt ? (
+              <div className="p-3 rounded-lg bg-card border border-border">
+                <pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed text-foreground/90">
+                  {agent.system_prompt}
+                </pre>
+                <p className="text-[10px] text-muted-foreground font-mono mt-3">
+                  read-only · this is the bones of who vibey is
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground py-4">no soul yet.</p>
             )}
-
-            {/* All memories with edit/delete */}
-            <section className="space-y-2">
-              <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
-                <Brain className="w-3 h-3" />
-                edit memories · {memories.length}
-              </h2>
-              {memLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-              ) : (
-                <AnimatePresence initial={false}>
-                  {memories.map((m) => (
-                    <MemoryCard
-                      key={m.id}
-                      m={m}
-                      adminMode
-                      onEdit={setEditingMemory}
-                      onDelete={deleteMemory}
-                    />
-                  ))}
-                </AnimatePresence>
-              )}
-            </section>
-
-            {/* All preferences */}
-            <section className="space-y-2">
-              <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
-                <Heart className="w-3 h-3" />
-                everyone's preferences · {allPrefs.length}
-              </h2>
-              {adminLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-              ) : allPrefs.length === 0 ? (
-                <p className="text-xs text-muted-foreground">no preferences set yet.</p>
-              ) : (
-                allPrefs.map((p) => (
-                  <div key={p.id} className="p-3 rounded-lg bg-card border border-border">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="text-xs font-semibold">
-                        {p.display_name ?? `tg ${p.telegram_user_id ?? "?"}`}
-                      </p>
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        {p.updated_at
-                          ? formatDistanceToNow(new Date(p.updated_at), { addSuffix: true })
-                          : ""}
-                      </span>
-                    </div>
-                    <p className="text-sm whitespace-pre-wrap text-foreground/90">
-                      {p.relationship_notes ?? <span className="text-muted-foreground italic">— empty —</span>}
-                    </p>
-                  </div>
-                ))
-              )}
-            </section>
-
-            {/* Chat history */}
-            <section className="space-y-2">
-              <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
-                <MessageSquare className="w-3 h-3" />
-                recent conversations · {chatLogs.length}
-              </h2>
-              {adminLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-              ) : chatLogs.length === 0 ? (
-                <p className="text-xs text-muted-foreground">no chat logs yet.</p>
-              ) : (
-                chatLogs.map((log) => (
-                  <div key={log.id} className="p-3 rounded-lg bg-card border border-border space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        {log.telegram_username ? `@${log.telegram_username}` : `tg ${log.telegram_user_id ?? "?"}`}
-                      </span>
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
-                    <div className="text-xs">
-                      <p className="text-muted-foreground font-mono text-[10px] uppercase mb-0.5">user</p>
-                      <p className="whitespace-pre-wrap">{log.user_message}</p>
-                    </div>
-                    <div className="text-xs">
-                      <p className="text-primary font-mono text-[10px] uppercase mb-0.5">vibey</p>
-                      <p className="whitespace-pre-wrap">{log.agent_response}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </section>
-          </>
+          </section>
         )}
       </div>
 
