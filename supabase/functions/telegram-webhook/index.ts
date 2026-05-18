@@ -723,7 +723,9 @@ Deno.serve(async (req) => {
   }
 
   // Process photo / document attachments (images, PDFs).
-  const hasAttachments = !!(msg.photo?.length || msg.document);
+  const hasAttachments = !!(
+    msg.photo?.length || msg.document || msg.video || msg.video_note || msg.animation || msg.sticker
+  );
   let attachmentImages: { url: string }[] = [];
   let attachmentExtraText: string[] = [];
   if (hasAttachments) {
