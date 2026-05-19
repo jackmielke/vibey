@@ -18,6 +18,14 @@ export default {
         mono: ["Space Mono", "monospace"],
       },
       colors: {
+        spec: {
+          bg: "#efefed",
+          surface: "#ffffff",
+          ink: "#0a0a0a",
+          muted: "#6b6b6b",
+          line: "rgba(0, 0, 0, 0.1)",
+          accent: "#ff3b00",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

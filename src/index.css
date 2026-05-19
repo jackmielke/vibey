@@ -126,4 +126,22 @@
   .h-safe-screen {
     height: 100svh;
   }
+
+  .micro-grid {
+    background-size: 24px 24px;
+    background-image:
+      linear-gradient(to right, rgba(0,0,0,0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0,0,0,0.04) 1px, transparent 1px);
+  }
 }
+
+@keyframes spec-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes spec-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-spec-marquee { animation: spec-marquee 40s linear infinite; }
+.animate-spec-rise { animation: spec-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
