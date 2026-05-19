@@ -112,8 +112,7 @@ export function ConversationsSection() {
           supabase
             .from("agent_chat_logs")
             .select(
-              "id, user_message, agent_response, created_at, session_key, telegram_chat_id, telegram_username"
-              + ", prompt_tokens, completion_tokens, total_tokens, cost_credits, openrouter_model"
+              "id, user_message, agent_response, created_at, session_key, telegram_chat_id, telegram_username, prompt_tokens, completion_tokens, total_tokens, cost_credits, openrouter_model"
             )
             .order("created_at", { ascending: false })
             .limit(PAGE_SIZE),
