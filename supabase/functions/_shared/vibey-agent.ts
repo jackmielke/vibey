@@ -1347,6 +1347,32 @@ async function executeToolCall(
       return await adminToggleSkill(supabase, parsed as { name: string; is_enabled: boolean });
     case "admin_toggle_tool":
       return await adminToggleTool(supabase, parsed as { name: string; is_enabled: boolean });
+    case "github_read_file":
+    case "github_list_dir":
+    case "github_search_code":
+    case "github_commit_file":
+    case "github_delete_file":
+    case "github_list_recent_commits": {
+      const actor = {
+        auth_id: (metadata?.actor_auth_id as string | null | undefined) ?? null,
+        name: (metadata?.actor_name as string | null | undefined) ?? null,
+      };
+      switch (call.function.name) {
+        case "github_read_file":
+          return await githubReadFile(supabase, parsed as { path: string; ref?: string }, actor);
+        case "github_list_dir":
+          return await githubListDir(supabase, parsed as { path?: string; ref?: string }, actor);
+        case "github_search_code":
+          return await githubSearchCode(supabase, parsed as { query: string }, actor);
+        case "github_commit_file":
+          return await githubCommitFile(supabase, parsed as { path: string; content: string; message: string; sha?: string }, actor);
+        case "github_delete_file":
+          return await githubDeleteFile(supabase, parsed as { path: string; sha: string; message: string }, actor);
+        case "github_list_recent_commits":
+          return await githubListRecentCommits(supabase, parsed as { limit?: number }, actor);
+      }
+      return JSON.stringify({ ok: false, error: "unreachable" });
+    }
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
