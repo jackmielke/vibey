@@ -103,3 +103,5 @@ From the blog post, here's the near-term roadmap:
 ---
 
 *built at the [Vibe Code Residency](https://vibecoderesidency.com)*
+
+**TEST LINE - Vibey can write to GitHub!**
