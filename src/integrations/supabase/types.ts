@@ -29,8 +29,8 @@ export type Database = {
           telegram_chat_id: number | null
           telegram_user_id: number | null
           telegram_username: string | null
-          total_tokens: number | null
           tokens_used: number | null
+          total_tokens: number | null
           usage_json: Json | null
           user_message: string
         }
@@ -48,8 +48,8 @@ export type Database = {
           telegram_chat_id?: number | null
           telegram_user_id?: number | null
           telegram_username?: string | null
-          total_tokens?: number | null
           tokens_used?: number | null
+          total_tokens?: number | null
           usage_json?: Json | null
           user_message: string
         }
@@ -67,8 +67,8 @@ export type Database = {
           telegram_chat_id?: number | null
           telegram_user_id?: number | null
           telegram_username?: string | null
-          total_tokens?: number | null
           tokens_used?: number | null
+          total_tokens?: number | null
           usage_json?: Json | null
           user_message?: string
         }
