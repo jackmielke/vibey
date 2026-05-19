@@ -300,26 +300,34 @@ export function ConversationsSection() {
                 </span>
               </div>
               <div className="flex flex-col items-start">
-                <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words bg-card border border-border">
-                  {m.agent_response}
-                </div>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className="text-[10px] text-muted-foreground font-mono">vibey</span>
-                  {(m.total_tokens || m.cost_credits) && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-mono rounded bg-muted px-1.5 py-0.5">
-                      <Zap className="w-2.5 h-2.5" />
-                      {formatTokens(m.total_tokens)} tok
-                      <span className="text-border">/</span>
-                      <Coins className="w-2.5 h-2.5" />
-                      {formatCredits(Number(m.cost_credits ?? 0))}
-                    </span>
-                  )}
-                  {m.openrouter_model && (
-                    <span className="text-[10px] text-muted-foreground font-mono rounded bg-muted px-1.5 py-0.5 truncate max-w-[220px]">
-                      {m.openrouter_model}
-                    </span>
-                  )}
-                </div>
+                {m.agent_response ? (
+                  <>
+                    <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words bg-card border border-border">
+                      {m.agent_response}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-[10px] text-muted-foreground font-mono">vibey</span>
+                      {(m.total_tokens || m.cost_credits) && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-mono rounded bg-muted px-1.5 py-0.5">
+                          <Zap className="w-2.5 h-2.5" />
+                          {formatTokens(m.total_tokens)} tok
+                          <span className="text-border">/</span>
+                          <Coins className="w-2.5 h-2.5" />
+                          {formatCredits(Number(m.cost_credits ?? 0))}
+                        </span>
+                      )}
+                      {m.openrouter_model && (
+                        <span className="text-[10px] text-muted-foreground font-mono rounded bg-muted px-1.5 py-0.5 truncate max-w-[220px]">
+                          {m.openrouter_model}
+                        </span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground/60 font-mono italic">
+                    vibey didn't reply · observed only
+                  </span>
+                )}
               </div>
             </div>
           ))}
