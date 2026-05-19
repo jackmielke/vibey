@@ -16,9 +16,11 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
+  addUsage,
   buildSkillsBlock,
   buildSystemPromptWithMemories,
   buildUserContextBlock,
+  createUsageAccumulator,
   isAdminTelegramUser,
   loadEnabledSkills,
   loadRecentMemories,
@@ -26,6 +28,7 @@ import {
   resolveVibeUserId,
   runAgentLoop,
   unifiedSessionKey,
+  usageSummary,
 } from "../_shared/vibey-agent.ts";
 
 const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
@@ -886,6 +889,7 @@ Deno.serve(async (req) => {
     const status = createStatusMessage(TELEGRAM_BOT_TOKEN, chatId, msg.message_id);
     let toolCount = 0;
     const counts: Record<string, number> = {};
+    const usage = createUsageAccumulator();
 
     const reply = await runAgentLoop({
       supabase,
@@ -908,6 +912,7 @@ Deno.serve(async (req) => {
       isAdmin,
       referer: "https://t.me/vibey_ai_bot",
       title: "Vibey (Telegram)",
+      onUsage: (u) => addUsage(usage, u),
       onProgress: async (evt) => {
         await status.start();
         if (evt.status === "start") {
@@ -959,11 +964,19 @@ Deno.serve(async (req) => {
     }
 
     // Log the exchange.
+    const usageData = usageSummary(usage);
     supabase.from("agent_chat_logs").insert({
       agent_id: VIBEY_AGENT_ID,
       community_id: VIBEY_COMMUNITY_ID,
       user_message: userText,
       agent_response: body,
+      tokens_used: usageData.total_tokens,
+      prompt_tokens: usageData.prompt_tokens,
+      completion_tokens: usageData.completion_tokens,
+      total_tokens: usageData.total_tokens,
+      cost_credits: usageData.cost_credits,
+      openrouter_model: agent.model,
+      usage_json: usageData.usage_json,
       session_key: sessionKey,
       telegram_chat_id: chatId,
       telegram_user_id: userId,
@@ -1010,6 +1023,7 @@ Deno.serve(async (req) => {
   const dmStatus = createStatusMessage(TELEGRAM_BOT_TOKEN, chatId);
   let dmToolCount = 0;
   const dmCounts: Record<string, number> = {};
+  const dmUsage = createUsageAccumulator();
 
   const reply = await runAgentLoop({
     supabase,
@@ -1031,6 +1045,7 @@ Deno.serve(async (req) => {
     isAdmin: isAdminDm,
     referer: "https://t.me/vibey_ai_bot",
     title: "Vibey (Telegram)",
+    onUsage: (u) => addUsage(dmUsage, u),
     onProgress: async (evt) => {
       await dmStatus.start();
       if (evt.status === "start") {
@@ -1075,11 +1090,19 @@ Deno.serve(async (req) => {
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", { chat_id: chatId, text: body });
   }
 
+  const dmUsageData = usageSummary(dmUsage);
   supabase.from("agent_chat_logs").insert({
     agent_id: VIBEY_AGENT_ID,
     community_id: VIBEY_COMMUNITY_ID,
     user_message: userText,
     agent_response: body,
+    tokens_used: dmUsageData.total_tokens,
+    prompt_tokens: dmUsageData.prompt_tokens,
+    completion_tokens: dmUsageData.completion_tokens,
+    total_tokens: dmUsageData.total_tokens,
+    cost_credits: dmUsageData.cost_credits,
+    openrouter_model: agent.model,
+    usage_json: dmUsageData.usage_json,
     session_key: sessionKey,
     telegram_chat_id: chatId,
     telegram_user_id: userId,

@@ -19,39 +19,57 @@ export type Database = {
           agent_id: string
           agent_response: string
           community_id: string
+          completion_tokens: number | null
+          cost_credits: number | null
           created_at: string | null
           id: string
+          openrouter_model: string | null
+          prompt_tokens: number | null
           session_key: string | null
           telegram_chat_id: number | null
           telegram_user_id: number | null
           telegram_username: string | null
+          total_tokens: number | null
           tokens_used: number | null
+          usage_json: Json | null
           user_message: string
         }
         Insert: {
           agent_id: string
           agent_response: string
           community_id: string
+          completion_tokens?: number | null
+          cost_credits?: number | null
           created_at?: string | null
           id?: string
+          openrouter_model?: string | null
+          prompt_tokens?: number | null
           session_key?: string | null
           telegram_chat_id?: number | null
           telegram_user_id?: number | null
           telegram_username?: string | null
+          total_tokens?: number | null
           tokens_used?: number | null
+          usage_json?: Json | null
           user_message: string
         }
         Update: {
           agent_id?: string
           agent_response?: string
           community_id?: string
+          completion_tokens?: number | null
+          cost_credits?: number | null
           created_at?: string | null
           id?: string
+          openrouter_model?: string | null
+          prompt_tokens?: number | null
           session_key?: string | null
           telegram_chat_id?: number | null
           telegram_user_id?: number | null
           telegram_username?: string | null
+          total_tokens?: number | null
           tokens_used?: number | null
+          usage_json?: Json | null
           user_message?: string
         }
         Relationships: [

@@ -19,6 +19,7 @@ import {
   Image as ImageIcon,
   UsersRound,
   LayoutDashboard,
+  Coins,
 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { useMissionControl } from "@/hooks/useMissionControl";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
+import { formatCredits } from "@/lib/usage";
 
 function timeAgo(iso: string | null) {
   if (!iso) return "—";
@@ -172,6 +174,14 @@ export default function MissionControl() {
         </Tile>
 
         <Tile>
+          <Label>OpenRouter 24h</Label>
+          <div className="mt-2">
+            <StatNumber value={formatCredits(stats?.costToday ?? 0)} loading={loading} />
+          </div>
+          <Coins className="absolute bottom-3 right-3 h-4 w-4 text-primary/40" />
+        </Tile>
+
+        <Tile>
           <Label>Tokens 24h</Label>
           <div className="mt-2">
             <StatNumber
@@ -275,11 +285,6 @@ export default function MissionControl() {
           <Activity className="absolute bottom-3 right-3 h-4 w-4 text-primary/40" />
         </Tile>
 
-        <Tile to="/memory">
-          <Label>Knowledge</Label>
-          <div className="mt-2 font-mono text-sm font-semibold">Edit memory →</div>
-          <Brain className="absolute bottom-3 right-3 h-4 w-4 text-primary/40" />
-        </Tile>
       </div>
     </PageShell>
   );

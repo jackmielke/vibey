@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Loader2, MessagesSquare, Users } from "lucide-react";
+import { ArrowLeft, Coins, Loader2, MessagesSquare, Users, Zap } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TelegramIcon } from "@/components/icons/TelegramIcon";
+import { formatCredits, formatTokens } from "@/lib/usage";
 import { toast } from "sonner";
 
 type UserLite = {
@@ -35,6 +36,11 @@ type ChatLog = {
   session_key: string | null;
   telegram_chat_id: number | null;
   telegram_username: string | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  cost_credits: number | null;
+  openrouter_model: string | null;
 };
 
 type GroupSetting = {
@@ -54,6 +60,8 @@ type Conversation = {
   messageCount: number;
   lastMessageAt: string;
   lastPreview: string;
+  totalTokens: number;
+  totalCost: number;
 };
 
 const PAGE_SIZE = 500;
@@ -105,6 +113,7 @@ export function ConversationsSection() {
             .from("agent_chat_logs")
             .select(
               "id, user_message, agent_response, created_at, session_key, telegram_chat_id, telegram_username"
+              + ", prompt_tokens, completion_tokens, total_tokens, cost_credits, openrouter_model"
             )
             .order("created_at", { ascending: false })
             .limit(PAGE_SIZE),
@@ -154,6 +163,8 @@ export function ConversationsSection() {
       const existing = map.get(key);
       if (existing) {
         existing.messageCount += 1;
+        existing.totalTokens += log.total_tokens ?? 0;
+        existing.totalCost += Number(log.cost_credits ?? 0);
         // logs come newest first, so keep the first one we see as the latest
         continue;
       }
@@ -171,6 +182,8 @@ export function ConversationsSection() {
         messageCount: 1,
         lastMessageAt: log.created_at,
         lastPreview: log.user_message,
+        totalTokens: log.total_tokens ?? 0,
+        totalCost: Number(log.cost_credits ?? 0),
       });
     }
     return Array.from(map.values()).sort((a, b) =>
@@ -276,7 +289,7 @@ export function ConversationsSection() {
         </div>
 
         <div className="space-y-3">
-          {selectedMessages.map((m) => (
+        {selectedMessages.map((m) => (
             <div key={m.id} className="space-y-2">
               <div className="flex flex-col items-end">
                 <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words bg-primary/10 border border-primary/20">
@@ -291,7 +304,23 @@ export function ConversationsSection() {
                 <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words bg-card border border-border">
                   {m.agent_response}
                 </div>
-                <span className="text-[10px] text-muted-foreground mt-1 font-mono">vibey</span>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <span className="text-[10px] text-muted-foreground font-mono">vibey</span>
+                  {(m.total_tokens || m.cost_credits) && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-mono rounded bg-muted px-1.5 py-0.5">
+                      <Zap className="w-2.5 h-2.5" />
+                      {formatTokens(m.total_tokens)} tok
+                      <span className="text-border">/</span>
+                      <Coins className="w-2.5 h-2.5" />
+                      {formatCredits(Number(m.cost_credits ?? 0))}
+                    </span>
+                  )}
+                  {m.openrouter_model && (
+                    <span className="text-[10px] text-muted-foreground font-mono rounded bg-muted px-1.5 py-0.5 truncate max-w-[220px]">
+                      {m.openrouter_model}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -368,6 +397,8 @@ export function ConversationsSection() {
                 <span>
                   {c.isTelegram ? "Telegram · " : ""}
                   {c.messageCount} message{c.messageCount === 1 ? "" : "s"}
+                  {c.totalTokens > 0 ? ` · ${formatTokens(c.totalTokens)} tok` : ""}
+                  {c.totalCost > 0 ? ` · ${formatCredits(c.totalCost)}` : ""}
                 </span>
               </p>
             </div>

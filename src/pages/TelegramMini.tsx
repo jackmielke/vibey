@@ -17,6 +17,8 @@ import {
   X,
   Calendar,
   Users as UsersIcon,
+  Coins,
+  Zap,
 } from "lucide-react";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { formatDistanceToNow } from "date-fns";
@@ -27,6 +29,7 @@ import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { formatCredits, formatTokens } from "@/lib/usage";
 
 const PREFERENCE_COMMUNITIES: { community_id: string; agent_id: string; label: string }[] = [
   {
@@ -72,6 +75,9 @@ type ChatLogRow = {
   telegram_username: string | null;
   telegram_user_id: number | null;
   created_at: string;
+  total_tokens: number | null;
+  cost_credits: number | null;
+  openrouter_model: string | null;
 };
 
 declare global {
@@ -1003,7 +1009,7 @@ export default function TelegramMini() {
           .limit(200),
         supabase
           .from("agent_chat_logs")
-          .select("id, user_message, agent_response, telegram_username, telegram_user_id, created_at")
+          .select("id, user_message, agent_response, telegram_username, telegram_user_id, created_at, total_tokens, cost_credits, openrouter_model")
           .eq("community_id", VIBEY_COMMUNITY_ID)
           .order("created_at", { ascending: false })
           .limit(50),
@@ -1119,6 +1125,17 @@ export default function TelegramMini() {
     return memories;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memories, memFilter, tgUserId]);
+
+  const adminUsage = useMemo(() => {
+    return chatLogs.reduce(
+      (acc, row) => {
+        acc.tokens += row.total_tokens ?? 0;
+        acc.cost += Number(row.cost_credits ?? 0);
+        return acc;
+      },
+      { tokens: 0, cost: 0 },
+    );
+  }, [chatLogs]);
 
   // ===== Render =====
   if (authState === "loading") {
@@ -1472,6 +1489,26 @@ export default function TelegramMini() {
                     <MessageSquare className="w-3 h-3" />
                     recent conversations · {chatLogs.length}
                   </h2>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-3 rounded-lg bg-card border border-border">
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+                        <Zap className="w-3 h-3" />
+                        tokens
+                      </p>
+                      <p className="font-mono text-lg font-semibold mt-1">
+                        {formatTokens(adminUsage.tokens)}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-card border border-border">
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+                        <Coins className="w-3 h-3" />
+                        OpenRouter
+                      </p>
+                      <p className="font-mono text-lg font-semibold mt-1">
+                        {formatCredits(adminUsage.cost)}
+                      </p>
+                    </div>
+                  </div>
                   {adminLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                   ) : chatLogs.length === 0 ? (
@@ -1487,6 +1524,27 @@ export default function TelegramMini() {
                             {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
                           </span>
                         </div>
+                        {(log.total_tokens || log.cost_credits || log.openrouter_model) && (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {log.total_tokens ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                                <Zap className="w-2.5 h-2.5" />
+                                {formatTokens(log.total_tokens)} tok
+                              </span>
+                            ) : null}
+                            {log.cost_credits ? (
+                              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                                <Coins className="w-2.5 h-2.5" />
+                                {formatCredits(Number(log.cost_credits))}
+                              </span>
+                            ) : null}
+                            {log.openrouter_model ? (
+                              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground truncate max-w-full">
+                                {log.openrouter_model}
+                              </span>
+                            ) : null}
+                          </div>
+                        )}
                         <div className="text-xs">
                           <p className="text-muted-foreground font-mono text-[10px] uppercase mb-0.5">user</p>
                           <p className="whitespace-pre-wrap">{log.user_message}</p>

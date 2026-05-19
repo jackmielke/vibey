@@ -29,6 +29,7 @@ export type MissionStats = {
   automationsEnabled: number;
   automationsTotal: number;
   tokensToday: number;
+  costToday: number;
   lastMessageAt: string | null;
 };
 
@@ -63,6 +64,8 @@ type AutomationRunDataRow = {
 
 type TokenRow = {
   tokens_used: number | null;
+  total_tokens: number | null;
+  cost_credits: number | null;
 };
 
 export function useMissionControl() {
@@ -129,7 +132,7 @@ export function useMissionControl() {
             .limit(6),
           supabase
             .from("agent_chat_logs")
-            .select("tokens_used")
+            .select("tokens_used, total_tokens, cost_credits")
             .eq("agent_id", VIBEY_AGENT_ID)
             .gte("created_at", since24)
             .limit(1000),
@@ -163,7 +166,11 @@ export function useMissionControl() {
         });
 
         const tokensToday = tokenUsageRows.reduce(
-          (sum, r) => sum + (r.tokens_used ?? 0),
+          (sum, r) => sum + (r.total_tokens ?? r.tokens_used ?? 0),
+          0
+        );
+        const costToday = tokenUsageRows.reduce(
+          (sum, r) => sum + Number(r.cost_credits ?? 0),
           0
         );
 
@@ -179,6 +186,7 @@ export function useMissionControl() {
           automationsEnabled: automationRows.filter((a) => a.enabled).length,
           automationsTotal: automationRows.length,
           tokensToday,
+          costToday,
           lastMessageAt: recentMessageRows[0]?.created_at ?? null,
         });
 

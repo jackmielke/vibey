@@ -9,9 +9,11 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
+  addUsage,
   buildSkillsBlock,
   buildSystemPromptWithMemories,
   buildUserContextBlock,
+  createUsageAccumulator,
   isAdminTelegramUser,
   loadEnabledSkills,
   loadRecentMemories,
@@ -19,6 +21,7 @@ import {
   resolveVibeUserId,
   runAgentLoopStreaming,
   unifiedSessionKey,
+  usageSummary,
 } from "../_shared/vibey-agent.ts";
 
 const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
@@ -376,7 +379,8 @@ Deno.serve(async (req) => {
         const decoder = new TextDecoder();
         let buffer = "";
         let assistantText = "";
-        let totalTokens = 0;
+        const usage = createUsageAccumulator();
+        let pendingEvent: string | null = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -388,15 +392,26 @@ Deno.serve(async (req) => {
             let line = buffer.slice(0, nl);
             buffer = buffer.slice(nl + 1);
             if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (line === "") {
+              pendingEvent = null;
+              continue;
+            }
+            if (line.startsWith("event: ")) {
+              pendingEvent = line.slice(7).trim();
+              continue;
+            }
             if (!line.startsWith("data: ")) continue;
             const payload = line.slice(6).trim();
             if (payload === "[DONE]") continue;
             try {
               const parsed = JSON.parse(payload);
+              if (pendingEvent === "usage") {
+                addUsage(usage, parsed);
+                continue;
+              }
               const delta = parsed?.choices?.[0]?.delta?.content;
               if (typeof delta === "string") assistantText += delta;
-              const usage = parsed?.usage?.total_tokens;
-              if (typeof usage === "number") totalTokens = usage;
+              addUsage(usage, parsed?.usage);
             } catch {
               // partial JSON across chunks — ignore for logging
             }
@@ -404,12 +419,19 @@ Deno.serve(async (req) => {
         }
 
         if (assistantText && lastUserMessage) {
+          const summary = usageSummary(usage);
           await supabase.from("agent_chat_logs").insert({
             agent_id: VIBEY_AGENT_ID,
             community_id: VIBEY_COMMUNITY_ID,
             user_message: lastUserMessage,
             agent_response: assistantText,
-            tokens_used: totalTokens || null,
+            tokens_used: summary.total_tokens,
+            prompt_tokens: summary.prompt_tokens,
+            completion_tokens: summary.completion_tokens,
+            total_tokens: summary.total_tokens,
+            cost_credits: summary.cost_credits,
+            openrouter_model: agent.model,
+            usage_json: summary.usage_json,
             session_key: sessionKey,
           });
         }

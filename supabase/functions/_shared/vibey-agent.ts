@@ -46,6 +46,54 @@ export type ChatMessage = {
   name?: string;
 };
 
+export type OpenRouterUsage = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  cost?: number;
+  cost_details?: Record<string, unknown>;
+  prompt_tokens_details?: Record<string, unknown>;
+  completion_tokens_details?: Record<string, unknown>;
+};
+
+export type UsageAccumulator = {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cost: number;
+  parts: OpenRouterUsage[];
+};
+
+export function createUsageAccumulator(): UsageAccumulator {
+  return {
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    total_tokens: 0,
+    cost: 0,
+    parts: [],
+  };
+}
+
+export function addUsage(acc: UsageAccumulator, usage: unknown) {
+  if (!usage || typeof usage !== "object") return;
+  const u = usage as OpenRouterUsage;
+  acc.prompt_tokens += Number(u.prompt_tokens ?? 0);
+  acc.completion_tokens += Number(u.completion_tokens ?? 0);
+  acc.total_tokens += Number(u.total_tokens ?? 0);
+  acc.cost += Number(u.cost ?? 0);
+  acc.parts.push(u);
+}
+
+export function usageSummary(acc: UsageAccumulator) {
+  return {
+    prompt_tokens: acc.prompt_tokens || null,
+    completion_tokens: acc.completion_tokens || null,
+    total_tokens: acc.total_tokens || null,
+    cost_credits: acc.cost || null,
+    usage_json: acc.parts.length > 0 ? { parts: acc.parts } : null,
+  };
+}
+
 export type Memory = {
   id: string;
   title: string | null;
@@ -1678,6 +1726,7 @@ export async function runAgentLoop(opts: {
       | { status: "start"; name: string; args: Record<string, unknown>; label: string }
       | { status: "done"; name: string; args: Record<string, unknown>; label: string; details?: string }
   ) => void | Promise<void>;
+  onUsage?: (usage: OpenRouterUsage) => void | Promise<void>;
 }): Promise<string> {
   const {
     supabase,
@@ -1695,6 +1744,7 @@ export async function runAgentLoop(opts: {
     referer = "https://community-vibes-ai.lovable.app",
     title = "Vibey",
     onProgress,
+    onUsage,
   } = opts;
 
   const userContent: string | UserContentPart[] = images.length > 0
@@ -1727,6 +1777,7 @@ export async function runAgentLoop(opts: {
         temperature,
         max_tokens: maxTokens,
         stream: false,
+        usage: { include: true },
         tools: filterTools(await loadEnabledToolNames(supabase), isAdmin),
         messages,
       }),
@@ -1739,6 +1790,9 @@ export async function runAgentLoop(opts: {
     }
 
     const json = await resp.json();
+    if (json?.usage && onUsage) {
+      try { await onUsage(json.usage as OpenRouterUsage); } catch (e) { console.warn("onUsage failed:", e); }
+    }
     const choice = json?.choices?.[0]?.message;
     if (!choice) return "";
 
@@ -1808,11 +1862,15 @@ export async function runAgentLoop(opts: {
       temperature,
       max_tokens: maxTokens,
       stream: false,
+      usage: { include: true },
       messages, // no tools this time
     }),
   });
   if (!finalResp.ok) return "";
   const finalJson = await finalResp.json();
+  if (finalJson?.usage && onUsage) {
+    try { await onUsage(finalJson.usage as OpenRouterUsage); } catch (e) { console.warn("onUsage final failed:", e); }
+  }
   return (finalJson?.choices?.[0]?.message?.content ?? "").trim();
 }
 
@@ -1985,6 +2043,7 @@ export async function runAgentLoopStreaming(opts: {
               temperature,
               max_tokens: maxTokens,
               stream: false,
+              usage: { include: true },
               tools: filterTools(await loadEnabledToolNames(supabase), isAdmin),
               messages,
             }),
@@ -2003,6 +2062,11 @@ export async function runAgentLoopStreaming(opts: {
           }
 
           const json = await resp.json();
+          if (json?.usage) {
+            controller.enqueue(
+              encoder.encode(`event: usage\ndata: ${JSON.stringify(json.usage)}\n\n`)
+            );
+          }
           const choice = json?.choices?.[0]?.message;
           const toolCalls = choice?.tool_calls as ChatMessage["tool_calls"];
 
@@ -2021,6 +2085,7 @@ export async function runAgentLoopStreaming(opts: {
                 temperature,
                 max_tokens: maxTokens,
                 stream: true,
+                usage: { include: true },
                 messages,
               }),
             });
@@ -2093,6 +2158,7 @@ export async function runAgentLoopStreaming(opts: {
             temperature,
             max_tokens: maxTokens,
             stream: true,
+            usage: { include: true },
             messages,
           }),
         });
