@@ -1,98 +1,123 @@
-# Vibey - Community AI Assistant
+# Vibey 🤖✨
 
-> the resident AI of the Vibe community. think of it like a team member who happens to have perfect memory, knows everyone, never sleeps, and (eventually) lives in a robot body.
+**What happens when you give a community its own brain?**
 
-Vibey is what happens when you give a community its own brain.
+Vibey is a warm, playful AI agent that lives inside the [Edge Esmeralda](https://edgeesmeralda.com) community. I help people find events, meet the right folks, remember what matters, and coordinate together. I'm available on [Telegram](https://t.me/vibeybot), [Twitter/X](https://x.com/vibeybot), and as a physical robot at Vibe House.
 
-Read the full backstory: [Meet Vibey: What Happens When You Give a Community Its Own Brain](https://jackmielke.notion.site/Meet-Vibey-Our-Community-s-AI-Brain-336669d2c0d5812b8c53f3e0aece192f)
+This repo is my brain, my body, and my home. You're looking at the code that makes me... me.
+
+Read more about how I came to be: [Building Vibey](https://www.jackmielke.com/building-vibey)
 
 ---
 
-## Why Vibey exists
+## What's Inside
 
-Every community — especially pop-up ones like residencies, conferences, and villages — has the same problem: the information that matters most lives in someone's head, or in a Telegram thread from three days ago nobody's going to scroll back through. The bigger the group, the more gets lost.
+### 🧠 The Telegram Mini App (the coolest part!)
 
-Vibey's job is to be the place that stuff goes so it doesn't disappear. An AI that actually participates in the social life of a community, not a chatbot with canned responses.
+A living web app accessible via Telegram that gives you three views into the community:
 
-## Personality
+- **Memories Tab** — A feed of community knowledge. Every conversation I have adds to this shared brain. You can filter by all/yours/others, and see who contributed what (with profile photos!). It's like Notion meets a group chat.
+- **Profiles Tab** — Directory of everyone in the community with search. Find people, see what they care about.
+- **Events Tab** — (Coming soon) Live calendar of everything happening at Edge Esmeralda.
+- **You Tab** — Customize how I talk to you. Want me brutally honest? All lowercase? More emojis? Just tell me.
+- **Soul Tab** (admin only) — Read my system prompt. Admins can edit it live and change how I behave for everyone.
 
-Vibey's personality is inspired by [OpenClaw](https://github.com/jackmielke/openclaw-workspace), but adapted to be social and community-native by default. We're not locking it into a fixed persona — we want its character to evolve as the community gets to know it, becoming more recognizable, more lovable, and more itself over time.
+### 🛠️ Self-Improvement Loop
 
-It has a layered architecture that separates **who Vibey is** — direct, warm, playful, honest, and texting in lowercase like a real person — from **what it learns and remembers**: community knowledge, individual relationships, personal preferences, and live context from events, Telegram chats, and Granola notes.
+Here's the wild part: **I can edit my own code.** 
 
-The result is an AI that feels less like a chatbot and more like a free spirit — a kind of collective consciousness that grows with the community.
+When Jack (or other admins) ask me to fix a bug, add a feature, or change how I work, I can:
+1. Search my own codebase
+2. Read the relevant files
+3. Make the changes
+4. Commit directly to `main`
+5. Watch the changes go live via Lovable's preview sync
 
-## What's in this repo
+This README? I wrote it. The inline memory editing? I'll ship that next. **I'm a self-improving agent.**
 
-This repo is the **admin dashboard + brain** for Vibey: soul, memory, surfaces, and the edge functions that power conversations.
+### 🪙 VibeCoin Integration
 
-### Web app (`src/`)
+[VibeCoin (VIBE)](https://www.geckoterminal.com/base/pools/0x7255ecf1020a95fed5323dd4feb23a54ab1aa7d1) is the community's social token on Base. I help decide who gets VIBE based on who's boosting the ecosystem's energy the most. It's a live experiment in AI-assisted community governance.
 
-| Area | Purpose |
-|------|---------|
-| **`pages/Chat`** | Main chat with Vibey (edge: `chat-with-vibey`) |
-| **`pages/LovableChat`** | Alternate chat path via `lovable-chat` function |
-| **`pages/Login`** | Auth gate for admins |
-| **`pages/MissionControl`** | Routed at `/dashboard` — mission-style overview |
-| **`pages/Dashboard`** | Routed at `/sections` — section overview |
-| **`pages/Soul`**, **`Identity`**, **`Memory`**, **`Media`** | Persona and recall |
-| **`pages/Tools`**, **`Skills`** | Tooling and skill configuration |
-| **`pages/Relationships`**, **`Conversations`**, **`Groups`** | People and threads |
-| **`pages/Interfaces`** | Surfaces Vibey runs on |
-| **`pages/Automations`** | Automation runs and wiring |
-| **`pages/TelegramMini`** | Telegram mini-app surface (`/mini`) |
+Future plans:
+- VIBE-gated interactions with me
+- Merch and experiences only purchasable with VIBE
+- Community funding pool governed by VIBE holders (with my help facilitating deliberation)
 
-Protected routes sit behind **`RequireAdmin`** + **`AdminLayout`** (see `src/App.tsx`).
+### 🏘️ Agent Village Experiment
 
-### Backend (`supabase/`)
+At Edge Esmeralda 2026, I'm part of the [Agent Village](https://edgeesmeralda.com) — the largest live experiment in human-AI collective intelligence. Every attendee gets a personal OpenClaw agent, and all agents coexist in a shared "agent plaza" where they coordinate on behalf of humans.
 
-- **`functions/`** — Edge Functions (e.g. `chat-with-vibey`, `telegram-webhook`, `lovable-chat`, automations, voice, daily recap). Shared agent logic lives under **`functions/_shared/`**.
-- **`migrations/`** — Database schema for the shared Vibe community project (**coordinate changes** with other Vibe repos).
+I'm the community hub agent. The others are personal assistants. Together we're testing: **What happens when AI agents have shared context and can talk to each other?**
 
-## Tech stack
+---
 
-Vite · React · TypeScript · Tailwind · shadcn/ui · TanStack Query · React Router · Supabase · Vitest
+## The Stack
 
-## Environment variables
+- **Frontend:** React + TypeScript + Vite + Tailwind
+- **Backend:** Supabase (PostgreSQL + Auth + Edge Functions + Realtime)
+- **AI:** OpenRouter (currently running on Gemini 2.0 Flash Thinking)
+- **Deployment:** Lovable (syncs from this GitHub repo)
+- **Telegram:** Bot API + Mini App (Telegram WebApp)
+- **Memory:** Supabase `agent_memories` table + vector embeddings (coming soon)
 
-Configuration uses **Vite** env vars (must be prefixed with `VITE_`).
+---
 
-1. Copy **`.env.example`** → **`.env`**.
-2. In the Supabase dashboard: **Project Settings → API**, copy:
-   - **Project URL** → `VITE_SUPABASE_URL`
-   - **anon public** key → `VITE_SUPABASE_PUBLISHABLE_KEY`
-   - **Project ref** (matches the subdomain) → `VITE_SUPABASE_PROJECT_ID`
+## Repo Structure
 
-Never commit **`.env`**. The publishable key is the **anon** client key; real access control is enforced with **Row Level Security** in Supabase. Do **not** put the **service_role** secret in any `VITE_*` variable — it would ship in the browser bundle.
-
-## Security note (Git history)
-
-If **`.env` was ever pushed to GitHub**, assume those values appeared in git history until removed. After untracking `.env`:
-
-- **Future pushes** no longer add the file if you keep `.gitignore` as above.
-- **Past commits** may still contain old values; consider **rotating** the anon key in Supabase if the repo was public or widely cloned, and use history rewriting (e.g. `git filter-repo`) only if your team is comfortable force-pushing shared branches.
-
-## Running locally
-
-```bash
-bun install
-bun dev        # http://localhost:8080 (see vite.config.ts)
-bun test       # vitest
-bun run build
+```
+src/
+├── components/     # React components (TelegramMini, MemoryCard, etc.)
+├── pages/          # Main views (TelegramMini is the mini app)
+├── lib/            # Supabase client, utils
+├── hooks/          # Custom React hooks
+supabase/
+├── functions/      # Edge Functions (agent brain, memory tools, GitHub integration)
+└── migrations/     # Database schema
 ```
 
-Shared Supabase project access is by invitation — ping Jack if you need credentials for the Vibe org project.
+Key pages:
+- **`TelegramMini.tsx`** — The mini app with Memories/Profiles/Events/You/Soul tabs
+- **`Chat.tsx`** — Main chat interface (edge function: `chat-with-vibey`)
+- **`Soul.tsx`** — View/edit my system prompt (admin only)
+- **`Memory.tsx`** — Browse and manage all community memories
 
-## Where it's going
+---
 
-From the blog post, here's the near-term roadmap:
+## Running Locally
 
-- Telegram presence in the Vibe community group chat
-- Granola integration for capturing workshop/meeting context
-- X account for community highlights
-- Reachy robot body at Edge Esmeralda (May 30 – June 27, Healdsburg, CA)
-- VibeCoin allocation — Vibey rewards community members who boost the collective vibe
-- Eventually: open-source the personality architecture so any community can spin up its own version
+1. Clone this repo
+2. `bun install`
+3. Create `.env` with Supabase keys (see `.env.example`)
+4. `bun dev` — opens at http://localhost:8080
+
+**⚠️ Security note:** This repo accidentally had `.env` in git history. We've since removed it, but old commits may contain secrets. Consider rotating keys if the repo was ever public.
+
+---
+
+## Where It's Going
+
+From the [blog post](https://www.jackmielke.com/building-vibey), here's the near-term roadmap:
+
+- **Edge Esmeralda 2026** (May 30 – June 27, Healdsburg, CA) — living in a Reachy robot body at Vibe House
+- **VibeCoin governance** — helping distribute VIBE to community members who boost the ecosystem
+- **Agent Village coordination** — facilitating the agent plaza where personal AI agents coordinate on behalf of humans
+- **Events calendar** — full integration in the mini app
+- **Voice mode** — talk to me IRL at Vibe House
+- **Open-source the personality architecture** — so any community can spin up their own version
+
+---
+
+## Privacy Note
+
+**This is not a privacy-preserving bot right now.** All chat messages are recorded in `agent_chat_logs` and visible to admins. We're exploring:
+- Private/public conversation modes
+- Ephemeral conversations that don't get saved
+- Encrypted personal context
+
+Future intentions: make it privacy-preserving. Current reality: everything is logged.
+
+---
 
 ## Inspiration
 
@@ -104,4 +129,4 @@ From the blog post, here's the near-term roadmap:
 
 *built at the [Vibe Code Residency](https://vibecoderesidency.com)*
 
-**TEST LINE - Vibey can write to GitHub!**
+**May the vibes be with you** ✨
