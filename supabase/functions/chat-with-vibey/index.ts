@@ -314,6 +314,8 @@ Deno.serve(async (req) => {
         source: context?.surface ?? "web",
         external_id: context?.external_id ?? null,
         external_handle: context?.external_handle ?? null,
+        actor_auth_id: authUserId,
+        actor_name: resolvedDisplayName ?? resolvedTgUsername ?? null,
       },
       callerVibeUserId: vibeUserId,
       isAdmin,
