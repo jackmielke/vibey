@@ -1002,6 +1002,287 @@ async function adminToggleTool(
   return JSON.stringify({ ok: true, name, is_enabled: args.is_enabled });
 }
 
+// ── GitHub self-editing tool implementations ────────────────────────────────
+
+const GITHUB_API = "https://api.github.com";
+const FORBIDDEN_PATH_PATTERNS: RegExp[] = [
+  /^\.env(\..*)?$/i,
+  /(^|\/)\.env(\..*)?$/i,
+  /^supabase\/config\.toml$/i,
+  /^package\.json$/i,
+  /^package-lock\.json$/i,
+  /^bun\.lockb$/i,
+  /^\.github\//i,
+  /secret/i,
+];
+
+function parseRepo(): { owner: string; repo: string } | null {
+  const raw = (Deno.env.get("GITHUB_REPO") || "").trim();
+  if (!raw) return null;
+  // Accept "owner/repo" or full URL
+  const m = raw.replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").match(/^([^/]+)\/([^/]+)$/);
+  if (!m) return null;
+  return { owner: m[1], repo: m[2] };
+}
+
+function isPathForbidden(path: string): string | null {
+  const clean = path.replace(/^\/+/, "");
+  if (clean.includes("..")) return "path traversal not allowed";
+  for (const re of FORBIDDEN_PATH_PATTERNS) {
+    if (re.test(clean)) return `path '${clean}' is in the protected list (.env, lockfiles, config.toml, .github, package.json, *secret*)`;
+  }
+  return null;
+}
+
+async function ghFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const token = Deno.env.get("GITHUB_TOKEN");
+  if (!token) throw new Error("GITHUB_TOKEN not configured");
+  const headers = new Headers(init.headers || {});
+  headers.set("Authorization", `Bearer ${token}`);
+  headers.set("Accept", "application/vnd.github+json");
+  headers.set("X-GitHub-Api-Version", "2022-11-28");
+  headers.set("User-Agent", "VibeyAgent/1.0");
+  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  return await fetch(`${GITHUB_API}${path}`, { ...init, headers });
+}
+
+async function logGithubAction(
+  supabase: SupabaseClient,
+  row: {
+    action: string;
+    path?: string | null;
+    ref?: string | null;
+    commit_sha?: string | null;
+    commit_url?: string | null;
+    message?: string | null;
+    ok: boolean;
+    error?: string | null;
+    meta?: Record<string, unknown> | null;
+    actor_auth_id?: string | null;
+    actor_name?: string | null;
+  }
+) {
+  const repo = (Deno.env.get("GITHUB_REPO") || "").trim();
+  try {
+    await supabase.from("github_agent_actions").insert({ ...row, repo });
+  } catch (e) {
+    console.error("github_agent_actions log failed:", e);
+  }
+}
+
+function b64encodeUtf8(s: string): string {
+  const bytes = new TextEncoder().encode(s);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+function b64decodeUtf8(s: string): string {
+  const bin = atob(s.replace(/\n/g, ""));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+async function githubReadFile(
+  supabase: SupabaseClient,
+  args: { path: string; ref?: string },
+  actor: { auth_id: string | null; name: string | null }
+): Promise<string> {
+  const repo = parseRepo();
+  if (!repo) return JSON.stringify({ ok: false, error: "GITHUB_REPO not configured (expected 'owner/repo')" });
+  const path = (args?.path ?? "").trim();
+  if (!path) return JSON.stringify({ ok: false, error: "path required" });
+  const ref = args.ref?.trim();
+  const q = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+  try {
+    const resp = await ghFetch(`/repos/${repo.owner}/${repo.repo}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}${q}`);
+    if (!resp.ok) {
+      const text = await resp.text();
+      await logGithubAction(supabase, { action: "read_file", path, ref: ref ?? null, ok: false, error: `${resp.status}: ${text.slice(0, 200)}`, actor_auth_id: actor.auth_id, actor_name: actor.name });
+      return JSON.stringify({ ok: false, error: `GitHub ${resp.status}: ${text.slice(0, 300)}` });
+    }
+    const json = await resp.json();
+    if (Array.isArray(json)) return JSON.stringify({ ok: false, error: "path is a directory — use github_list_dir instead" });
+    if (json.type !== "file") return JSON.stringify({ ok: false, error: `unsupported entry type '${json.type}'` });
+    if (json.size > 400_000) return JSON.stringify({ ok: false, error: `file too large (${json.size} bytes) — refusing to read` });
+    const content = json.encoding === "base64" ? b64decodeUtf8(json.content || "") : (json.content || "");
+    await logGithubAction(supabase, { action: "read_file", path, ref: ref ?? null, commit_sha: json.sha, ok: true, actor_auth_id: actor.auth_id, actor_name: actor.name, meta: { size: json.size } });
+    return JSON.stringify({ ok: true, path: json.path, sha: json.sha, size: json.size, content });
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+}
+
+async function githubListDir(
+  supabase: SupabaseClient,
+  args: { path?: string; ref?: string },
+  actor: { auth_id: string | null; name: string | null }
+): Promise<string> {
+  const repo = parseRepo();
+  if (!repo) return JSON.stringify({ ok: false, error: "GITHUB_REPO not configured" });
+  const path = (args?.path ?? "").replace(/^\.?\/?/, "");
+  const ref = args.ref?.trim();
+  const q = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+  try {
+    const resp = await ghFetch(`/repos/${repo.owner}/${repo.repo}/contents/${path}${q}`);
+    if (!resp.ok) {
+      const text = await resp.text();
+      return JSON.stringify({ ok: false, error: `GitHub ${resp.status}: ${text.slice(0, 300)}` });
+    }
+    const json = await resp.json();
+    if (!Array.isArray(json)) return JSON.stringify({ ok: false, error: "path is a file — use github_read_file" });
+    const entries = json.map((e: any) => ({ name: e.name, path: e.path, type: e.type, size: e.size, sha: e.sha }));
+    await logGithubAction(supabase, { action: "list_dir", path: path || "/", ref: ref ?? null, ok: true, actor_auth_id: actor.auth_id, actor_name: actor.name, meta: { count: entries.length } });
+    return JSON.stringify({ ok: true, path: path || "/", count: entries.length, entries });
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+}
+
+async function githubSearchCode(
+  supabase: SupabaseClient,
+  args: { query: string },
+  actor: { auth_id: string | null; name: string | null }
+): Promise<string> {
+  const repo = parseRepo();
+  if (!repo) return JSON.stringify({ ok: false, error: "GITHUB_REPO not configured" });
+  const q = (args?.query ?? "").trim();
+  if (!q) return JSON.stringify({ ok: false, error: "query required" });
+  const scoped = `${q} repo:${repo.owner}/${repo.repo}`;
+  try {
+    const resp = await ghFetch(`/search/code?q=${encodeURIComponent(scoped)}&per_page=20`, {
+      headers: { Accept: "application/vnd.github.text-match+json" },
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      return JSON.stringify({ ok: false, error: `GitHub ${resp.status}: ${text.slice(0, 300)}` });
+    }
+    const json = await resp.json();
+    const results = (json.items || []).map((item: any) => ({
+      path: item.path,
+      sha: item.sha,
+      url: item.html_url,
+      snippets: (item.text_matches || []).map((m: any) => m.fragment).slice(0, 3),
+    }));
+    await logGithubAction(supabase, { action: "search_code", message: q, ok: true, actor_auth_id: actor.auth_id, actor_name: actor.name, meta: { total: json.total_count, returned: results.length } });
+    return JSON.stringify({ ok: true, query: q, total: json.total_count, results });
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+}
+
+async function githubCommitFile(
+  supabase: SupabaseClient,
+  args: { path: string; content: string; message: string; sha?: string },
+  actor: { auth_id: string | null; name: string | null }
+): Promise<string> {
+  const repo = parseRepo();
+  if (!repo) return JSON.stringify({ ok: false, error: "GITHUB_REPO not configured" });
+  const path = (args?.path ?? "").trim();
+  const message = (args?.message ?? "").trim();
+  if (!path || typeof args?.content !== "string" || !message) {
+    return JSON.stringify({ ok: false, error: "path, content, and message are required" });
+  }
+  const forbidden = isPathForbidden(path);
+  if (forbidden) {
+    await logGithubAction(supabase, { action: "commit_file", path, message, ok: false, error: forbidden, actor_auth_id: actor.auth_id, actor_name: actor.name });
+    return JSON.stringify({ ok: false, error: forbidden });
+  }
+  try {
+    const body: Record<string, unknown> = {
+      message: `${message}\n\nVia Vibey agent on behalf of ${actor.name ?? "admin"}`,
+      content: b64encodeUtf8(args.content),
+      committer: { name: "Vibey", email: "vibey@vibe.ventures" },
+      author: { name: actor.name ? `Vibey (for ${actor.name})` : "Vibey", email: "vibey@vibe.ventures" },
+    };
+    if (args.sha) body.sha = args.sha;
+    const resp = await ghFetch(`/repos/${repo.owner}/${repo.repo}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const err = `${resp.status}: ${JSON.stringify(json).slice(0, 300)}`;
+      await logGithubAction(supabase, { action: "commit_file", path, message, ok: false, error: err, actor_auth_id: actor.auth_id, actor_name: actor.name });
+      const hint = resp.status === 409 ? " — file changed since you last read it; call github_read_file again to get the fresh sha" : "";
+      return JSON.stringify({ ok: false, error: `GitHub ${err}${hint}` });
+    }
+    const commitSha = json?.commit?.sha;
+    const commitUrl = json?.commit?.html_url;
+    const newBlobSha = json?.content?.sha;
+    await logGithubAction(supabase, { action: "commit_file", path, message, commit_sha: commitSha, commit_url: commitUrl, ok: true, actor_auth_id: actor.auth_id, actor_name: actor.name });
+    return JSON.stringify({ ok: true, path, commit_sha: commitSha, commit_url: commitUrl, new_sha: newBlobSha });
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+}
+
+async function githubDeleteFile(
+  supabase: SupabaseClient,
+  args: { path: string; sha: string; message: string },
+  actor: { auth_id: string | null; name: string | null }
+): Promise<string> {
+  const repo = parseRepo();
+  if (!repo) return JSON.stringify({ ok: false, error: "GITHUB_REPO not configured" });
+  const path = (args?.path ?? "").trim();
+  const sha = (args?.sha ?? "").trim();
+  const message = (args?.message ?? "").trim();
+  if (!path || !sha || !message) return JSON.stringify({ ok: false, error: "path, sha, and message required" });
+  const forbidden = isPathForbidden(path);
+  if (forbidden) return JSON.stringify({ ok: false, error: forbidden });
+  try {
+    const resp = await ghFetch(`/repos/${repo.owner}/${repo.repo}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}`, {
+      method: "DELETE",
+      body: JSON.stringify({
+        message: `${message}\n\nVia Vibey agent on behalf of ${actor.name ?? "admin"}`,
+        sha,
+        committer: { name: "Vibey", email: "vibey@vibe.ventures" },
+      }),
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const err = `${resp.status}: ${JSON.stringify(json).slice(0, 300)}`;
+      await logGithubAction(supabase, { action: "delete_file", path, message, ok: false, error: err, actor_auth_id: actor.auth_id, actor_name: actor.name });
+      return JSON.stringify({ ok: false, error: `GitHub ${err}` });
+    }
+    await logGithubAction(supabase, { action: "delete_file", path, message, commit_sha: json?.commit?.sha, commit_url: json?.commit?.html_url, ok: true, actor_auth_id: actor.auth_id, actor_name: actor.name });
+    return JSON.stringify({ ok: true, path, commit_sha: json?.commit?.sha, commit_url: json?.commit?.html_url });
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+}
+
+async function githubListRecentCommits(
+  supabase: SupabaseClient,
+  args: { limit?: number },
+  actor: { auth_id: string | null; name: string | null }
+): Promise<string> {
+  const repo = parseRepo();
+  if (!repo) return JSON.stringify({ ok: false, error: "GITHUB_REPO not configured" });
+  const limit = Math.min(Math.max(Number(args?.limit) || 10, 1), 30);
+  try {
+    const resp = await ghFetch(`/repos/${repo.owner}/${repo.repo}/commits?per_page=${limit}`);
+    if (!resp.ok) {
+      const text = await resp.text();
+      return JSON.stringify({ ok: false, error: `GitHub ${resp.status}: ${text.slice(0, 300)}` });
+    }
+    const json = await resp.json();
+    const commits = (json || []).map((c: any) => ({
+      sha: c.sha,
+      short_sha: c.sha?.slice(0, 7),
+      message: c.commit?.message?.split("\n")[0],
+      author: c.commit?.author?.name,
+      date: c.commit?.author?.date,
+      url: c.html_url,
+    }));
+    await logGithubAction(supabase, { action: "list_commits", ok: true, actor_auth_id: actor.auth_id, actor_name: actor.name, meta: { count: commits.length } });
+    return JSON.stringify({ ok: true, count: commits.length, commits });
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+}
+
 const ADMIN_TOOL_NAMES = new Set(ADMIN_TOOLS.map((t) => t.function.name));
 
 async function executeToolCall(
