@@ -848,7 +848,22 @@ Deno.serve(async (req) => {
     }
 
     // Enabled: only respond to @mentions or replies to Vibey.
+    // But still log every group message so Chat History shows the full conversation.
     if (!isMentioned(msg) && !isReplyToBot(msg)) {
+      if (userText || attachmentImages.length > 0 || attachmentExtraText.length > 0) {
+        supabase.from("agent_chat_logs").insert({
+          agent_id: VIBEY_AGENT_ID,
+          community_id: VIBEY_COMMUNITY_ID,
+          user_message: userText || "(attachment)",
+          agent_response: "",
+          session_key: sessionKey,
+          telegram_chat_id: chatId,
+          telegram_user_id: userId,
+          telegram_username: username,
+        }).then(({ error }: { error: unknown }) => {
+          if (error) console.error("Failed to log passive group message:", error);
+        });
+      }
       return new Response("ok", { status: 200 });
     }
 
