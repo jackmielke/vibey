@@ -7,7 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import vibeySplash from "@/assets/vibey-splash.png";
+import { RobotScene } from "@/components/VibeyRobot";
 import { Mail, KeyRound, Loader2, ArrowLeft } from "lucide-react";
+
+const tickerItems = [
+  ["INF", "Summarized 'Biotech Futures' workshop for TG group."],
+  ["ACT", "Detected high vibe in lounge; queued requested track."],
+  ["SYN", "Updated Esmeralda knowledge graph (32 new nodes)."],
+  ["NET", "Posted curated thread to @vibey on X."],
+  ["OBS", "Listening to 'Decentralized Trust' session, room 04."],
+];
 
 type Mode = "password" | "magic";
 
