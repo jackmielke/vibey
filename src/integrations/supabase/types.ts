@@ -1851,6 +1851,57 @@ export type Database = {
           },
         ]
       }
+      github_agent_actions: {
+        Row: {
+          action: string
+          actor_auth_id: string | null
+          actor_name: string | null
+          commit_sha: string | null
+          commit_url: string | null
+          created_at: string
+          error: string | null
+          id: string
+          message: string | null
+          meta: Json | null
+          ok: boolean
+          path: string | null
+          ref: string | null
+          repo: string
+        }
+        Insert: {
+          action: string
+          actor_auth_id?: string | null
+          actor_name?: string | null
+          commit_sha?: string | null
+          commit_url?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          message?: string | null
+          meta?: Json | null
+          ok?: boolean
+          path?: string | null
+          ref?: string | null
+          repo: string
+        }
+        Update: {
+          action?: string
+          actor_auth_id?: string | null
+          actor_name?: string | null
+          commit_sha?: string | null
+          commit_url?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          message?: string | null
+          meta?: Json | null
+          ok?: boolean
+          path?: string | null
+          ref?: string | null
+          repo?: string
+        }
+        Relationships: []
+      }
       magic_link_tokens: {
         Row: {
           community_id: string

@@ -293,6 +293,102 @@ export const ADMIN_TOOLS = [
       },
     },
   },
+  // ── GitHub self-editing tools ────────────────────────────────────────────
+  {
+    type: "function" as const,
+    function: {
+      name: "github_read_file",
+      description:
+        "ADMIN ONLY. Read a file from Vibey's own GitHub repo. Use this BEFORE editing any file so you know its current contents and SHA. Returns the file's text plus the blob `sha` you'll need to pass to github_commit_file when overwriting it.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Repo-relative path, e.g. 'src/pages/TelegramMini.tsx'." },
+          ref: { type: "string", description: "Optional branch / commit / tag. Defaults to the repo's default branch (main)." },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "github_list_dir",
+      description:
+        "ADMIN ONLY. List the files and folders at a path in Vibey's repo. Use to explore the codebase before reading specific files.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Directory path. Use '' or '.' for repo root." },
+          ref: { type: "string", description: "Optional branch / commit. Defaults to main." },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "github_search_code",
+      description:
+        "ADMIN ONLY. Search Vibey's repo for a string or symbol. Returns up to 20 matching file paths with snippets. Use this to locate where something lives before reading the file. Searches are scoped to the configured repo automatically.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Code search query. GitHub code-search syntax works (e.g. `useState path:src extension:tsx`)." },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "github_commit_file",
+      description:
+        "ADMIN ONLY. Create or overwrite a single file in Vibey's repo and commit directly to main. ALWAYS call github_read_file first if the file might exist, and pass back the returned `sha` so GitHub knows you're updating (not blindly overwriting) the right version. Lovable will sync the change to the live preview within seconds. Forbidden paths: .env*, supabase/config.toml, package.json, package-lock.json, bun.lockb, .github/, anything matching *secret*.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Repo-relative path of the file to write." },
+          content: { type: "string", description: "Full new file contents (UTF-8 text). Replaces the entire file." },
+          message: { type: "string", description: "Short commit message in imperative mood, e.g. 'Fix Profiles tab search input focus ring'." },
+          sha: { type: "string", description: "REQUIRED when updating an existing file — the blob sha returned by github_read_file. Omit only when creating a brand-new file." },
+        },
+        required: ["path", "content", "message"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "github_delete_file",
+      description:
+        "ADMIN ONLY. Delete a file from Vibey's repo and commit to main. Requires the blob sha from github_read_file. Use sparingly — prefer editing files to deleting them.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          sha: { type: "string", description: "Blob sha from github_read_file." },
+          message: { type: "string", description: "Short commit message explaining why this file is gone." },
+        },
+        required: ["path", "sha", "message"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "github_list_recent_commits",
+      description:
+        "ADMIN ONLY. List the most recent commits on main with author, message, sha, and URL. Use this when an admin asks 'what did you change recently?', 'show me your last commits', or wants a sha to revert.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "integer", description: "Max commits to return (default 10, max 30)." },
+        },
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
