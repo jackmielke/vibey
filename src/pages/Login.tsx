@@ -7,7 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import vibeySplash from "@/assets/vibey-splash.png";
+import { RobotScene } from "@/components/VibeyRobot";
 import { Mail, KeyRound, Loader2, ArrowLeft } from "lucide-react";
+
+const tickerItems = [
+  ["INF", "Summarized 'Biotech Futures' workshop for TG group."],
+  ["ACT", "Detected high vibe in lounge; queued requested track."],
+  ["SYN", "Updated Esmeralda knowledge graph (32 new nodes)."],
+  ["NET", "Posted curated thread to @vibey on X."],
+  ["OBS", "Listening to 'Decentralized Trust' session, room 04."],
+];
 
 type Mode = "password" | "magic";
 
@@ -66,45 +75,80 @@ export default function Login() {
 
   return (
     <div className="min-h-safe-screen flex items-stretch bg-background">
-      {/* Left visual panel — hidden on mobile */}
-      <div className="hidden lg:flex flex-1 relative overflow-hidden bg-secondary border-r border-border">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,hsl(var(--primary)/0.15),transparent_60%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_70%,hsl(var(--primary)/0.08),transparent_50%)]" />
-
-        {/* Grid texture */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)",
-            backgroundSize: "32px 32px",
-          }}
-        />
-
-        <div className="relative z-10 flex flex-col justify-between p-12 w-full">
+      {/* Left landing panel — hidden on mobile */}
+      <div className="hidden lg:flex flex-1 relative overflow-hidden bg-spec-bg text-spec-ink font-sans border-r border-spec-line">
+        {/* Top status bar */}
+        <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-6 py-3 bg-spec-bg/85 backdrop-blur-md border-b border-spec-line">
+          <span className="font-mono font-bold tracking-tighter text-xs uppercase">Vibey v1.0.4</span>
           <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-              Vibey · Admin Console
-            </span>
+            <span className="size-2 rounded-full bg-spec-accent animate-pulse" />
+            <span className="text-[10px] font-mono uppercase tracking-tighter">System: Active</span>
+          </div>
+        </div>
+
+        {/* Hero */}
+        <div className="relative w-full pt-16 pb-0 px-10 xl:px-14 flex flex-col">
+          <div className="flex-1 grid grid-cols-12 gap-6 items-center py-6">
+            <div className="col-span-12 xl:col-span-5 animate-spec-rise">
+              <div className="inline-block px-2 py-1 border border-spec-accent text-spec-accent text-[10px] font-mono mb-5 uppercase tracking-widest">
+                Hardware Integrated AI
+              </div>
+              <h1 className="text-5xl xl:text-6xl font-bold tracking-tighter leading-[0.88] mb-6 uppercase">
+                Your AI <br />
+                <span className="text-spec-accent">Neighbor</span>
+              </h1>
+              <p className="text-sm text-spec-muted max-w-[42ch] mb-8 leading-relaxed">
+                A community-first agent engineered for Edge Esmeralda. Vibey synthesizes workshop data, manages
+                Telegram protocols, and operates physical chassis units. Open-source, by design.
+              </p>
+              <dl className="grid grid-cols-3 gap-5 max-w-sm font-mono text-[10px] uppercase tracking-widest">
+                <div>
+                  <dt className="text-spec-muted">Model</dt>
+                  <dd className="text-spec-ink mt-1">VBY-1.0.4</dd>
+                </div>
+                <div>
+                  <dt className="text-spec-muted">Origin</dt>
+                  <dd className="text-spec-ink mt-1">Esmeralda</dd>
+                </div>
+                <div>
+                  <dt className="text-spec-muted">License</dt>
+                  <dd className="text-spec-ink mt-1">MIT</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div className="col-span-12 xl:col-span-7 relative animate-spec-rise [animation-delay:200ms]">
+              <div className="relative w-full aspect-[4/5] max-h-[58vh] bg-spec-surface rounded-2xl border border-spec-line shadow-[0_30px_80px_-30px_rgba(0,0,0,0.25)] overflow-hidden">
+                <div className="absolute inset-0 micro-grid pointer-events-none" />
+                <RobotScene
+                  url="/models/robot-expressive.glb"
+                  theme="light"
+                  cameraZ={9}
+                  scale={0.42}
+                  yOffset={-1.0}
+                  showControls={false}
+                />
+                <span className="absolute top-3 left-3 text-[10px] font-mono text-spec-muted uppercase tracking-widest z-10">
+                  Component_View_01
+                </span>
+                <span className="absolute top-3 right-3 text-[10px] font-mono text-spec-accent uppercase tracking-widest z-10">
+                  // LIVE
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex-1 flex items-center justify-center">
-            <img
-              src={vibeySplash}
-              alt=""
-              className="w-full max-w-md object-contain drop-shadow-2xl animate-fade-in"
-            />
-          </div>
-
-          <div className="space-y-3 max-w-md">
-            <h2 className="text-3xl font-light leading-tight tracking-tight">
-              The control panel for your community's AI agent.
-            </h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Curate memories. Tune behavior. Watch every conversation.
-              All from one place.
-            </p>
+          {/* Ticker */}
+          <div className="border-y border-spec-line bg-spec-surface/60 py-2 overflow-hidden -mx-10 xl:-mx-14">
+            <div className="flex w-max gap-10 whitespace-nowrap animate-spec-marquee font-mono text-[10px]">
+              {[...tickerItems, ...tickerItems, ...tickerItems].map(([k, v], i) => (
+                <span key={i} className="flex items-center gap-3">
+                  <span className="text-spec-accent font-bold">{k}:</span>
+                  <span className="text-spec-ink/80">{v}</span>
+                  <span className="text-spec-muted/40">//</span>
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </div>
