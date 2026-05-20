@@ -73,9 +73,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-safe-screen flex items-stretch bg-background">
+    <div className="min-h-safe-screen flex items-stretch bg-spec-bg text-spec-ink">
       {/* Left landing panel — hidden on mobile */}
       <div className="hidden lg:flex flex-1 relative overflow-hidden bg-spec-bg text-spec-ink font-sans border-r border-spec-line">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(155,225,93,0.18),transparent_30%),radial-gradient(circle_at_80%_12%,rgba(90,180,150,0.14),transparent_28%),linear-gradient(145deg,rgba(11,20,16,0)_0%,rgba(29,45,31,0.38)_100%)] pointer-events-none" />
         {/* Top status bar */}
         <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-6 py-3 bg-spec-bg/85 backdrop-blur-md border-b border-spec-line">
           <span className="font-mono font-bold tracking-tighter text-xs uppercase">Vibey v1.0.4</span>
@@ -117,15 +118,16 @@ export default function Login() {
             </div>
 
             <div className="col-span-12 xl:col-span-7 relative animate-spec-rise [animation-delay:200ms]">
-              <div className="relative w-full aspect-[4/5] max-h-[58vh] bg-spec-surface rounded-2xl border border-spec-line shadow-[0_30px_80px_-30px_rgba(0,0,0,0.25)] overflow-hidden">
+              <div className="relative w-full aspect-[4/5] max-h-[58vh] bg-spec-surface rounded-2xl border border-spec-line shadow-[0_30px_90px_-34px_rgba(0,0,0,0.75)] overflow-hidden">
                 <div className="absolute inset-0 micro-grid pointer-events-none" />
                 <RobotScene
                   url="/models/robot-expressive.glb"
-                  theme="light"
+                  theme="dark"
                   cameraZ={9}
                   scale={0.42}
                   yOffset={-1.0}
-                  showControls={false}
+                  rimColor="#9be15d"
+                  showControls
                 />
                 <span className="absolute top-3 left-3 text-[10px] font-mono text-spec-muted uppercase tracking-widest z-10">
                   Component_View_01
@@ -153,7 +155,7 @@ export default function Login() {
       </div>
 
       {/* Right form panel */}
-      <div className="flex-1 lg:flex-none lg:w-[480px] flex flex-col justify-center px-6 sm:px-12 py-12">
+      <div className="flex-1 lg:flex-none lg:w-[480px] flex flex-col justify-center px-6 sm:px-12 py-12 bg-background/88 lg:bg-[#0d1110] lg:border-l lg:border-white/5">
         <div className="w-full max-w-sm mx-auto space-y-8">
           {/* Compact landing signal for narrower editor/browser panes */}
           <div className="lg:hidden flex flex-col items-center text-center gap-4">
@@ -161,11 +163,12 @@ export default function Login() {
               <div className="absolute inset-0 micro-grid pointer-events-none" />
               <RobotScene
                 url="/models/robot-expressive.glb"
-                theme="light"
+                theme="dark"
                 cameraZ={10}
                 scale={0.38}
                 yOffset={-1.2}
-                showControls={false}
+                rimColor="#9be15d"
+                showControls
               />
               <span className="absolute top-2 left-2 text-[9px] font-mono text-spec-muted uppercase tracking-widest z-10">
                 Component_View_01

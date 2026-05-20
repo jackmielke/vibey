@@ -246,11 +246,11 @@ export function RobotScene({
   const buttonStyles =
     theme === "dark"
       ? {
-          base: "border-white/15 text-white/40 hover:text-white hover:border-white/40",
-          active: "border-primary text-primary bg-primary/10",
+          base: "border-white/15 bg-black/20 text-white/55 hover:text-white hover:border-primary/60 hover:bg-primary/10 backdrop-blur-sm",
+          active: "border-primary text-primary bg-primary/15 shadow-[0_0_24px_-12px_hsl(var(--primary))] backdrop-blur-sm",
         }
       : {
-          base: "border-black/15 text-black/40 hover:text-black/80 hover:border-black/40",
+          base: "border-black/15 bg-white/25 text-black/50 hover:text-black/80 hover:border-black/40 backdrop-blur-sm",
           active: "border-spec-accent text-spec-accent bg-spec-accent/5",
         };
 
@@ -282,7 +282,7 @@ export function RobotScene({
 
       {showControls && (
         <div
-          className={`absolute bottom-3 left-3 right-3 flex flex-wrap gap-1.5 transition-opacity duration-500 ${
+          className={`absolute bottom-3 left-3 right-3 flex flex-wrap justify-center gap-1.5 transition-opacity duration-500 ${
             ready ? "opacity-100" : "opacity-0"
           }`}
         >

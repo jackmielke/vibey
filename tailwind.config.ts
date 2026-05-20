@@ -19,12 +19,12 @@ export default {
       },
       colors: {
         spec: {
-          bg: "#efefed",
-          surface: "#ffffff",
-          ink: "#0a0a0a",
-          muted: "#6b6b6b",
-          line: "rgba(0, 0, 0, 0.1)",
-          accent: "#ff3b00",
+          bg: "#0b1410",
+          surface: "#111d17",
+          ink: "#f2f7ee",
+          muted: "#92a69a",
+          line: "rgba(190, 226, 203, 0.16)",
+          accent: "#9be15d",
         },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
