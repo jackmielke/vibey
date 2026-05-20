@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import vibeySplash from "@/assets/vibey-splash.png";
 import { RobotScene } from "@/components/VibeyRobot";
 import { Mail, KeyRound, Loader2, ArrowLeft } from "lucide-react";
 
@@ -156,9 +155,22 @@ export default function Login() {
       {/* Right form panel */}
       <div className="flex-1 lg:flex-none lg:w-[480px] flex flex-col justify-center px-6 sm:px-12 py-12">
         <div className="w-full max-w-sm mx-auto space-y-8">
-          {/* Mobile-only header with splash */}
+          {/* Compact landing signal for narrower editor/browser panes */}
           <div className="lg:hidden flex flex-col items-center text-center gap-4">
-            <img src={vibeySplash} alt="" className="w-32 h-32 object-contain" />
+            <div className="relative w-full max-w-[280px] aspect-[4/3] rounded-2xl border border-spec-line bg-spec-surface overflow-hidden shadow-[0_24px_60px_-34px_rgba(0,0,0,0.45)]">
+              <div className="absolute inset-0 micro-grid pointer-events-none" />
+              <RobotScene
+                url="/models/robot-expressive.glb"
+                theme="light"
+                cameraZ={10}
+                scale={0.38}
+                yOffset={-1.2}
+                showControls={false}
+              />
+              <span className="absolute top-2 left-2 text-[9px] font-mono text-spec-muted uppercase tracking-widest z-10">
+                Component_View_01
+              </span>
+            </div>
             <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
               Vibey · Admin Console
             </span>
