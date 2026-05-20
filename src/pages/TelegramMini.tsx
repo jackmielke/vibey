@@ -95,6 +95,7 @@ type EventRow = {
   event_end_time: string;
   event_location: string | null;
   event_type: string | null;
+  event_image_url: string | null;
   hosted_by: string | null;
   is_featured: boolean | null;
   tags: string[] | null;
@@ -749,6 +750,7 @@ export default function TelegramMini() {
   const [newEventLocation, setNewEventLocation] = useState("");
   const [newEventStart, setNewEventStart] = useState("");
   const [newEventEnd, setNewEventEnd] = useState("");
+  const [newEventImageUrl, setNewEventImageUrl] = useState("");
   const [savingEvent, setSavingEvent] = useState(false);
 
   // Admin
@@ -1035,7 +1037,7 @@ export default function TelegramMini() {
       const now = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from("events")
-        .select("id, title, description, event_start_time, event_end_time, event_location, event_type, hosted_by, is_featured, tags")
+        .select("id, title, description, event_start_time, event_end_time, event_location, event_type, event_image_url, hosted_by, is_featured, tags")
         .eq("community_id", VIBEY_COMMUNITY_ID)
         .gte("event_end_time", now)
         .order("event_start_time", { ascending: true })
@@ -1275,17 +1277,18 @@ export default function TelegramMini() {
         title: newEventTitle.trim(),
         description: newEventDescription.trim() || null,
         event_location: newEventLocation.trim() || null,
+        event_image_url: newEventImageUrl.trim() || null,
         event_start_time: start.toISOString(),
         event_end_time: end.toISOString(),
-        event_status: "scheduled",
-        event_type: "community",
+        event_status: "published",
+        event_type: "virtual",
         hosted_by: myProfile.name ?? myProfile.username ?? tgName ?? "Vibey community",
         is_public: true,
         registration_required: false,
         tags: ["vibey"],
         metadata: { source: "telegram_mini" },
       })
-      .select("id, title, description, event_start_time, event_end_time, event_location, event_type, hosted_by, is_featured, tags")
+      .select("id, title, description, event_start_time, event_end_time, event_location, event_type, event_image_url, hosted_by, is_featured, tags")
       .single();
     setSavingEvent(false);
     if (error) {
@@ -1302,6 +1305,7 @@ export default function TelegramMini() {
     setNewEventLocation("");
     setNewEventStart("");
     setNewEventEnd("");
+    setNewEventImageUrl("");
     setEventComposerOpen(false);
     toast.success("event added");
   }
@@ -1794,6 +1798,26 @@ export default function TelegramMini() {
                   placeholder="location or link"
                   className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
                 />
+                <div className="space-y-1.5">
+                  <input
+                    value={newEventImageUrl}
+                    onChange={(e) => setNewEventImageUrl(e.target.value)}
+                    placeholder="cover image url (optional)"
+                    className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
+                  />
+                  {newEventImageUrl.trim() && (
+                    <div className="rounded-md overflow-hidden border border-border aspect-[16/9] bg-muted">
+                      <img
+                        src={newEventImageUrl.trim()}
+                        alt="cover preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="space-y-1">
                     <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">starts</span>
@@ -1849,8 +1873,22 @@ export default function TelegramMini() {
                   return (
                     <article
                       key={event.id}
-                      className="rounded-lg bg-card border border-border p-3 space-y-2"
+                      className="rounded-lg bg-card border border-border overflow-hidden"
                     >
+                      {event.event_image_url && (
+                        <div className="aspect-[16/9] bg-muted overflow-hidden">
+                          <img
+                            src={event.event_image_url}
+                            alt={event.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            onError={(e) => {
+                              (e.currentTarget.parentElement as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div className="p-3 space-y-2">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold leading-snug">{event.title}</p>
@@ -1882,6 +1920,7 @@ export default function TelegramMini() {
                           <Clock className="w-3 h-3" />
                           {formatDistanceToNow(start, { addSuffix: true })}
                         </span>
+                      </div>
                       </div>
                     </article>
                   );
