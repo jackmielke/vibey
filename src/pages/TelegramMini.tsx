@@ -965,7 +965,7 @@ export default function TelegramMini() {
             if (miniPublicUserId) {
               const { data: linkedProfile } = await supabase
                 .from("users")
-                .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_user_id, telegram_username, headline, bio, email, created_at")
+                .select(MINI_PROFILE_COLUMNS)
                 .eq("id", miniPublicUserId)
                 .maybeSingle();
               best = linkedProfile as MiniProfile | null;
@@ -973,7 +973,7 @@ export default function TelegramMini() {
             if (!best) {
               const { data: meRow } = await supabase
                 .from("users")
-                .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_user_id, telegram_username, headline, bio, email, created_at")
+                .select(MINI_PROFILE_COLUMNS)
                 .eq("auth_user_id", meAuthId)
                 .limit(20);
               best = pickBestProfile(meRow as MiniProfile[] | null);
