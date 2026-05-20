@@ -1113,7 +1113,7 @@ export default function TelegramMini() {
       const { data, error } = await supabase
         .from("community_members")
         .select(
-          "user_id, users:users!community_members_user_id_fkey(id, auth_user_id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, instagram_handle, twitter_handle, source_url, headline, bio)",
+          "user_id, users:users!community_members_user_id_fkey(id, auth_user_id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, instagram_handle, twitter_handle, source_url, headline, bio, intentions, interests_skills)",
         )
         .eq("community_id", VIBE_CODE_RESIDENCY_COMMUNITY_ID)
         .order("joined_at", { ascending: true })
