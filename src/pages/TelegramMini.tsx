@@ -30,6 +30,7 @@ import vibeyAvatar from "@/assets/vibey-avatar.png";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatCredits, formatTokens } from "@/lib/usage";
+import { pickBestProfile } from "@/lib/profiles";
 
 const PREFERENCE_COMMUNITIES: { community_id: string; agent_id: string; label: string }[] = [
   {
@@ -609,6 +610,10 @@ type MeButtonProfile = {
   headline: string | null;
   bio: string | null;
   email: string | null;
+  auth_user_id?: string | null;
+  username?: string | null;
+  profile_picture_url?: string | null;
+  created_at?: string | null;
 };
 
 function MeButton({ profile, fallbackName }: { profile: MeButtonProfile | null; fallbackName: string | null }) {
@@ -839,13 +844,14 @@ export default function TelegramMini() {
             .from("users")
             .select("id")
             .eq("auth_user_id", authUid)
-            .maybeSingle();
-          if (userRow?.id) {
+            .limit(20);
+          const bestUser = pickBestProfile(userRow as Array<{ id: string }> | null);
+          if (bestUser?.id) {
             const { data: memberRow } = await supabase
               .from("community_members")
               .select("id")
               .eq("community_id", VIBEY_COMMUNITY_ID)
-              .eq("user_id", userRow.id)
+              .eq("user_id", bestUser.id)
               .maybeSingle();
             if (memberRow) setIsMember(true);
           }
@@ -859,10 +865,11 @@ export default function TelegramMini() {
           if (meAuthId) {
             const { data: meRow } = await supabase
               .from("users")
-              .select("id, name, avatar_url, telegram_photo_url, telegram_username, headline, bio, email")
+              .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, headline, bio, email, created_at")
               .eq("auth_user_id", meAuthId)
-              .maybeSingle();
-            if (meRow) setMyProfile(meRow as MyProfile);
+              .limit(20);
+            const best = pickBestProfile(meRow as MyProfile[] | null);
+            if (best) setMyProfile(best as MyProfile);
           }
         } catch (e) {
           console.warn("load my profile failed", e);

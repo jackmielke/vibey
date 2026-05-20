@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth, signOut } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { pickBestProfile } from "@/lib/profiles";
 
 type Profile = {
   id: string | null;
@@ -58,8 +59,8 @@ export function SidebarUserProfile({ collapsed }: { collapsed: boolean }) {
           "id, name, username, avatar_url, telegram_username, telegram_user_id, telegram_photo_url, email, bio, headline, intentions, interests_skills, instagram_handle, twitter_handle, phone_number, phone_verified, vibecoin_balance, wallet_address, wallet_provider, world_id_verified, universal_id, created_at"
         )
         .eq("auth_user_id", session.user.id)
-        .maybeSingle();
-      if (!cancelled) setProfile((data as Profile) ?? null);
+        .limit(20);
+      if (!cancelled) setProfile(pickBestProfile(data as Profile[] | null));
     })();
     return () => {
       cancelled = true;

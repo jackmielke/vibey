@@ -31,6 +31,43 @@ async function hmacSha256(key: ArrayBuffer | Uint8Array, data: string) {
 const toHex = (bytes: Uint8Array) =>
   Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 
+type ProfileCandidate = {
+  id: string;
+  auth_user_id: string | null;
+  name?: string | null;
+  email?: string | null;
+  telegram_user_id?: number | null;
+  telegram_username?: string | null;
+  username?: string | null;
+  avatar_url?: string | null;
+  telegram_photo_url?: string | null;
+  profile_picture_url?: string | null;
+  headline?: string | null;
+  bio?: string | null;
+  created_at?: string | null;
+};
+
+function profileScore(row: ProfileCandidate) {
+  return (
+    (row.auth_user_id ? 64 : 0) +
+    (row.telegram_user_id != null ? 32 : 0) +
+    (row.telegram_username || row.username ? 16 : 0) +
+    (row.avatar_url || row.telegram_photo_url || row.profile_picture_url ? 8 : 0) +
+    (row.email && !row.email.endsWith("@vibey.telegram") ? 4 : 0) +
+    (row.headline ? 2 : 0) +
+    (row.bio ? 1 : 0)
+  );
+}
+
+function pickBestProfile(rows: ProfileCandidate[] | null | undefined): ProfileCandidate | null {
+  if (!rows?.length) return null;
+  return [...rows].sort((a, b) => {
+    const byScore = profileScore(b) - profileScore(a);
+    if (byScore !== 0) return byScore;
+    return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
+  })[0];
+}
+
 // Telegram initData validation per https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
 async function validateInitData(initData: string, botToken: string) {
   const params = new URLSearchParams(initData);
@@ -91,67 +128,78 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Synthetic email per Telegram user — keeps auth.users 1:1 with TG identity.
-    const email = `tg-${tgUser.id}@vibey.telegram`;
+    // Synthetic fallback email per Telegram user. If this Telegram identity is
+    // already linked to a real Supabase auth account, we sign into that account
+    // instead so web + Telegram share one Vibe profile.
+    let email = `tg-${tgUser.id}@vibey.telegram`;
     const displayName = [tgUser.first_name, tgUser.last_name]
       .filter(Boolean)
       .join(" ") || tgUser.username || `tg-${tgUser.id}`;
 
-    // Ensure auth user exists
-    const { data: existing } = await admin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1,
-    });
     let userId: string | null = null;
+    let publicUserId: string | null = null;
 
-    // Use the lookup via getUserByEmail-ish: createUser returns 422 if exists.
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      user_metadata: {
-        telegram_user_id: tgUser.id,
-        telegram_username: tgUser.username,
-        name: displayName,
-        avatar_url: tgUser.photo_url,
-        source: "telegram_mini_app",
-      },
-    });
+    const { data: matchingProfiles } = await admin
+      .from("users")
+      .select("id, auth_user_id, name, email, telegram_user_id, telegram_username, username, avatar_url, telegram_photo_url, profile_picture_url, headline, bio, created_at")
+      .eq("telegram_user_id", tgUser.id)
+      .limit(50);
+    const existingProfile = pickBestProfile(matchingProfiles as ProfileCandidate[] | null);
+    if (existingProfile?.id) publicUserId = existingProfile.id;
 
-    if (created?.user) {
-      userId = created.user.id;
-    } else if (createErr) {
-      // Already exists — find them
-      const { data: list } = await admin.auth.admin.listUsers({
-        page: 1,
-        perPage: 200,
-      });
-      const found = list?.users.find((u) => u.email === email);
-      if (!found) return json({ error: createErr.message }, 500);
-      userId = found.id;
+    if (existingProfile?.auth_user_id) {
+      const { data: authLookup } = await admin.auth.admin.getUserById(existingProfile.auth_user_id);
+      if (authLookup?.user?.email) {
+        userId = authLookup.user.id;
+        email = authLookup.user.email;
+      }
     }
-    void existing;
+
+    if (!userId) {
+      // Use the lookup via getUserByEmail-ish: createUser returns 422 if exists.
+      const { data: created, error: createErr } = await admin.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        user_metadata: {
+          telegram_user_id: tgUser.id,
+          telegram_username: tgUser.username,
+          name: displayName,
+          avatar_url: tgUser.photo_url,
+          source: "telegram_mini_app",
+        },
+      });
+
+      if (created?.user) {
+        userId = created.user.id;
+      } else if (createErr) {
+        // Already exists — find them
+        const { data: list } = await admin.auth.admin.listUsers({
+          page: 1,
+          perPage: 200,
+        });
+        const found = list?.users.find((u) => u.email === email);
+        if (!found) return json({ error: createErr.message }, 500);
+        userId = found.id;
+      }
+    }
 
     // Link the public.users row that already exists for this Telegram user
     // (telegram bot creates rows w/ telegram_user_id but auth_user_id = NULL).
     // Without this, RLS on memories/community_members will hide everything.
     const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
-    let publicUserId: string | null = null;
     if (userId) {
-      // Try to find existing public.users row by telegram_user_id
-      const { data: existingUser } = await admin
-        .from("users")
-        .select("id, auth_user_id")
-        .eq("telegram_user_id", tgUser.id)
-        .maybeSingle();
-
-      if (existingUser) {
-        publicUserId = existingUser.id;
-        if (existingUser.auth_user_id !== userId) {
-          await admin
-            .from("users")
-            .update({ auth_user_id: userId })
-            .eq("id", existingUser.id);
-        }
+      if (publicUserId) {
+        await admin
+          .from("users")
+          .update({
+            auth_user_id: userId,
+            telegram_user_id: tgUser.id,
+            telegram_username: tgUser.username ?? existingProfile?.telegram_username ?? null,
+            name: existingProfile?.name ?? displayName,
+            email,
+            telegram_photo_url: tgUser.photo_url ?? existingProfile?.telegram_photo_url ?? null,
+          })
+          .eq("id", publicUserId);
       } else {
         // Create a public.users row for this Telegram user
         const { data: newUser } = await admin
@@ -159,7 +207,9 @@ Deno.serve(async (req) => {
           .insert({
             auth_user_id: userId,
             telegram_user_id: tgUser.id,
+            telegram_username: tgUser.username ?? null,
             name: displayName,
+            email,
             avatar_url: tgUser.photo_url ?? null,
           })
           .select("id")

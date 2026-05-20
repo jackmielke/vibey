@@ -9,6 +9,7 @@ import { supabase, supabasePublishableKey, supabaseUrl } from "@/integrations/su
 import { VoiceMode } from "@/components/VoiceMode";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
+import { pickBestProfile } from "@/lib/profiles";
 
 interface GalleryImage {
   id: string;
@@ -95,16 +96,17 @@ export default function Chat() {
         .from("users")
         .select("id")
         .eq("auth_user_id", session.user.id)
-        .maybeSingle();
+        .limit(20);
       if (cancelled) return;
-      if (!userRow?.id) {
+      const bestUser = pickBestProfile(userRow as Array<{ id: string }> | null);
+      if (!bestUser?.id) {
         setHistoryLoaded(true);
         return;
       }
       const { data: logs } = await supabase
         .from("agent_chat_logs")
         .select("id, user_message, agent_response, created_at")
-        .eq("session_key", `user:${userRow.id}`)
+        .eq("session_key", `user:${bestUser.id}`)
         .order("created_at", { ascending: true })
         .limit(50);
       if (cancelled) return;
