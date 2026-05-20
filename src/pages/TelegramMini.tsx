@@ -16,12 +16,14 @@ import {
   Plus,
   X,
   Calendar,
+  Clock,
+  MapPin,
   Users as UsersIcon,
   Coins,
   Zap,
 } from "lucide-react";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
 import { VIBEY_COMMUNITY_ID, VIBE_CODE_RESIDENCY_COMMUNITY_ID } from "@/lib/vibey";
@@ -83,6 +85,19 @@ type MiniProfile = {
   bio: string | null;
   email: string | null;
   created_at?: string | null;
+};
+
+type EventRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  event_start_time: string;
+  event_end_time: string;
+  event_location: string | null;
+  event_type: string | null;
+  hosted_by: string | null;
+  is_featured: boolean | null;
+  tags: string[] | null;
 };
 
 type ChatLogRow = {
@@ -714,6 +729,8 @@ export default function TelegramMini() {
 
   const [memories, setMemories] = useState<MemoryRow[]>([]);
   const [memLoading, setMemLoading] = useState(true);
+  const [events, setEvents] = useState<EventRow[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [prefs, setPrefs] = useState<PreferenceRow[]>([]);
   const [prefsLoading, setPrefsLoading] = useState(true);
   const [memFilter, setMemFilter] = useState<"all" | "mine" | "others">("all");
@@ -724,6 +741,15 @@ export default function TelegramMini() {
   const [newMemTitle, setNewMemTitle] = useState("");
   const [newMemContent, setNewMemContent] = useState("");
   const [savingMem, setSavingMem] = useState(false);
+
+  // Event composer (member-only)
+  const [eventComposerOpen, setEventComposerOpen] = useState(false);
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventDescription, setNewEventDescription] = useState("");
+  const [newEventLocation, setNewEventLocation] = useState("");
+  const [newEventStart, setNewEventStart] = useState("");
+  const [newEventEnd, setNewEventEnd] = useState("");
+  const [savingEvent, setSavingEvent] = useState(false);
 
   // Admin
   const [isAdmin, setIsAdmin] = useState(false);
@@ -1000,6 +1026,34 @@ export default function TelegramMini() {
     };
   }, [authState]);
 
+  // 3. Events
+  useEffect(() => {
+    if (authState !== "ready") return;
+    let cancelled = false;
+    (async () => {
+      setEventsLoading(true);
+      const now = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from("events")
+        .select("id, title, description, event_start_time, event_end_time, event_location, event_type, hosted_by, is_featured, tags")
+        .eq("community_id", VIBEY_COMMUNITY_ID)
+        .gte("event_end_time", now)
+        .order("event_start_time", { ascending: true })
+        .limit(50);
+      if (cancelled) return;
+      if (error) {
+        console.error("load events failed", error.message);
+        setEvents([]);
+      } else {
+        setEvents((data ?? []) as EventRow[]);
+      }
+      setEventsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authState]);
+
   // 3. Personal preferences
   useEffect(() => {
     if (authState !== "ready" || !tgUserId) {
@@ -1190,6 +1244,66 @@ export default function TelegramMini() {
     setNewMemContent("");
     setMemComposerOpen(false);
     toast.success("memory saved");
+  }
+
+  async function addEvent() {
+    if (!newEventTitle.trim() || !newEventStart.trim()) return;
+    if (!myProfile?.id) {
+      toast.error("Couldn't create event", { description: "Your profile is still loading." });
+      return;
+    }
+
+    const start = new Date(newEventStart);
+    const end = newEventEnd.trim()
+      ? new Date(newEventEnd)
+      : new Date(start.getTime() + 60 * 60 * 1000);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      toast.error("Couldn't create event", { description: "Please add a valid date and time." });
+      return;
+    }
+    if (end <= start) {
+      toast.error("Couldn't create event", { description: "End time needs to be after start time." });
+      return;
+    }
+
+    setSavingEvent(true);
+    const { data, error } = await supabase
+      .from("events")
+      .insert({
+        community_id: VIBEY_COMMUNITY_ID,
+        created_by: myProfile.id,
+        title: newEventTitle.trim(),
+        description: newEventDescription.trim() || null,
+        event_location: newEventLocation.trim() || null,
+        event_start_time: start.toISOString(),
+        event_end_time: end.toISOString(),
+        event_status: "scheduled",
+        event_type: "community",
+        hosted_by: myProfile.name ?? myProfile.username ?? tgName ?? "Vibey community",
+        is_public: true,
+        registration_required: false,
+        tags: ["vibey"],
+        metadata: { source: "telegram_mini" },
+      })
+      .select("id, title, description, event_start_time, event_end_time, event_location, event_type, hosted_by, is_featured, tags")
+      .single();
+    setSavingEvent(false);
+    if (error) {
+      toast.error("Couldn't create event", { description: error.message });
+      return;
+    }
+    setEvents((prev) =>
+      [...prev, data as EventRow].sort(
+        (a, b) => new Date(a.event_start_time).getTime() - new Date(b.event_start_time).getTime(),
+      ),
+    );
+    setNewEventTitle("");
+    setNewEventDescription("");
+    setNewEventLocation("");
+    setNewEventStart("");
+    setNewEventEnd("");
+    setEventComposerOpen(false);
+    toast.success("event added");
   }
 
   const isMine = (m: MemoryRow) =>
@@ -1642,20 +1756,138 @@ export default function TelegramMini() {
         {/* ===== EVENTS TAB ===== */}
         {tab === "events" && (
           <section className="space-y-3">
-            <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-              <Calendar className="w-3 h-3" />
-              upcoming events
-            </h2>
-            <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-muted-foreground" />
-              </div>
-              <p className="text-sm text-muted-foreground">no events yet</p>
-              <p className="text-[11px] text-muted-foreground max-w-xs">
-                community gatherings, dinners, and pop-ups will show up here once vibey starts
-                tracking them.
-              </p>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <Calendar className="w-3 h-3" />
+                upcoming events · {events.length}
+              </h2>
+              {isMember && (
+                <button
+                  type="button"
+                  onClick={() => setEventComposerOpen((open) => !open)}
+                  className="h-8 px-2.5 rounded-md bg-primary/10 border border-primary/30 text-primary font-mono text-[10px] uppercase tracking-widest flex items-center gap-1.5"
+                >
+                  {eventComposerOpen ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                  {eventComposerOpen ? "close" : "new"}
+                </button>
+              )}
             </div>
+
+            {eventComposerOpen && isMember && (
+              <div className="p-3 rounded-lg bg-card border border-primary/25 space-y-2">
+                <input
+                  value={newEventTitle}
+                  onChange={(e) => setNewEventTitle(e.target.value)}
+                  placeholder="event title"
+                  className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
+                />
+                <textarea
+                  value={newEventDescription}
+                  onChange={(e) => setNewEventDescription(e.target.value)}
+                  placeholder="short description"
+                  rows={3}
+                  className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60 resize-none"
+                />
+                <input
+                  value={newEventLocation}
+                  onChange={(e) => setNewEventLocation(e.target.value)}
+                  placeholder="location or link"
+                  className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="space-y-1">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">starts</span>
+                    <input
+                      type="datetime-local"
+                      value={newEventStart}
+                      onChange={(e) => setNewEventStart(e.target.value)}
+                      className="w-full bg-background border border-border rounded-md p-2 text-xs focus:outline-none focus:border-primary/60"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">ends</span>
+                    <input
+                      type="datetime-local"
+                      value={newEventEnd}
+                      onChange={(e) => setNewEventEnd(e.target.value)}
+                      className="w-full bg-background border border-border rounded-md p-2 text-xs focus:outline-none focus:border-primary/60"
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={addEvent}
+                  disabled={savingEvent || !newEventTitle.trim() || !newEventStart.trim()}
+                  className="w-full h-9 rounded-md bg-primary text-primary-foreground font-mono text-[10px] uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {savingEvent ? <Loader2 className="w-3 h-3 animate-spin" /> : <Calendar className="w-3 h-3" />}
+                  add event
+                </button>
+              </div>
+            )}
+
+            {eventsLoading ? (
+              <div className="flex items-center py-6">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : events.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                  <Calendar className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">no events yet</p>
+                <p className="text-[11px] text-muted-foreground max-w-xs">
+                  community calls, workshops, dinners, and pop-ups will show up here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {events.map((event) => {
+                  const start = new Date(event.event_start_time);
+                  const end = new Date(event.event_end_time);
+                  const sameDay = start.toDateString() === end.toDateString();
+                  return (
+                    <article
+                      key={event.id}
+                      className="rounded-lg bg-card border border-border p-3 space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold leading-snug">{event.title}</p>
+                          <p className="font-mono text-[10px] uppercase tracking-widest text-primary mt-1">
+                            {format(start, "EEE, MMM d")} · {format(start, "h:mm a")}
+                            {" - "}
+                            {sameDay ? format(end, "h:mm a") : format(end, "EEE h:mm a")}
+                          </p>
+                        </div>
+                        {event.is_featured && (
+                          <span className="shrink-0 rounded bg-primary/10 border border-primary/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary">
+                            featured
+                          </span>
+                        )}
+                      </div>
+                      {event.description && (
+                        <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                          {event.description}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                        {event.event_location && (
+                          <span className="inline-flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {event.event_location}
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {formatDistanceToNow(start, { addSuffix: true })}
+                        </span>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </section>
         )}
 

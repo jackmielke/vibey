@@ -10,6 +10,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   addUsage,
+  buildEventsBlock,
   buildSkillsBlock,
   buildSystemPromptWithMemories,
   buildUserContextBlock,
@@ -17,6 +18,7 @@ import {
   isAdminTelegramUser,
   loadEnabledSkills,
   loadRecentMemories,
+  loadUpcomingEvents,
   loadUserPreferences,
   resolveVibeUserId,
   runAgentLoopStreaming,
@@ -276,8 +278,9 @@ Deno.serve(async (req) => {
       : Promise.resolve([]);
 
     // Augment system prompt with: image-handling note + recent community memories + per-user prefs + skills.
-    const [memories, userPrefs, skills] = await Promise.all([
+    const [memories, events, userPrefs, skills] = await Promise.all([
       loadRecentMemories(supabase),
+      loadUpcomingEvents(supabase),
       loadUserPreferences(supabase, {
         telegram_user_id: resolvedTgUserId,
         telegram_username: resolvedTgUsername,
@@ -291,7 +294,7 @@ Deno.serve(async (req) => {
       telegram_username: resolvedTgUsername,
     });
     const isAdmin = isAdminTelegramUser(resolvedTgUserId);
-    const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories, vibeUserId, isAdmin)}\n\n${userContext}${buildSkillsBlock(skills)}`;
+    const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories, vibeUserId, isAdmin)}${buildEventsBlock(events)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
     // Split incoming messages into prior history + the current user turn so the
     // agent loop can run tool iterations before streaming the final reply.

@@ -104,6 +104,17 @@ export type Memory = {
   metadata: Record<string, unknown> | null;
 };
 
+export type CommunityEvent = {
+  id: string;
+  title: string;
+  description: string | null;
+  event_start_time: string;
+  event_end_time: string;
+  event_location: string | null;
+  hosted_by: string | null;
+  event_type: string | null;
+};
+
 type ProfileCandidate = {
   id?: string;
   auth_user_id?: string | null;
@@ -569,6 +580,51 @@ export async function loadRecentMemories(
     return [];
   }
   return (data ?? []) as Memory[];
+}
+
+export async function loadUpcomingEvents(
+  supabase: SupabaseClient,
+  limit = 12
+): Promise<CommunityEvent[]> {
+  const now = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("events")
+    .select("id, title, description, event_start_time, event_end_time, event_location, hosted_by, event_type")
+    .eq("community_id", VIBEY_COMMUNITY_ID)
+    .gte("event_end_time", now)
+    .order("event_start_time", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    console.error("loadUpcomingEvents failed:", error.message);
+    return [];
+  }
+  return (data ?? []) as CommunityEvent[];
+}
+
+export function buildEventsBlock(events: CommunityEvent[]): string {
+  if (events.length === 0) return "";
+  const lines = events
+    .map((event) => {
+      const start = new Date(event.event_start_time).toLocaleString("en-US", {
+        timeZone: "America/Los_Angeles",
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      const end = new Date(event.event_end_time).toLocaleString("en-US", {
+        timeZone: "America/Los_Angeles",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      const location = event.event_location ? ` @ ${event.event_location}` : "";
+      const description = event.description ? ` — ${event.description}` : "";
+      return `- ${event.title}: ${start}-${end} PT${location}${description}`;
+    })
+    .join("\n");
+  return `\n\n## Upcoming community events\n\nUse this when people ask what's coming up, what to attend, or what Vibey can remind them about.\n\n${lines}`;
 }
 
 async function saveMemory(

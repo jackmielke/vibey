@@ -17,6 +17,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   addUsage,
+  buildEventsBlock,
   buildSkillsBlock,
   buildSystemPromptWithMemories,
   buildUserContextBlock,
@@ -24,6 +25,7 @@ import {
   isAdminTelegramUser,
   loadEnabledSkills,
   loadRecentMemories,
+  loadUpcomingEvents,
   loadUserPreferences,
   resolveVibeUserId,
   runAgentLoop,
@@ -888,9 +890,10 @@ Deno.serve(async (req) => {
     }
 
     // Hydrate history for this group session + load community memories + per-user prefs.
-    const [history, memories, userPrefs, skills] = await Promise.all([
+    const [history, memories, events, userPrefs, skills] = await Promise.all([
       loadHistory(supabase, sessionKey),
       loadRecentMemories(supabase),
+      loadUpcomingEvents(supabase),
       loadUserPreferences(supabase, { telegram_user_id: userId, telegram_username: msg.from?.username ?? null }),
       loadEnabledSkills(supabase),
     ]);
@@ -899,7 +902,7 @@ Deno.serve(async (req) => {
       telegram_username: msg.from?.username ?? null,
     });
     const isAdmin = isAdminTelegramUser(userId);
-    const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId, isAdmin)}\n\n${userContext}${buildSkillsBlock(skills)}`;
+    const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId, isAdmin)}${buildEventsBlock(events)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
     const status = createStatusMessage(TELEGRAM_BOT_TOKEN, chatId, msg.message_id);
     let toolCount = 0;
@@ -1022,9 +1025,10 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200 });
   }
 
-  const [history, memories, userPrefs, skills] = await Promise.all([
+  const [history, memories, events, userPrefs, skills] = await Promise.all([
     loadHistory(supabase, sessionKey),
     loadRecentMemories(supabase),
+    loadUpcomingEvents(supabase),
     loadUserPreferences(supabase, { telegram_user_id: userId, telegram_username: msg.from?.username ?? null }),
     loadEnabledSkills(supabase),
   ]);
@@ -1033,7 +1037,7 @@ Deno.serve(async (req) => {
     telegram_username: msg.from?.username ?? null,
   });
   const isAdminDm = isAdminTelegramUser(userId);
-  const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId, isAdminDm)}\n\n${userContext}${buildSkillsBlock(skills)}`;
+  const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId, isAdminDm)}${buildEventsBlock(events)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
   const dmStatus = createStatusMessage(TELEGRAM_BOT_TOKEN, chatId);
   let dmToolCount = 0;
