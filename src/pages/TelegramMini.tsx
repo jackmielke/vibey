@@ -1419,7 +1419,31 @@ export default function TelegramMini() {
             admin
           </button>
         )}
-        <MeButton profile={myProfile} fallbackName={tgName} />
+        <MeButton
+          profile={myProfile}
+          fallbackName={tgName}
+          onViewFull={() => {
+            if (!myProfile) return;
+            setSelectedProfile({
+              id: myProfile.id,
+              name: myProfile.name,
+              avatar_url: myProfile.avatar_url,
+              profile_picture_url: myProfile.profile_picture_url ?? null,
+              telegram_photo_url: myProfile.telegram_photo_url,
+              telegram_username: myProfile.telegram_username,
+              instagram_handle: myProfile.instagram_handle ?? null,
+              twitter_handle: myProfile.twitter_handle ?? null,
+              source_url: myProfile.source_url ?? null,
+              headline: myProfile.headline,
+              bio: myProfile.bio,
+              intentions: myProfile.intentions ?? null,
+              interests_skills: myProfile.interests_skills ?? null,
+              email: myProfile.email,
+              vibecoin_balance: myProfile.vibecoin_balance ?? null,
+              world_id_verified: myProfile.world_id_verified ?? null,
+            });
+          }}
+        />
       </div>
 
       {/* Tabs */}
