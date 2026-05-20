@@ -541,6 +541,11 @@ type ProfileDetail = {
   source_url: string | null;
   headline: string | null;
   bio: string | null;
+  intentions?: string | null;
+  interests_skills?: string[] | null;
+  email?: string | null;
+  vibecoin_balance?: number | null;
+  world_id_verified?: boolean | null;
 };
 
 function ProfileDetailModal({
