@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Coins, Loader2, MessagesSquare, Users, Zap } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,6 +103,7 @@ export function ConversationsSection() {
   const [loading, setLoading] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [telegramOnly, setTelegramOnly] = useState(false);
+  const threadEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -220,6 +221,14 @@ export function ConversationsSection() {
       .reverse(); // chronological inside the thread
   }, [logs, selectedKey]);
 
+  useEffect(() => {
+    if (!selectedKey || selectedMessages.length === 0) return;
+    const id = requestAnimationFrame(() => {
+      threadEndRef.current?.scrollIntoView({ block: "end" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [selectedKey, selectedMessages.length]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -288,7 +297,7 @@ export function ConversationsSection() {
         </div>
 
         <div className="space-y-3">
-        {selectedMessages.map((m) => (
+          {selectedMessages.map((m) => (
             <div key={m.id} className="space-y-2">
               <div className="flex flex-col items-end">
                 <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words bg-primary/10 border border-primary/20">
@@ -331,6 +340,7 @@ export function ConversationsSection() {
               </div>
             </div>
           ))}
+          <div ref={threadEndRef} aria-hidden="true" />
         </div>
       </div>
     );
