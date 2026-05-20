@@ -15,6 +15,7 @@ import {
   Gauge,
   Bot,
   Zap,
+  CalendarDays,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useLocation } from "react-router-dom";
@@ -50,6 +51,7 @@ const navItems = [
   { title: "Interfaces", url: "/interfaces", icon: Settings2 },
   { title: "Identity", url: "/identity", icon: IdCard },
   { title: "Chat History", url: "/conversations", icon: MessagesSquare },
+  { title: "Calendar", url: "/calendar", icon: CalendarDays },
   { title: "Media Library", url: "/media", icon: Image },
   { title: "Group Chats", url: "/groups", icon: UsersRound },
   { title: "Mission Control", url: "/dashboard", icon: Gauge },
