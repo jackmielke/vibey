@@ -793,6 +793,8 @@ export default function TelegramMini() {
     (async () => {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
+        let miniAuthUserId: string | null = null;
+        let miniPublicUserId: string | null = null;
 
         if (mockMode) {
           // Preview mode: rely on an existing Supabase session (admin login).
@@ -811,7 +813,7 @@ export default function TelegramMini() {
           let hash = 0;
           for (const ch of u.id) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
           setTgUserId(Math.abs(hash) || 1);
-        } else if (!sessionData.session) {
+        } else {
           if (!initData) throw new Error("No Telegram initData — try reopening the mini app.");
           const { data, error } = await supabase.functions.invoke(
             "telegram-mini-auth",
@@ -819,12 +821,23 @@ export default function TelegramMini() {
           );
           if (error) throw error;
           if (!data?.token_hash || !data?.email) throw new Error("no token");
-          const { error: verifyErr } = await supabase.auth.verifyOtp({
-            token_hash: data.token_hash,
-            type: "magiclink",
-          });
-          if (verifyErr) throw verifyErr;
+          miniAuthUserId = data.auth_user_id ?? null;
+          miniPublicUserId = data.public_user_id ?? null;
+          const currentUserId = sessionData.session?.user?.id ?? null;
+
+          // Telegram is the source of truth inside the mini app. Reconcile even
+          // when the WebView has a cached session, otherwise RLS can point at an
+          // old synthetic Telegram account and hide the real Jack profile data.
+          if (!currentUserId || !miniAuthUserId || currentUserId !== miniAuthUserId) {
+            if (currentUserId) await supabase.auth.signOut();
+            const { error: verifyErr } = await supabase.auth.verifyOtp({
+              token_hash: data.token_hash,
+              type: "magiclink",
+            });
+            if (verifyErr) throw verifyErr;
+          }
           if (data.user?.name) setTgName(data.user.name);
+          if (data.user?.telegram_id) setTgUserId(data.user.telegram_id);
         }
 
         // Check admin status (server-side via SECURITY DEFINER function)
@@ -840,12 +853,23 @@ export default function TelegramMini() {
         // Check community membership (gates the "add memory" composer)
         const authUid = (await supabase.auth.getUser()).data.user?.id;
         if (authUid) {
-          const { data: userRow } = await supabase
-            .from("users")
-            .select("id")
-            .eq("auth_user_id", authUid)
-            .limit(20);
-          const bestUser = pickBestProfile(userRow as Array<{ id: string }> | null);
+          let bestUser: { id: string } | null = null;
+          if (miniPublicUserId) {
+            const { data: linkedUser } = await supabase
+              .from("users")
+              .select("id")
+              .eq("id", miniPublicUserId)
+              .maybeSingle();
+            bestUser = linkedUser;
+          }
+          if (!bestUser) {
+            const { data: userRow } = await supabase
+              .from("users")
+              .select("id")
+              .eq("auth_user_id", authUid)
+              .limit(20);
+            bestUser = pickBestProfile(userRow as Array<{ id: string }> | null);
+          }
           if (bestUser?.id) {
             const { data: memberRow } = await supabase
               .from("community_members")
@@ -863,12 +887,23 @@ export default function TelegramMini() {
         try {
           const meAuthId = (await supabase.auth.getUser()).data.user?.id;
           if (meAuthId) {
-            const { data: meRow } = await supabase
-              .from("users")
-              .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, headline, bio, email, created_at")
-              .eq("auth_user_id", meAuthId)
-              .limit(20);
-            const best = pickBestProfile(meRow as MyProfile[] | null);
+            let best: MyProfile | null = null;
+            if (miniPublicUserId) {
+              const { data: linkedProfile } = await supabase
+                .from("users")
+                .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, headline, bio, email, created_at")
+                .eq("id", miniPublicUserId)
+                .maybeSingle();
+              best = linkedProfile as MyProfile | null;
+            }
+            if (!best) {
+              const { data: meRow } = await supabase
+                .from("users")
+                .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, headline, bio, email, created_at")
+                .eq("auth_user_id", meAuthId)
+                .limit(20);
+              best = pickBestProfile(meRow as MyProfile[] | null) as MyProfile | null;
+            }
             if (best) setMyProfile(best as MyProfile);
           }
         } catch (e) {

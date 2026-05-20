@@ -247,6 +247,8 @@ Deno.serve(async (req) => {
     return json({
       token_hash: link.properties.hashed_token,
       email,
+      auth_user_id: userId,
+      public_user_id: publicUserId,
       user: {
         telegram_id: tgUser.id,
         name: displayName,
