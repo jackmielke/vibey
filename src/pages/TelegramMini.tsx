@@ -84,8 +84,19 @@ type MiniProfile = {
   headline: string | null;
   bio: string | null;
   email: string | null;
+  intentions?: string | null;
+  interests_skills?: string[] | null;
+  instagram_handle?: string | null;
+  twitter_handle?: string | null;
+  source_url?: string | null;
+  phone_number?: string | null;
+  vibecoin_balance?: number | null;
+  world_id_verified?: boolean | null;
   created_at?: string | null;
 };
+
+const MINI_PROFILE_COLUMNS =
+  "id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_user_id, telegram_username, headline, bio, email, intentions, interests_skills, instagram_handle, twitter_handle, source_url, phone_number, vibecoin_balance, world_id_verified, created_at";
 
 type EventRow = {
   id: string;
