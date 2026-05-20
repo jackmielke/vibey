@@ -622,6 +622,29 @@ function ProfileDetailModal({
           </div>
         )}
 
+        {profile.intentions && (
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">intentions</p>
+            <p className="text-sm whitespace-pre-wrap [overflow-wrap:anywhere] text-foreground/90">{profile.intentions}</p>
+          </div>
+        )}
+
+        {profile.interests_skills && profile.interests_skills.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">interests & skills</p>
+            <div className="flex flex-wrap gap-1.5">
+              {profile.interests_skills.map((s, i) => (
+                <span
+                  key={`${s}-${i}`}
+                  className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20"
+                >
+                  {s}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {links.length > 0 && (
           <div className="space-y-1.5">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">links</p>
@@ -641,7 +664,30 @@ function ProfileDetailModal({
           </div>
         )}
 
-        {!profile.headline && !profile.bio && links.length === 0 && (
+        {(profile.email || profile.vibecoin_balance != null || profile.world_id_verified) && (
+          <div className="grid grid-cols-2 gap-3 pt-1 border-t border-border">
+            {profile.email && (
+              <div className="col-span-2 min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">email</p>
+                <p className="text-xs font-mono break-all">{profile.email}</p>
+              </div>
+            )}
+            {profile.vibecoin_balance != null && (
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">vibecoin</p>
+                <p className="text-xs font-mono">{profile.vibecoin_balance}</p>
+              </div>
+            )}
+            {profile.world_id_verified && (
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">world id</p>
+                <p className="text-xs">verified ✓</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!profile.headline && !profile.bio && !profile.intentions && links.length === 0 && (!profile.interests_skills || profile.interests_skills.length === 0) && (
           <p className="text-xs text-muted-foreground italic">no profile details yet.</p>
         )}
       </div>
