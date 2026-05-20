@@ -69,6 +69,22 @@ type PreferenceRow = {
   updated_at: string | null;
 };
 
+type MiniProfile = {
+  id: string;
+  auth_user_id?: string | null;
+  name: string | null;
+  username?: string | null;
+  avatar_url: string | null;
+  profile_picture_url?: string | null;
+  telegram_photo_url: string | null;
+  telegram_user_id?: number | null;
+  telegram_username: string | null;
+  headline: string | null;
+  bio: string | null;
+  email: string | null;
+  created_at?: string | null;
+};
+
 type ChatLogRow = {
   id: string;
   user_message: string;
@@ -742,17 +758,7 @@ export default function TelegramMini() {
   const [directoryQuery, setDirectoryQuery] = useState("");
 
   // Current user mini-profile (for header avatar popover)
-  type MyProfile = {
-    id: string;
-    name: string | null;
-    avatar_url: string | null;
-    telegram_photo_url: string | null;
-    telegram_username: string | null;
-    headline: string | null;
-    bio: string | null;
-    email: string | null;
-  };
-  const [myProfile, setMyProfile] = useState<MyProfile | null>(null);
+  const [myProfile, setMyProfile] = useState<MiniProfile | null>(null);
 
   const filteredDirectory = useMemo(() => {
     const q = directoryQuery.trim().toLowerCase();
@@ -804,15 +810,44 @@ export default function TelegramMini() {
             );
           }
           const u = sessionData.session.user;
-          setTgName(
-            (u.user_metadata?.name as string) ??
-              u.email?.split("@")[0] ??
-              "Preview",
-          );
-          // Stable fake telegram_user_id derived from auth uid so "mine" filter works.
-          let hash = 0;
-          for (const ch of u.id) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
-          setTgUserId(Math.abs(hash) || 1);
+          miniAuthUserId = u.id;
+
+          const { data: previewRows, error: previewErr } = await supabase
+            .from("users")
+            .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_user_id, telegram_username, headline, bio, email, created_at")
+            .eq("auth_user_id", u.id)
+            .limit(20);
+          if (previewErr) throw previewErr;
+
+          const previewProfile = pickBestProfile(previewRows as MiniProfile[] | null);
+          if (previewProfile) {
+            miniPublicUserId = previewProfile.id;
+            setMyProfile(previewProfile);
+            setTgName(
+              previewProfile.name ??
+                previewProfile.username ??
+                (u.user_metadata?.name as string) ??
+                u.email?.split("@")[0] ??
+                "Preview",
+            );
+            if (previewProfile.telegram_user_id != null) {
+              setTgUserId(previewProfile.telegram_user_id);
+            }
+          } else {
+            setTgName(
+              (u.user_metadata?.name as string) ??
+                u.email?.split("@")[0] ??
+                "Preview",
+            );
+          }
+
+          if (previewProfile?.telegram_user_id == null) {
+            // Keep local-only preview features usable for profiles that have not
+            // linked Telegram yet; real Telegram auth always replaces this.
+            let hash = 0;
+            for (const ch of u.id) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+            setTgUserId(Math.abs(hash) || 1);
+          }
         } else {
           if (!initData) throw new Error("No Telegram initData — try reopening the mini app.");
           const { data, error } = await supabase.functions.invoke(
@@ -887,24 +922,24 @@ export default function TelegramMini() {
         try {
           const meAuthId = (await supabase.auth.getUser()).data.user?.id;
           if (meAuthId) {
-            let best: MyProfile | null = null;
+            let best: MiniProfile | null = null;
             if (miniPublicUserId) {
               const { data: linkedProfile } = await supabase
                 .from("users")
-                .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, headline, bio, email, created_at")
+                .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_user_id, telegram_username, headline, bio, email, created_at")
                 .eq("id", miniPublicUserId)
                 .maybeSingle();
-              best = linkedProfile as MyProfile | null;
+              best = linkedProfile as MiniProfile | null;
             }
             if (!best) {
               const { data: meRow } = await supabase
                 .from("users")
-                .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, headline, bio, email, created_at")
+                .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_user_id, telegram_username, headline, bio, email, created_at")
                 .eq("auth_user_id", meAuthId)
                 .limit(20);
-              best = pickBestProfile(meRow as MyProfile[] | null) as MyProfile | null;
+              best = pickBestProfile(meRow as MiniProfile[] | null);
             }
-            if (best) setMyProfile(best as MyProfile);
+            if (best) setMyProfile(best);
           }
         } catch (e) {
           console.warn("load my profile failed", e);
