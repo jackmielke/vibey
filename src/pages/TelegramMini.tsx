@@ -29,7 +29,7 @@ import { useVibeyAgent } from "@/hooks/useVibeyAgent";
 import { VIBEY_COMMUNITY_ID, VIBE_CODE_RESIDENCY_COMMUNITY_ID } from "@/lib/vibey";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+// (popover no longer used in this file)
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatCredits, formatTokens } from "@/lib/usage";
 import { pickBestProfile } from "@/lib/profiles";
@@ -84,8 +84,19 @@ type MiniProfile = {
   headline: string | null;
   bio: string | null;
   email: string | null;
+  intentions?: string | null;
+  interests_skills?: string[] | null;
+  instagram_handle?: string | null;
+  twitter_handle?: string | null;
+  source_url?: string | null;
+  phone_number?: string | null;
+  vibecoin_balance?: number | null;
+  world_id_verified?: boolean | null;
   created_at?: string | null;
 };
+
+const MINI_PROFILE_COLUMNS =
+  "id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_user_id, telegram_username, headline, bio, email, intentions, interests_skills, instagram_handle, twitter_handle, source_url, phone_number, vibecoin_balance, world_id_verified, created_at";
 
 type EventRow = {
   id: string;
@@ -530,6 +541,11 @@ type ProfileDetail = {
   source_url: string | null;
   headline: string | null;
   bio: string | null;
+  intentions?: string | null;
+  interests_skills?: string[] | null;
+  email?: string | null;
+  vibecoin_balance?: number | null;
+  world_id_verified?: boolean | null;
 };
 
 function ProfileDetailModal({
@@ -606,6 +622,29 @@ function ProfileDetailModal({
           </div>
         )}
 
+        {profile.intentions && (
+          <div className="space-y-1">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">intentions</p>
+            <p className="text-sm whitespace-pre-wrap [overflow-wrap:anywhere] text-foreground/90">{profile.intentions}</p>
+          </div>
+        )}
+
+        {profile.interests_skills && profile.interests_skills.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">interests & skills</p>
+            <div className="flex flex-wrap gap-1.5">
+              {profile.interests_skills.map((s, i) => (
+                <span
+                  key={`${s}-${i}`}
+                  className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20"
+                >
+                  {s}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {links.length > 0 && (
           <div className="space-y-1.5">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">links</p>
@@ -625,7 +664,30 @@ function ProfileDetailModal({
           </div>
         )}
 
-        {!profile.headline && !profile.bio && links.length === 0 && (
+        {(profile.email || profile.vibecoin_balance != null || profile.world_id_verified) && (
+          <div className="grid grid-cols-2 gap-3 pt-1 border-t border-border">
+            {profile.email && (
+              <div className="col-span-2 min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">email</p>
+                <p className="text-xs font-mono break-all">{profile.email}</p>
+              </div>
+            )}
+            {profile.vibecoin_balance != null && (
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">vibecoin</p>
+                <p className="text-xs font-mono">{profile.vibecoin_balance}</p>
+              </div>
+            )}
+            {profile.world_id_verified && (
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">world id</p>
+                <p className="text-xs">verified ✓</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!profile.headline && !profile.bio && !profile.intentions && links.length === 0 && (!profile.interests_skills || profile.interests_skills.length === 0) && (
           <p className="text-xs text-muted-foreground italic">no profile details yet.</p>
         )}
       </div>
@@ -648,7 +710,15 @@ type MeButtonProfile = {
   created_at?: string | null;
 };
 
-function MeButton({ profile, fallbackName }: { profile: MeButtonProfile | null; fallbackName: string | null }) {
+function MeButton({
+  profile,
+  fallbackName,
+  onViewFull,
+}: {
+  profile: MeButtonProfile | null;
+  fallbackName: string | null;
+  onViewFull?: () => void;
+}) {
   const name = profile?.name ?? fallbackName ?? "You";
   const handle = profile?.telegram_username ?? null;
   const photo = profile?.avatar_url ?? profile?.telegram_photo_url ?? undefined;
@@ -661,63 +731,17 @@ function MeButton({ profile, fallbackName }: { profile: MeButtonProfile | null; 
     .toUpperCase();
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label="Your profile"
-          className="rounded-full ring-1 ring-primary/40 hover:ring-primary transition-shadow"
-        >
-          <Avatar className="w-8 h-8">
-            {photo && <AvatarImage src={photo} alt={name} />}
-            <AvatarFallback className="text-[10px] font-mono">{initials}</AvatarFallback>
-          </Avatar>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 p-3 space-y-2">
-        <div className="flex items-center gap-3">
-          <Avatar className="w-12 h-12 ring-1 ring-border">
-            {photo && <AvatarImage src={photo} alt={name} />}
-            <AvatarFallback className="text-xs font-mono">{initials}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold truncate">{name}</p>
-            {handle && (
-              <p className="text-[10px] font-mono text-muted-foreground truncate">@{handle}</p>
-            )}
-          </div>
-        </div>
-        {profile?.headline && (
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
-              headline
-            </p>
-            <p className="text-xs">{profile.headline}</p>
-          </div>
-        )}
-        {profile?.bio && (
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
-              bio
-            </p>
-            <p className="text-xs whitespace-pre-wrap">{profile.bio}</p>
-          </div>
-        )}
-        {profile?.email && (
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
-              email
-            </p>
-            <p className="text-xs font-mono break-all">{profile.email}</p>
-          </div>
-        )}
-        {!profile && (
-          <p className="text-xs text-muted-foreground">
-            Signed in as {fallbackName ?? "you"}. No profile row yet.
-          </p>
-        )}
-      </PopoverContent>
-    </Popover>
+    <button
+      type="button"
+      aria-label="Your profile"
+      onClick={onViewFull}
+      className="rounded-full ring-1 ring-primary/40 hover:ring-primary transition-shadow"
+    >
+      <Avatar className="w-8 h-8">
+        {photo && <AvatarImage src={photo} alt={name} />}
+        <AvatarFallback className="text-[10px] font-mono">{initials}</AvatarFallback>
+      </Avatar>
+    </button>
   );
 }
 
@@ -779,6 +803,8 @@ export default function TelegramMini() {
     source_url: string | null;
     headline: string | null;
     bio: string | null;
+    intentions: string | null;
+    interests_skills: string[] | null;
   };
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
@@ -954,7 +980,7 @@ export default function TelegramMini() {
             if (miniPublicUserId) {
               const { data: linkedProfile } = await supabase
                 .from("users")
-                .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_user_id, telegram_username, headline, bio, email, created_at")
+                .select(MINI_PROFILE_COLUMNS)
                 .eq("id", miniPublicUserId)
                 .maybeSingle();
               best = linkedProfile as MiniProfile | null;
@@ -962,7 +988,7 @@ export default function TelegramMini() {
             if (!best) {
               const { data: meRow } = await supabase
                 .from("users")
-                .select("id, auth_user_id, name, username, avatar_url, profile_picture_url, telegram_photo_url, telegram_user_id, telegram_username, headline, bio, email, created_at")
+                .select(MINI_PROFILE_COLUMNS)
                 .eq("auth_user_id", meAuthId)
                 .limit(20);
               best = pickBestProfile(meRow as MiniProfile[] | null);
@@ -1087,7 +1113,7 @@ export default function TelegramMini() {
       const { data, error } = await supabase
         .from("community_members")
         .select(
-          "user_id, users:users!community_members_user_id_fkey(id, auth_user_id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, instagram_handle, twitter_handle, source_url, headline, bio)",
+          "user_id, users:users!community_members_user_id_fkey(id, auth_user_id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, instagram_handle, twitter_handle, source_url, headline, bio, intentions, interests_skills)",
         )
         .eq("community_id", VIBE_CODE_RESIDENCY_COMMUNITY_ID)
         .order("joined_at", { ascending: true })
@@ -1393,7 +1419,31 @@ export default function TelegramMini() {
             admin
           </button>
         )}
-        <MeButton profile={myProfile} fallbackName={tgName} />
+        <MeButton
+          profile={myProfile}
+          fallbackName={tgName}
+          onViewFull={() => {
+            if (!myProfile) return;
+            setSelectedProfile({
+              id: myProfile.id,
+              name: myProfile.name,
+              avatar_url: myProfile.avatar_url,
+              profile_picture_url: myProfile.profile_picture_url ?? null,
+              telegram_photo_url: myProfile.telegram_photo_url,
+              telegram_username: myProfile.telegram_username,
+              instagram_handle: myProfile.instagram_handle ?? null,
+              twitter_handle: myProfile.twitter_handle ?? null,
+              source_url: myProfile.source_url ?? null,
+              headline: myProfile.headline,
+              bio: myProfile.bio,
+              intentions: myProfile.intentions ?? null,
+              interests_skills: myProfile.interests_skills ?? null,
+              email: myProfile.email,
+              vibecoin_balance: myProfile.vibecoin_balance ?? null,
+              world_id_verified: myProfile.world_id_verified ?? null,
+            });
+          }}
+        />
       </div>
 
       {/* Tabs */}

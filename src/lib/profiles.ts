@@ -1,4 +1,5 @@
 type ProfileCandidate = {
+  id?: string | null;
   auth_user_id?: string | null;
   email?: string | null;
   telegram_user_id?: number | null;
