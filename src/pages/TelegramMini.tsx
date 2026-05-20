@@ -29,7 +29,7 @@ import { useVibeyAgent } from "@/hooks/useVibeyAgent";
 import { VIBEY_COMMUNITY_ID, VIBE_CODE_RESIDENCY_COMMUNITY_ID } from "@/lib/vibey";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
-import { Avatar as _AvatarUnused } from "@/components/ui/avatar";
+// (popover no longer used in this file)
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatCredits, formatTokens } from "@/lib/usage";
 import { pickBestProfile } from "@/lib/profiles";
