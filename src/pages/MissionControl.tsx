@@ -29,6 +29,7 @@ import { useMissionControl } from "@/hooks/useMissionControl";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 import { formatCredits } from "@/lib/usage";
+import { CalendarUpcoming } from "@/components/CalendarUpcoming";
 
 function timeAgo(iso: string | null) {
   if (!iso) return "—";
@@ -283,6 +284,11 @@ export default function MissionControl() {
           <Label>Messages 7d</Label>
           <div className="mt-2"><StatNumber value={stats?.messages7d ?? 0} loading={loading} /></div>
           <Activity className="absolute bottom-3 right-3 h-4 w-4 text-primary/40" />
+        </Tile>
+
+        {/* Calendar — wide tall */}
+        <Tile className="col-span-2 md:col-span-2 row-span-3" to="/calendar">
+          <CalendarUpcoming limit={5} />
         </Tile>
 
       </div>
