@@ -803,6 +803,8 @@ export default function TelegramMini() {
     source_url: string | null;
     headline: string | null;
     bio: string | null;
+    intentions: string | null;
+    interests_skills: string[] | null;
   };
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
