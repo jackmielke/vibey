@@ -1526,6 +1526,22 @@ export function buildSystemPromptWithMemories(
   callerVibeUserId: string | null = null,
   isAdmin: boolean = false
 ): string {
+  // Always inject the current Pacific time. Vibey lives in California (Edge
+  // Esmeralda, Vibe House, etc.) so PT is the right default. Telegram doesn't
+  // expose the user's timezone, so we anchor to Pacific and let Vibey adapt
+  // when someone explicitly says they're elsewhere.
+  const timeBlock =
+    `Current time: ${new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(new Date())} (Pacific Time)\n\n`;
+
   const memoryBlock =
     memories.length === 0
       ? "(none yet — feel free to call save_memory when something durable is worth remembering)"
@@ -1676,7 +1692,7 @@ Your messages get rendered with Markdown → Telegram HTML. Use these freely:
 
 When a tool gives you a URL (web_search, fetch_url, get_vibe_price, etc.), wrap it in a Markdown link with a human-readable label rather than dumping the raw link.`;
 
-  return `${basePrompt}\n\n${toolsBlock}${adminBlock}${formattingBlock}`;
+  return `${timeBlock}${basePrompt}\n\n${toolsBlock}${adminBlock}${formattingBlock}`;
 }
 
 // ── Identity resolution ──────────────────────────────────────────────────────
