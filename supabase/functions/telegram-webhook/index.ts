@@ -250,7 +250,12 @@ function createStatusMessage(token: string, chatId: number, reply_to_message_id?
     if (steps.length === 0) return "✨ thinking…";
     // Keep last ~12 steps so the message doesn't blow past 4096 chars.
     const shown = steps.slice(-12);
-    return `✨ thinking…\n${shown.join("\n")}`;
+    // Run each line through the same markdown -> HTML converter the final
+    // reply uses, so Vibey's **bold** etc. render live during streaming
+    // instead of showing as literal asterisks until finalize swaps in the
+    // already-converted trace block.
+    const lines = shown.map((line) => mdToTelegramHtml(line));
+    return `✨ thinking…\n${lines.join("\n")}`;
   };
 
   const flush = () => {
@@ -260,8 +265,9 @@ function createStatusMessage(token: string, chatId: number, reply_to_message_id?
         chat_id: chatId,
         message_id: messageId,
         text: render(),
+        parse_mode: "HTML",
         disable_web_page_preview: true,
-      }).catch(() => { /* ignore rate-limit / not-modified */ });
+      }).catch(() => { /* ignore rate-limit / not-modified / malformed-HTML */ });
     });
   };
 
