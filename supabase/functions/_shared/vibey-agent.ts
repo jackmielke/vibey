@@ -2262,6 +2262,15 @@ export function describeToolDone(
       }
       return { label: `🪙 VIBE price fetched`, details: lines.join("\n") };
     }
+    case "notify_jack": {
+      if (result?.ok === false) {
+        return { label: `📵 couldn't reach Jack`, details: result?.error };
+      }
+      const u = String(args?.urgency ?? "fyi");
+      const emoji = u === "blocked" ? "🔴" : u === "stuck" ? "🟡" : "🟢";
+      const msg = String(args?.message ?? "").slice(0, 200);
+      return { label: `${emoji} Jack pinged on Telegram`, details: msg || undefined };
+    }
     default:
       return { label: `✅ ${name} done` };
   }
