@@ -88,3 +88,42 @@ export function useGoogleCalendarList() {
 
   return { calendars, loading, error };
 }
+
+/**
+ * Create a new Google Calendar event.
+ * 
+ * Example usage:
+ * ```ts
+ * const result = await createGoogleCalendarEvent({
+ *   summary: "Monopoly Night",
+ *   description: "Early dot-com edition!",
+ *   location: "Vibe House",
+ *   start: { dateTime: "2026-06-05T19:00:00-07:00", timeZone: "America/Los_Angeles" },
+ *   end: { dateTime: "2026-06-05T22:00:00-07:00", timeZone: "America/Los_Angeles" },
+ * });
+ * ```
+ */
+export async function createGoogleCalendarEvent(
+  event: Partial<GCalEvent>,
+  calendarId = "primary"
+): Promise<{ data?: GCalEvent; error?: string }> {
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      "google-calendar-events",
+      {
+        method: "POST",
+        body: { calendarId, event },
+      }
+    );
+
+    if (error) {
+      return { error: error.message };
+    }
+    if ((data as any)?.error) {
+      return { error: (data as any).error };
+    }
+    return { data: data as GCalEvent };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
