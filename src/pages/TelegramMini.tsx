@@ -21,6 +21,8 @@ import {
   Users as UsersIcon,
   Coins,
   Zap,
+  ImagePlus,
+  Camera,
 } from "lucide-react";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { format, formatDistanceToNow } from "date-fns";
