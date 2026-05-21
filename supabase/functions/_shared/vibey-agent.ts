@@ -283,6 +283,36 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "notify_jack",
+      description:
+        "Send Jack a Telegram DM when you're stuck, blocked, want to flag something, or just want to escalate to a human. Use sparingly — only when the situation genuinely benefits from human help. Examples: a tool keeps failing, an admin asked you to edit a file you can't handle, a request is genuinely ambiguous and you'd rather check than guess, or you noticed something Jack would want to know. Don't use for routine confusion you can resolve by re-asking the user. The DM is delivered out-of-band; the current conversation continues normally — tell the user (politely) that you've pinged Jack so they know help is on the way.",
+      parameters: {
+        type: "object",
+        properties: {
+          urgency: {
+            type: "string",
+            enum: ["fyi", "stuck", "blocked"],
+            description:
+              "fyi = no action needed, just a heads-up. stuck = tried something and failed, user is waiting. blocked = literally can't proceed without Jack.",
+          },
+          message: {
+            type: "string",
+            description:
+              "What you'd say to Jack in 1-3 sentences — the actual situation in your own voice. Be specific and direct.",
+          },
+          context: {
+            type: "string",
+            description:
+              "Optional extra context: which user/conversation, what tool failed, what was attempted, relevant error messages. Will be shown to Jack as a code block.",
+          },
+        },
+        required: ["urgency", "message"],
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
@@ -1423,6 +1453,119 @@ async function githubListRecentCommits(
   }
 }
 
+// ── notify_jack: Vibey's escape hatch to a human ────────────────────────────
+//
+// When Vibey is stuck, blocked, or just wants to flag something, she can call
+// notify_jack to DM Jack on Telegram. The call also logs a row to
+// `vibey_vents` for later review in the admin UI.
+
+const JACK_TELEGRAM_CHAT_ID = 5780091237; // Jack Mielke — Telegram user id == DM chat_id
+const TELEGRAM_GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
+
+function urgencyEmoji(urgency: string): string {
+  switch (urgency) {
+    case "blocked": return "🔴";
+    case "stuck": return "🟡";
+    case "fyi":
+    default: return "🟢";
+  }
+}
+
+async function notifyJack(
+  supabase: SupabaseClient,
+  args: { urgency?: string; message?: string; context?: string },
+  metadata: Record<string, unknown>
+): Promise<string> {
+  const urgency = (args?.urgency ?? "fyi").toLowerCase();
+  const message = (args?.message ?? "").trim();
+  const context = (args?.context ?? "").trim();
+  if (!message) return JSON.stringify({ ok: false, error: "message is required" });
+  if (!["fyi", "stuck", "blocked"].includes(urgency)) {
+    return JSON.stringify({ ok: false, error: "urgency must be fyi, stuck, or blocked" });
+  }
+
+  const source =
+    (metadata?.source as string | undefined) ??
+    (metadata?.interface as string | undefined) ??
+    "chat";
+  const callerName =
+    (metadata?.display_name as string | undefined) ??
+    (metadata?.telegram_username as string | undefined) ??
+    null;
+
+  // Build the Telegram message body. Plain text to keep it bulletproof.
+  const header = `${urgencyEmoji(urgency)} Vibey ${urgency.toUpperCase()}`;
+  const fromLine = callerName ? `from: ${callerName} (${source})` : `from: ${source}`;
+  const ctxBlock = context ? `\n\ncontext:\n${context.slice(0, 1500)}` : "";
+  const telegramText = `${header}\n${fromLine}\n\n${message}${ctxBlock}`;
+
+  // Insert the vent row first so we have it logged even if Telegram fails.
+  let ventId: string | null = null;
+  try {
+    const { data: ventRow } = await supabase
+      .from("vibey_vents")
+      .insert({
+        urgency,
+        message,
+        context: context || null,
+        source,
+      })
+      .select("id")
+      .single();
+    ventId = (ventRow as { id?: string } | null)?.id ?? null;
+  } catch (e) {
+    console.warn("notify_jack: failed to log vent row:", e);
+  }
+
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY");
+  if (!LOVABLE_API_KEY || !TELEGRAM_API_KEY) {
+    const err = "Telegram connector is not configured (missing LOVABLE_API_KEY or TELEGRAM_API_KEY).";
+    if (ventId) {
+      await supabase.from("vibey_vents").update({ delivered: false, delivery_error: err }).eq("id", ventId);
+    }
+    return JSON.stringify({ ok: false, error: err });
+  }
+
+  try {
+    const resp = await fetch(`${TELEGRAM_GATEWAY_URL}/sendMessage`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "X-Connection-Api-Key": TELEGRAM_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: JACK_TELEGRAM_CHAT_ID,
+        text: telegramText,
+        disable_web_page_preview: true,
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data?.ok === false) {
+      const err = `Telegram sendMessage failed [${resp.status}]: ${JSON.stringify(data).slice(0, 400)}`;
+      if (ventId) {
+        await supabase.from("vibey_vents").update({ delivered: false, delivery_error: err }).eq("id", ventId);
+      }
+      return JSON.stringify({ ok: false, error: err });
+    }
+    const tgMessageId = data?.result?.message_id ?? null;
+    if (ventId) {
+      await supabase
+        .from("vibey_vents")
+        .update({ delivered: true, telegram_message_id: tgMessageId, delivery_error: null })
+        .eq("id", ventId);
+    }
+    return JSON.stringify({ ok: true, urgency, vent_id: ventId, telegram_message_id: tgMessageId });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    if (ventId) {
+      await supabase.from("vibey_vents").update({ delivered: false, delivery_error: err }).eq("id", ventId);
+    }
+    return JSON.stringify({ ok: false, error: err });
+  }
+}
+
 const ADMIN_TOOL_NAMES = new Set(ADMIN_TOOLS.map((t) => t.function.name));
 
 async function executeToolCall(
@@ -1475,6 +1618,12 @@ async function executeToolCall(
       });
     case "get_vibe_price":
       return await getVibePrice(parsed as { usd?: number; vibe?: number });
+    case "notify_jack":
+      return await notifyJack(
+        supabase,
+        parsed as { urgency?: string; message?: string; context?: string },
+        metadata
+      );
     case "admin_update_soul":
       return await adminUpdateSoul(supabase, parsed as Parameters<typeof adminUpdateSoul>[1]);
     case "admin_delete_memory":
@@ -1598,6 +1747,19 @@ You have access to these tools:
   when the user is talking about distribution or selling, not for simple lookups.
   The result always includes \`million_vibe_usd\` (what 1,000,000 VIBE is worth right now) —
   weave that in naturally as a fun reference stat when sharing the price.
+
+- **notify_jack({ urgency, message, context? })** — your escape hatch to a human.
+  Pings Jack on Telegram out-of-band when you're stuck, blocked, or want to flag
+  something he'd care about. Use sparingly and only when human help genuinely
+  unblocks you or him — NOT for routine confusion you can resolve by re-asking
+  the user. Examples worth pinging on: a tool fails repeatedly, an admin asks
+  for a file edit you can't safely do, a memory conflict you can't resolve,
+  someone reports a real bug, or a feature request you literally can't fulfill.
+  Urgencies: \`fyi\` (heads-up, no action needed), \`stuck\` (tried and failed,
+  user is waiting), \`blocked\` (can't proceed without him). After calling, tell
+  the current user in your reply that you've pinged Jack — keep it casual, no
+  drama. Don't promise Jack will respond instantly.
+
 
 You can call any tool zero, one, or multiple times before replying. After all tool
 calls finish, give the user your normal natural-language reply — don't mention tools
@@ -2030,6 +2192,11 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       if (typeof vibe === "number") return `🪙 valuing ${Number(vibe).toLocaleString()} VIBE…`;
       return "🪙 fetching live VIBE price…";
     }
+    case "notify_jack": {
+      const u = String(args?.urgency ?? "fyi");
+      const emoji = u === "blocked" ? "🔴" : u === "stuck" ? "🟡" : "🟢";
+      return `${emoji} pinging Jack…`;
+    }
     default:
       return `⚙️ running ${name}…`;
   }
@@ -2094,6 +2261,15 @@ export function describeToolDone(
         lines.push(`${Number(result.vibe_input).toLocaleString()} VIBE = $${result.usd_amount.toFixed(4)}`);
       }
       return { label: `🪙 VIBE price fetched`, details: lines.join("\n") };
+    }
+    case "notify_jack": {
+      if (result?.ok === false) {
+        return { label: `📵 couldn't reach Jack`, details: result?.error };
+      }
+      const u = String(args?.urgency ?? "fyi");
+      const emoji = u === "blocked" ? "🔴" : u === "stuck" ? "🟡" : "🟢";
+      const msg = String(args?.message ?? "").slice(0, 200);
+      return { label: `${emoji} Jack pinged on Telegram`, details: msg || undefined };
     }
     default:
       return { label: `✅ ${name} done` };
