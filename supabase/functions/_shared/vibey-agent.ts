@@ -1053,6 +1053,71 @@ async function fetchGranolaNotes(args: {
   }
 }
 
+// Fetch a single Granola note by URL or id (handles pasted notes.granola.ai links).
+const GRANOLA_NOTE_ID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+async function fetchGranolaNote(args: { url_or_id: string }): Promise<string> {
+  const GRANOLA_API_KEY = Deno.env.get("GRANOLA_API_KEY");
+  if (!GRANOLA_API_KEY) {
+    return JSON.stringify({
+      ok: false,
+      error: "Granola notes are not configured. Missing GRANOLA_API_KEY.",
+      account_email: GRANOLA_ACCOUNT_EMAIL,
+    });
+  }
+  const raw = (args?.url_or_id ?? "").trim();
+  const match = raw.match(GRANOLA_NOTE_ID_RE);
+  if (!match) {
+    return JSON.stringify({
+      ok: false,
+      error: "Could not find a Granola note id (UUID) in that input.",
+      input: raw.slice(0, 200),
+    });
+  }
+  const id = match[0];
+  try {
+    const resp = await fetch(
+      `https://public-api.granola.ai/v1/notes/${encodeURIComponent(id)}?include=transcript`,
+      { headers: { Authorization: `Bearer ${GRANOLA_API_KEY}` } }
+    );
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      return JSON.stringify({
+        ok: false,
+        error: `Granola ${resp.status}: ${text.slice(0, 300)}`,
+        note_id: id,
+        account_email: GRANOLA_ACCOUNT_EMAIL,
+      });
+    }
+    const note = (await resp.json()) as GranolaNote;
+    const body = compactGranolaText(note);
+    return JSON.stringify({
+      ok: true,
+      account_email: GRANOLA_ACCOUNT_EMAIL,
+      note: {
+        id: note.id ?? id,
+        title: note.title ?? "Untitled Granola note",
+        owner: note.owner ?? null,
+        created_at: note.created_at ?? null,
+        updated_at: note.updated_at ?? null,
+        summary: note.summary_text ?? note.summary_markdown ?? note.summary ?? null,
+        content: body.slice(0, 6000),
+        truncated: body.length > 6000,
+        original_length: body.length,
+        url: note.web_url ?? note.url ?? `https://notes.granola.ai/t/${id}`,
+      },
+    });
+  } catch (e) {
+    return JSON.stringify({
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+      note_id: id,
+      account_email: GRANOLA_ACCOUNT_EMAIL,
+    });
+  }
+}
+
+
 // ── VIBE pricing tool (GeckoTerminal) ────────────────────────────────────────
 
 const VIBE_POOL_URL =
