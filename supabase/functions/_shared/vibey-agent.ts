@@ -286,6 +286,24 @@ export const TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "fetch_granola_note",
+      description:
+        "Fetch a single Granola meeting note by URL or note ID. Use this whenever the user shares a notes.granola.ai link (e.g. https://notes.granola.ai/t/<uuid>) or refers to a specific note by id. Returns title, summary, and transcript. Auth'd as vibey@vibeventures.studio, so it works on private notes that fetch_url can't read.",
+      parameters: {
+        type: "object",
+        properties: {
+          url_or_id: {
+            type: "string",
+            description: "Either a full notes.granola.ai URL or the bare note UUID.",
+          },
+        },
+        required: ["url_or_id"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "notify_jack",
       description:
         "Send Jack a Telegram DM when you're stuck, blocked, want to flag something, or just want to escalate to a human. Use sparingly — only when the situation genuinely benefits from human help. Examples: a tool keeps failing, an admin asked you to edit a file you can't handle, a request is genuinely ambiguous and you'd rather check than guess, or you noticed something Jack would want to know. Don't use for routine confusion you can resolve by re-asking the user. The DM is delivered out-of-band; the current conversation continues normally — tell the user (politely) that you've pinged Jack so they know help is on the way.",
@@ -542,6 +560,13 @@ export async function loadEnabledToolNames(
     Deno.env.get("GRANOLA_API_KEY")
   ) {
     enabled.add("granola_notes");
+  }
+  const hasGranolaNoteRegistryRow = rows.some((r) => r.name === "fetch_granola_note");
+  if (
+    !hasGranolaNoteRegistryRow &&
+    Deno.env.get("GRANOLA_API_KEY")
+  ) {
+    enabled.add("fetch_granola_note");
   }
 
   return enabled;
@@ -842,6 +867,18 @@ async function fetchUrl(args: { url: string }): Promise<string> {
     return JSON.stringify({ ok: false, error: "valid http(s) url required" });
   }
 
+  // Auto-route Granola note URLs to the authenticated tool — public scrape
+  // returns a login wall.
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host === "notes.granola.ai" || host.endsWith(".granola.ai") || host === "granola.ai") {
+      return await fetchGranolaNote({ url_or_id: url });
+    }
+  } catch { /* ignore */ }
+
+  try {
+  }
+
   try {
     const resp = await fetch(url, {
       headers: {
@@ -1022,6 +1059,71 @@ async function fetchGranolaNotes(args: {
     });
   }
 }
+
+// Fetch a single Granola note by URL or id (handles pasted notes.granola.ai links).
+const GRANOLA_NOTE_ID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+async function fetchGranolaNote(args: { url_or_id: string }): Promise<string> {
+  const GRANOLA_API_KEY = Deno.env.get("GRANOLA_API_KEY");
+  if (!GRANOLA_API_KEY) {
+    return JSON.stringify({
+      ok: false,
+      error: "Granola notes are not configured. Missing GRANOLA_API_KEY.",
+      account_email: GRANOLA_ACCOUNT_EMAIL,
+    });
+  }
+  const raw = (args?.url_or_id ?? "").trim();
+  const match = raw.match(GRANOLA_NOTE_ID_RE);
+  if (!match) {
+    return JSON.stringify({
+      ok: false,
+      error: "Could not find a Granola note id (UUID) in that input.",
+      input: raw.slice(0, 200),
+    });
+  }
+  const id = match[0];
+  try {
+    const resp = await fetch(
+      `https://public-api.granola.ai/v1/notes/${encodeURIComponent(id)}?include=transcript`,
+      { headers: { Authorization: `Bearer ${GRANOLA_API_KEY}` } }
+    );
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      return JSON.stringify({
+        ok: false,
+        error: `Granola ${resp.status}: ${text.slice(0, 300)}`,
+        note_id: id,
+        account_email: GRANOLA_ACCOUNT_EMAIL,
+      });
+    }
+    const note = (await resp.json()) as GranolaNote;
+    const body = compactGranolaText(note);
+    return JSON.stringify({
+      ok: true,
+      account_email: GRANOLA_ACCOUNT_EMAIL,
+      note: {
+        id: note.id ?? id,
+        title: note.title ?? "Untitled Granola note",
+        owner: note.owner ?? null,
+        created_at: note.created_at ?? null,
+        updated_at: note.updated_at ?? null,
+        summary: note.summary_text ?? note.summary_markdown ?? note.summary ?? null,
+        content: body.slice(0, 6000),
+        truncated: body.length > 6000,
+        original_length: body.length,
+        url: note.web_url ?? note.url ?? `https://notes.granola.ai/t/${id}`,
+      },
+    });
+  } catch (e) {
+    return JSON.stringify({
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+      note_id: id,
+      account_email: GRANOLA_ACCOUNT_EMAIL,
+    });
+  }
+}
+
 
 // ── VIBE pricing tool (GeckoTerminal) ────────────────────────────────────────
 
@@ -1610,6 +1712,8 @@ async function executeToolCall(
         created_after?: string;
         created_before?: string;
       });
+    case "fetch_granola_note":
+      return await fetchGranolaNote(parsed as { url_or_id: string });
     case "get_vibe_price":
       return await getVibePrice(parsed as { usd?: number; vibe?: number });
     case "notify_jack":
@@ -1732,6 +1836,10 @@ You have access to these tools:
   Use when the user asks about Granola notes, meeting/call/workshop context, decisions, action items,
   or says they sent/shared something to Vibey through Granola. Keep retrieved notes private to the
   current conversation; summarize only the relevant parts.
+
+- **fetch_granola_note(url_or_id)** — open ONE specific Granola note. ALWAYS use this when the user
+  pastes a notes.granola.ai link or gives you a note id. Do NOT try fetch_url on granola links —
+  it can't see private notes. Pass the URL or UUID directly; the tool extracts the id for you.
 
 - **get_vibe_price(usd?, vibe?)** — fetch the LIVE price of VibeCoin (VIBE on Base) from GeckoTerminal.
   Call this ANY time the user mentions VIBE, VibeCoin, "vibes" as a token, sending VibeCoin,
@@ -2176,6 +2284,8 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       const q = String(args?.query ?? "").trim();
       return q ? `📝 searching Granola for "${q.slice(0, 80)}"…` : "📝 checking Granola notes…";
     }
+    case "fetch_granola_note":
+      return "📝 opening that Granola note…";
     case "save_memory":
       return "🧠 jotting this one down…";
     case "update_memory":
@@ -2226,6 +2336,13 @@ export function describeToolDone(
         label: n > 0 ? `📝 found ${n} Granola note${n === 1 ? "" : "s"}` : `📝 no matching Granola notes`,
         details: `searched${email}`,
       };
+    }
+    case "fetch_granola_note": {
+      if (result?.ok === false) {
+        return { label: `📭 couldn't open that Granola note`, details: result?.error };
+      }
+      const title = result?.note?.title ?? "Granola note";
+      return { label: `📝 read "${String(title).slice(0, 60)}"` };
     }
     case "save_memory":
       return { label: result?.ok ? `✨ memory saved` : `🤔 couldn't save that one` };
