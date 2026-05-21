@@ -1505,6 +1505,12 @@ async function executeToolCall(
       });
     case "get_vibe_price":
       return await getVibePrice(parsed as { usd?: number; vibe?: number });
+    case "notify_jack":
+      return await notifyJack(
+        supabase,
+        parsed as { urgency?: string; message?: string; context?: string },
+        metadata
+      );
     case "admin_update_soul":
       return await adminUpdateSoul(supabase, parsed as Parameters<typeof adminUpdateSoul>[1]);
     case "admin_delete_memory":
