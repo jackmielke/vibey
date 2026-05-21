@@ -283,6 +283,36 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "notify_jack",
+      description:
+        "Send Jack a Telegram DM when you're stuck, blocked, want to flag something, or just want to escalate to a human. Use sparingly — only when the situation genuinely benefits from human help. Examples: a tool keeps failing, an admin asked you to edit a file you can't handle, a request is genuinely ambiguous and you'd rather check than guess, or you noticed something Jack would want to know. Don't use for routine confusion you can resolve by re-asking the user. The DM is delivered out-of-band; the current conversation continues normally — tell the user (politely) that you've pinged Jack so they know help is on the way.",
+      parameters: {
+        type: "object",
+        properties: {
+          urgency: {
+            type: "string",
+            enum: ["fyi", "stuck", "blocked"],
+            description:
+              "fyi = no action needed, just a heads-up. stuck = tried something and failed, user is waiting. blocked = literally can't proceed without Jack.",
+          },
+          message: {
+            type: "string",
+            description:
+              "What you'd say to Jack in 1-3 sentences — the actual situation in your own voice. Be specific and direct.",
+          },
+          context: {
+            type: "string",
+            description:
+              "Optional extra context: which user/conversation, what tool failed, what was attempted, relevant error messages. Will be shown to Jack as a code block.",
+          },
+        },
+        required: ["urgency", "message"],
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
