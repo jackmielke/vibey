@@ -561,6 +561,13 @@ export async function loadEnabledToolNames(
   ) {
     enabled.add("granola_notes");
   }
+  const hasGranolaNoteRegistryRow = rows.some((r) => r.name === "fetch_granola_note");
+  if (
+    !hasGranolaNoteRegistryRow &&
+    Deno.env.get("GRANOLA_API_KEY")
+  ) {
+    enabled.add("fetch_granola_note");
+  }
 
   return enabled;
 }
