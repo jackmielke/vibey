@@ -2333,6 +2333,13 @@ export function describeToolDone(
         details: `searched${email}`,
       };
     }
+    case "fetch_granola_note": {
+      if (result?.ok === false) {
+        return { label: `📭 couldn't open that Granola note`, details: result?.error };
+      }
+      const title = result?.note?.title ?? "Granola note";
+      return { label: `📝 read "${String(title).slice(0, 60)}"` };
+    }
     case "save_memory":
       return { label: result?.ok ? `✨ memory saved` : `🤔 couldn't save that one` };
     case "update_memory": {
