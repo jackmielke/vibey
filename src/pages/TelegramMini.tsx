@@ -1277,6 +1277,35 @@ export default function TelegramMini() {
     toast.success("memory saved");
   }
 
+  async function uploadEventCover(file: File) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please pick an image file");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image too large", { description: "Max 8 MB." });
+      return;
+    }
+    setUploadingEventImage(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const path = `${VIBEY_COMMUNITY_ID}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("event-images")
+        .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("event-images").getPublicUrl(path);
+      setNewEventImageUrl(data.publicUrl);
+      toast.success("cover uploaded");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      toast.error("Couldn't upload cover", { description: msg });
+    } finally {
+      setUploadingEventImage(false);
+    }
+  }
+
   async function addEvent() {
     if (!newEventTitle.trim() || !newEventStart.trim()) return;
     if (!myProfile?.id) {
