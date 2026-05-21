@@ -1712,6 +1712,8 @@ async function executeToolCall(
         created_after?: string;
         created_before?: string;
       });
+    case "fetch_granola_note":
+      return await fetchGranolaNote(parsed as { url_or_id: string });
     case "get_vibe_price":
       return await getVibePrice(parsed as { usd?: number; vibe?: number });
     case "notify_jack":
