@@ -286,6 +286,24 @@ export const TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "fetch_granola_note",
+      description:
+        "Fetch a single Granola meeting note by URL or note ID. Use this whenever the user shares a notes.granola.ai link (e.g. https://notes.granola.ai/t/<uuid>) or refers to a specific note by id. Returns title, summary, and transcript. Auth'd as vibey@vibeventures.studio, so it works on private notes that fetch_url can't read.",
+      parameters: {
+        type: "object",
+        properties: {
+          url_or_id: {
+            type: "string",
+            description: "Either a full notes.granola.ai URL or the bare note UUID.",
+          },
+        },
+        required: ["url_or_id"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "notify_jack",
       description:
         "Send Jack a Telegram DM when you're stuck, blocked, want to flag something, or just want to escalate to a human. Use sparingly — only when the situation genuinely benefits from human help. Examples: a tool keeps failing, an admin asked you to edit a file you can't handle, a request is genuinely ambiguous and you'd rather check than guess, or you noticed something Jack would want to know. Don't use for routine confusion you can resolve by re-asking the user. The DM is delivered out-of-band; the current conversation continues normally — tell the user (politely) that you've pinged Jack so they know help is on the way.",
