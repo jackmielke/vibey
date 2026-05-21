@@ -1460,7 +1460,6 @@ async function githubListRecentCommits(
 // `vibey_vents` for later review in the admin UI.
 
 const JACK_TELEGRAM_CHAT_ID = 5780091237; // Jack Mielke — Telegram user id == DM chat_id
-const TELEGRAM_GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
 
 function urgencyEmoji(urgency: string): string {
   switch (urgency) {
@@ -1517,10 +1516,9 @@ async function notifyJack(
     console.warn("notify_jack: failed to log vent row:", e);
   }
 
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY");
-  if (!LOVABLE_API_KEY || !TELEGRAM_API_KEY) {
-    const err = "Telegram connector is not configured (missing LOVABLE_API_KEY or TELEGRAM_API_KEY).";
+  const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
+  if (!TELEGRAM_BOT_TOKEN) {
+    const err = "TELEGRAM_BOT_TOKEN is not configured.";
     if (ventId) {
       await supabase.from("vibey_vents").update({ delivered: false, delivery_error: err }).eq("id", ventId);
     }
@@ -1528,13 +1526,9 @@ async function notifyJack(
   }
 
   try {
-    const resp = await fetch(`${TELEGRAM_GATEWAY_URL}/sendMessage`, {
+    const resp = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": TELEGRAM_API_KEY,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: JACK_TELEGRAM_CHAT_ID,
         text: telegramText,
