@@ -860,6 +860,18 @@ async function fetchUrl(args: { url: string }): Promise<string> {
     return JSON.stringify({ ok: false, error: "valid http(s) url required" });
   }
 
+  // Auto-route Granola note URLs to the authenticated tool — public scrape
+  // returns a login wall.
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host === "notes.granola.ai" || host.endsWith(".granola.ai") || host === "granola.ai") {
+      return await fetchGranolaNote({ url_or_id: url });
+    }
+  } catch { /* ignore */ }
+
+  try {
+  }
+
   try {
     const resp = await fetch(url, {
       headers: {
