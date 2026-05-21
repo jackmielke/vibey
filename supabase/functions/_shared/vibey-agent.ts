@@ -2192,6 +2192,11 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       if (typeof vibe === "number") return `🪙 valuing ${Number(vibe).toLocaleString()} VIBE…`;
       return "🪙 fetching live VIBE price…";
     }
+    case "notify_jack": {
+      const u = String(args?.urgency ?? "fyi");
+      const emoji = u === "blocked" ? "🔴" : u === "stuck" ? "🟡" : "🟢";
+      return `${emoji} pinging Jack…`;
+    }
     default:
       return `⚙️ running ${name}…`;
   }
