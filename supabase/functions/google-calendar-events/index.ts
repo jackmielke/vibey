@@ -1,6 +1,5 @@
 // Lists upcoming events from the connected Google Calendar account via the
-// Lovable connector gateway. Read-only — uses the calendar.readonly scope
-// already configured on the connection.
+// Lovable connector gateway. Now also supports creating events via POST.
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_calendar/calendar/v3";
 
@@ -26,18 +25,47 @@ Deno.serve(async (req) => {
       );
     }
 
-    const url = new URL(req.url);
-    const calendarId = url.searchParams.get("calendarId") ?? "primary";
-    const maxResults = Number(url.searchParams.get("maxResults") ?? 25);
-    const action = url.searchParams.get("action") ?? "events";
-
     const headers = {
       Authorization: `Bearer ${LOVABLE_API_KEY}`,
       "X-Connection-Api-Key": GOOGLE_CALENDAR_API_KEY,
       "Content-Type": "application/json",
     };
 
-    // List user's calendars (so the UI can let admin pick which one to show)
+    // CREATE EVENT (POST)
+    if (req.method === "POST") {
+      const body = await req.json();
+      const { calendarId = "primary", event } = body;
+
+      if (!event) {
+        throw new Error("Missing 'event' object in request body");
+      }
+
+      const resp = await fetch(
+        `${GATEWAY_URL}/calendars/${encodeURIComponent(calendarId)}/events`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(event),
+        }
+      );
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(
+          `Google create event failed [${resp.status}]: ${JSON.stringify(data)}`
+        );
+      }
+
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // LIST CALENDARS (GET with action=calendarList)
+    const url = new URL(req.url);
+    const calendarId = url.searchParams.get("calendarId") ?? "primary";
+    const maxResults = Number(url.searchParams.get("maxResults") ?? 25);
+    const action = url.searchParams.get("action") ?? "events";
+
     if (action === "calendarList") {
       const resp = await fetch(`${GATEWAY_URL}/users/me/calendarList`, { headers });
       const data = await resp.json();
@@ -51,7 +79,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Default: upcoming events for one calendar
+    // LIST EVENTS (GET, default)
     const timeMin = new Date().toISOString();
     const params = new URLSearchParams({
       timeMin,
