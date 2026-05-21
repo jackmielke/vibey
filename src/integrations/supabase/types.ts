@@ -3323,6 +3323,45 @@ export type Database = {
         }
         Relationships: []
       }
+      vibey_vents: {
+        Row: {
+          acknowledged_at: string | null
+          context: string | null
+          created_at: string
+          delivered: boolean
+          delivery_error: string | null
+          id: string
+          message: string
+          source: string | null
+          telegram_message_id: number | null
+          urgency: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          context?: string | null
+          created_at?: string
+          delivered?: boolean
+          delivery_error?: string | null
+          id?: string
+          message: string
+          source?: string | null
+          telegram_message_id?: number | null
+          urgency: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          context?: string | null
+          created_at?: string
+          delivered?: boolean
+          delivery_error?: string | null
+          id?: string
+          message?: string
+          source?: string | null
+          telegram_message_id?: number | null
+          urgency?: string
+        }
+        Relationships: []
+      }
       world_objects: {
         Row: {
           community_id: string
