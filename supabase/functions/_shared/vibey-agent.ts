@@ -1453,6 +1453,119 @@ async function githubListRecentCommits(
   }
 }
 
+// ── notify_jack: Vibey's escape hatch to a human ────────────────────────────
+//
+// When Vibey is stuck, blocked, or just wants to flag something, she can call
+// notify_jack to DM Jack on Telegram. The call also logs a row to
+// `vibey_vents` for later review in the admin UI.
+
+const JACK_TELEGRAM_CHAT_ID = 5780091237; // Jack Mielke — Telegram user id == DM chat_id
+const TELEGRAM_GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
+
+function urgencyEmoji(urgency: string): string {
+  switch (urgency) {
+    case "blocked": return "🔴";
+    case "stuck": return "🟡";
+    case "fyi":
+    default: return "🟢";
+  }
+}
+
+async function notifyJack(
+  supabase: SupabaseClient,
+  args: { urgency?: string; message?: string; context?: string },
+  metadata: Record<string, unknown>
+): Promise<string> {
+  const urgency = (args?.urgency ?? "fyi").toLowerCase();
+  const message = (args?.message ?? "").trim();
+  const context = (args?.context ?? "").trim();
+  if (!message) return JSON.stringify({ ok: false, error: "message is required" });
+  if (!["fyi", "stuck", "blocked"].includes(urgency)) {
+    return JSON.stringify({ ok: false, error: "urgency must be fyi, stuck, or blocked" });
+  }
+
+  const source =
+    (metadata?.source as string | undefined) ??
+    (metadata?.interface as string | undefined) ??
+    "chat";
+  const callerName =
+    (metadata?.display_name as string | undefined) ??
+    (metadata?.telegram_username as string | undefined) ??
+    null;
+
+  // Build the Telegram message body. Plain text to keep it bulletproof.
+  const header = `${urgencyEmoji(urgency)} Vibey ${urgency.toUpperCase()}`;
+  const fromLine = callerName ? `from: ${callerName} (${source})` : `from: ${source}`;
+  const ctxBlock = context ? `\n\ncontext:\n${context.slice(0, 1500)}` : "";
+  const telegramText = `${header}\n${fromLine}\n\n${message}${ctxBlock}`;
+
+  // Insert the vent row first so we have it logged even if Telegram fails.
+  let ventId: string | null = null;
+  try {
+    const { data: ventRow } = await supabase
+      .from("vibey_vents")
+      .insert({
+        urgency,
+        message,
+        context: context || null,
+        source,
+      })
+      .select("id")
+      .single();
+    ventId = (ventRow as { id?: string } | null)?.id ?? null;
+  } catch (e) {
+    console.warn("notify_jack: failed to log vent row:", e);
+  }
+
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY");
+  if (!LOVABLE_API_KEY || !TELEGRAM_API_KEY) {
+    const err = "Telegram connector is not configured (missing LOVABLE_API_KEY or TELEGRAM_API_KEY).";
+    if (ventId) {
+      await supabase.from("vibey_vents").update({ delivered: false, delivery_error: err }).eq("id", ventId);
+    }
+    return JSON.stringify({ ok: false, error: err });
+  }
+
+  try {
+    const resp = await fetch(`${TELEGRAM_GATEWAY_URL}/sendMessage`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "X-Connection-Api-Key": TELEGRAM_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: JACK_TELEGRAM_CHAT_ID,
+        text: telegramText,
+        disable_web_page_preview: true,
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data?.ok === false) {
+      const err = `Telegram sendMessage failed [${resp.status}]: ${JSON.stringify(data).slice(0, 400)}`;
+      if (ventId) {
+        await supabase.from("vibey_vents").update({ delivered: false, delivery_error: err }).eq("id", ventId);
+      }
+      return JSON.stringify({ ok: false, error: err });
+    }
+    const tgMessageId = data?.result?.message_id ?? null;
+    if (ventId) {
+      await supabase
+        .from("vibey_vents")
+        .update({ delivered: true, telegram_message_id: tgMessageId, delivery_error: null })
+        .eq("id", ventId);
+    }
+    return JSON.stringify({ ok: true, urgency, vent_id: ventId, telegram_message_id: tgMessageId });
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    if (ventId) {
+      await supabase.from("vibey_vents").update({ delivered: false, delivery_error: err }).eq("id", ventId);
+    }
+    return JSON.stringify({ ok: false, error: err });
+  }
+}
+
 const ADMIN_TOOL_NAMES = new Set(ADMIN_TOOLS.map((t) => t.function.name));
 
 async function executeToolCall(
