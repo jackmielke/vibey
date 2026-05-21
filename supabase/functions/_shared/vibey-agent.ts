@@ -2280,6 +2280,8 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       const q = String(args?.query ?? "").trim();
       return q ? `📝 searching Granola for "${q.slice(0, 80)}"…` : "📝 checking Granola notes…";
     }
+    case "fetch_granola_note":
+      return "📝 opening that Granola note…";
     case "save_memory":
       return "🧠 jotting this one down…";
     case "update_memory":
