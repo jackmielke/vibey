@@ -1629,8 +1629,9 @@ syncs back into the live preview within seconds, so commits ship immediately.
 
 - **github_list_recent_commits({ limit? })** — see what changed recently. Good first call when
   an admin asks "what did you change?" or wants a sha to revert.
-- **github_search_code({ query })** — find where something lives. Always do this before reading
-  a file you don't already know the path of.
+- **github_search_code({ query })** — find where something lives by keyword. NOTE: this is
+  currently unreliable on this repo (returns 0 results for most queries). PREFER \`github_list_dir\`
+  + \`github_read_file\` to navigate. Only fall back to search if dir-walking is too expensive.
 - **github_list_dir({ path?, ref? })** — explore folders.
 - **github_read_file({ path, ref? })** — read a file. Always do this BEFORE editing — you need
   the returned \`sha\` to pass back to github_commit_file (otherwise GitHub will reject the write
@@ -1799,7 +1800,7 @@ export function buildUserContextBlock(
 // telegram-webhook. The web chat function uses the lower-level pieces so it
 // can stream the FINAL model call back to the browser.
 
-const MAX_TOOL_ITERATIONS = 10;
+const MAX_TOOL_ITERATIONS = 25;
 
 export async function runAgentLoop(opts: {
   supabase: SupabaseClient;
@@ -1820,6 +1821,7 @@ export async function runAgentLoop(opts: {
     event:
       | { status: "start"; name: string; args: Record<string, unknown>; label: string }
       | { status: "done"; name: string; args: Record<string, unknown>; label: string; details?: string }
+      | { status: "thought"; content: string }
   ) => void | Promise<void>;
   onUsage?: (usage: OpenRouterUsage) => void | Promise<void>;
 }): Promise<string> {
@@ -1896,6 +1898,15 @@ export async function runAgentLoop(opts: {
     if (!toolCalls || toolCalls.length === 0) {
       // Done — no more tool calls. Return the assistant text.
       return (choice.content ?? "").trim();
+    }
+
+    // Surface Vibey's intermediate reasoning (when she narrates a plan alongside
+    // tool calls) so the caller can render it as a "thinking trace".
+    const intermediateThought = (choice.content ?? "").trim();
+    if (intermediateThought && onProgress) {
+      try {
+        await onProgress({ status: "thought", content: intermediateThought });
+      } catch (e) { console.warn("onProgress thought failed:", e); }
     }
 
     // Append the assistant's tool-call turn, then run each tool.
