@@ -23,7 +23,9 @@ import {
   Zap,
   ImagePlus,
   Camera,
+  MessagesSquare,
 } from "lucide-react";
+import { ConversationsSection } from "@/components/sections/ConversationsSection";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { format, formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
