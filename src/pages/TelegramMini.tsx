@@ -2140,6 +2140,23 @@ export default function TelegramMini() {
           onClose={() => setSelectedProfile(null)}
         />
       )}
+
+      {selectedEvent && (
+        <EventEditModal
+          event={selectedEvent}
+          canEdit={isAdmin || (myProfile?.id != null && selectedEvent.created_by === myProfile.id)}
+          canDelete={isAdmin || (myProfile?.id != null && selectedEvent.created_by === myProfile.id)}
+          onClose={() => setSelectedEvent(null)}
+          onSaved={(updated) => {
+            setEvents((prev) => prev.map((e) => (e.id === updated.id ? (updated as EventRow) : e)));
+            setSelectedEvent(updated);
+          }}
+          onDeleted={(id) => {
+            setEvents((prev) => prev.filter((e) => e.id !== id));
+            setSelectedEvent(null);
+          }}
+        />
+      )}
     </div>
   );
 }
