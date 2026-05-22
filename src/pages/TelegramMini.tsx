@@ -23,7 +23,9 @@ import {
   Zap,
   ImagePlus,
   Camera,
+  MessagesSquare,
 } from "lucide-react";
+import { ConversationsSection } from "@/components/sections/ConversationsSection";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { format, formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -789,7 +791,7 @@ export default function TelegramMini() {
   const [adminLoading, setAdminLoading] = useState(false);
 
   // Tabs
-  type Tab = "memories" | "profiles" | "preferences" | "events" | "soul";
+  type Tab = "memories" | "profiles" | "preferences" | "events" | "soul" | "chats";
   const [tab, setTab] = useState<Tab>("memories");
 
   // Profiles directory
@@ -1418,6 +1420,7 @@ export default function TelegramMini() {
     { id: "profiles", label: "profiles", icon: UsersIcon },
     { id: "preferences", label: "you", icon: Heart },
     { id: "events", label: "events", icon: Calendar },
+    ...(isAdmin ? [{ id: "chats" as Tab, label: "chats", icon: MessagesSquare }] : []),
     { id: "soul", label: "soul", icon: Sparkles },
   ];
 
@@ -2082,6 +2085,17 @@ export default function TelegramMini() {
             ) : (
               <p className="text-xs text-muted-foreground py-4">no soul yet.</p>
             )}
+          </section>
+        )}
+
+        {/* ===== CHATS TAB (admin only) ===== */}
+        {tab === "chats" && isAdmin && (
+          <section className="space-y-2">
+            <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
+              <MessagesSquare className="w-3 h-3" />
+              chat history · admin
+            </h2>
+            <ConversationsSection />
           </section>
         )}
       </div>
