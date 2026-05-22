@@ -1358,7 +1358,7 @@ export default function TelegramMini() {
         tags: ["vibey"],
         metadata: { source: "telegram_mini" },
       })
-      .select("id, title, description, event_start_time, event_end_time, event_location, event_type, event_image_url, hosted_by, is_featured, tags")
+      .select(EVENT_SELECT)
       .single();
     setSavingEvent(false);
     if (error) {
