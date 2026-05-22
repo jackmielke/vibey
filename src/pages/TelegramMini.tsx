@@ -29,6 +29,7 @@ import { useVibeyAgent } from "@/hooks/useVibeyAgent";
 import { VIBEY_COMMUNITY_ID, VIBE_CODE_RESIDENCY_COMMUNITY_ID } from "@/lib/vibey";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
+import { RobotScene } from "@/components/VibeyRobot";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatCredits, formatTokens } from "@/lib/usage";
@@ -721,6 +722,87 @@ function MeButton({ profile, fallbackName }: { profile: MeButtonProfile | null; 
   );
 }
 
+function VibeyEasterEgg({ onClose }: { onClose: () => void }) {
+  const stars = useMemo(
+    () =>
+      Array.from({ length: 32 }, () => ({
+        top: `${Math.random() * 100}%`,
+        left: `${Math.random() * 100}%`,
+        size: `${Math.random() * 2 + 1}px`,
+        delay: `${Math.random() * 3}s`,
+        duration: `${2 + Math.random() * 3}s`,
+      })),
+    [],
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.85, y: 14 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 280, damping: 24 }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-sm aspect-[3/4] max-h-[85vh] overflow-hidden rounded-2xl border border-primary/30 shadow-[0_0_80px_-20px_hsl(var(--primary))]"
+      >
+        {/* cosmic backdrop */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_22%,hsl(var(--primary)/0.3),transparent_55%),linear-gradient(180deg,#120a26_0%,#06060d_100%)]" />
+        {/* twinkling stars */}
+        <div className="absolute inset-0 overflow-hidden">
+          {stars.map((s, i) => (
+            <span
+              key={i}
+              className="absolute rounded-full bg-white animate-pulse"
+              style={{
+                top: s.top,
+                left: s.left,
+                width: s.size,
+                height: s.size,
+                animationDelay: s.delay,
+                animationDuration: s.duration,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* header */}
+        <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-4 py-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-white/55">
+            vibey · unplugged
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-white/55 hover:text-white transition-colors p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* caption */}
+        <p className="absolute top-10 inset-x-0 z-10 text-center font-mono text-[11px] text-white/70">
+          you caught me dancing · tap a move
+        </p>
+
+        {/* 3D vibey */}
+        <div className="absolute inset-0">
+          <RobotScene
+            theme="dark"
+            initialAction="Dance"
+            cameraZ={7}
+            scale={0.6}
+            yOffset={-1.4}
+            showControls
+          />
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function TelegramMini() {
   const { agent } = useVibeyAgent();
   const [authState, setAuthState] = useState<AuthState>("loading");
@@ -783,6 +865,7 @@ export default function TelegramMini() {
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<ProfileDetail | null>(null);
+  const [vibeyEggOpen, setVibeyEggOpen] = useState(false);
   const [directoryQuery, setDirectoryQuery] = useState("");
 
   // Current user mini-profile (for header avatar popover)
@@ -1367,9 +1450,14 @@ export default function TelegramMini() {
     <div className="h-screen flex flex-col bg-background text-foreground">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-        <div className="w-8 h-8 rounded-lg overflow-hidden ring-1 ring-primary/30">
+        <button
+          type="button"
+          onClick={() => setVibeyEggOpen(true)}
+          aria-label="Meet Vibey in 3D"
+          className="w-8 h-8 shrink-0 rounded-lg overflow-hidden ring-1 ring-primary/30 transition-all hover:ring-primary hover:scale-105 active:scale-95"
+        >
           <img src={vibeyAvatar} alt="Vibey" className="w-full h-full object-cover" />
-        </div>
+        </button>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold leading-tight truncate">
             {agent?.name ?? "Vibey"}'s Brain
@@ -1974,6 +2062,8 @@ export default function TelegramMini() {
           onClose={() => setSelectedProfile(null)}
         />
       )}
+
+      {vibeyEggOpen && <VibeyEasterEgg onClose={() => setVibeyEggOpen(false)} />}
     </div>
   );
 }
