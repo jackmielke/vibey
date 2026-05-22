@@ -114,7 +114,17 @@ type EventRow = {
   hosted_by: string | null;
   is_featured: boolean | null;
   tags: string[] | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  current_attendees: number | null;
+  max_attendees: number | null;
+  is_public: boolean | null;
+  registration_required: boolean | null;
 };
+
+const EVENT_SELECT =
+  "id, title, description, event_start_time, event_end_time, event_location, event_type, event_image_url, hosted_by, is_featured, tags, created_by, created_at, updated_at, current_attendees, max_attendees, is_public, registration_required";
 
 type ChatLogRow = {
   id: string;
