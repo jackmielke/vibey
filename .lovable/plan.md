@@ -1,54 +1,77 @@
+# Two daily heartbeats
 
+Replace the one-shot `daily-recap` with a proper heartbeat system: morning brief (6am PT) and evening reflection (9pm PT), both sounding like Vibey, both showing their work.
 
-# Vibey PWA — UI Scaffold
+## What changes for you
 
-## Overview
-Build the Vibey admin control panel and chat interface as an installable PWA, styled with the **Vibe Ventures aesthetic** (near-black bg `hsl(0 0% 6%)`, warm off-white foreground, blue accent `hsl(200 80% 60%)`, Space Grotesk + Space Mono typography, tight 0.25rem radius, minimal/editorial feel) — replacing the original Vibey mint-glow look.
+- **6am PT** — morning text from Vibey: what's coming today, who to check on, what to bring to the call
+- **9pm PT** — evening text from Vibey: what happened, what's worth remembering, anything to follow up on tomorrow
+- **Heartbeats tab** in admin showing each run with full reasoning trace — system prompt, tools she called, what she found, final message, token cost. Like chat history but for her scheduled work.
+- **Per-user toggle** in the Telegram Mini app so people can opt in/out of morning, evening, or both
+- Vibey's voice — no more hardcoded "TEXT MESSAGE" override. The soul prompt runs as-is; the heartbeat just gives it task context.
 
-## Design System
-- **Palette**: Vibe Ventures dark — charcoal black bg, warm cream text, cyan-blue accent
-- **Typography**: Space Grotesk (body/sans) + Space Mono (labels/headings/mono), imported from Google Fonts
-- **Utilities**: `text-label` (mono, uppercase, tracked), prose styles for markdown rendering, glow utilities adapted to blue accent
-- **Border radius**: 0.25rem (sharp, editorial)
+## How it works
 
-## Pages & Routing
+```text
+pg_cron (6am PT)  ──┐
+pg_cron (9pm PT)  ──┴──► scheduled-heartbeat fn
+                              │
+                              ├─ load automation row (kind: morning|evening)
+                              ├─ load recipients (opted-in users)
+                              ├─ for each recipient:
+                              │    └─ run chat-with-vibey agent loop
+                              │         with seed prompt like:
+                              │         "it's morning, write jack his brief.
+                              │          use your tools to look things up."
+                              │         ↓
+                              │       she calls tools: granola, events,
+                              │       relationships, recent chats
+                              │         ↓
+                              │       final message
+                              ├─ persist heartbeat_run (prompt, tool calls,
+                              │   thoughts, final text, tokens, duration)
+                              └─ deliver via Telegram
+```
 
-### 1. Admin Shell (`/` — layout with `<Outlet>`)
-- Sidebar (collapsible icon mode) with Vibey avatar + "VIBEY" header
-- **Talk to Vibey** — top-level chat link
-- **Agent group**: Soul, Identity, Memory, Media Library, Interfaces
-- **Social group**: Relationships, Conversations, Group Chats
-- Footer: "View Site" link
-- Header bar with sidebar trigger + "VIBEY CONTROL" label
+## Technical details
 
-### 2. Chat Interface (`/` — index route)
-- Empty state: Vibey avatar, "Talk to Vibey" heading, Telegram link
-- Chat bubbles (user right, Vibey left with avatar), input bar with send button
-- Mock data only — no Supabase calls yet
+**DB migration**
 
-### 3. Admin Sub-pages (stub/placeholder for each)
-- `/soul` — Soul Editor (markdown textarea placeholder)
-- `/identity` — Identity Editor (name, personality fields placeholder)
-- `/memory` — Memory Viewer (card list placeholder)
-- `/media` — Media Library (grid placeholder)
-- `/interfaces` — Interfaces Editor (toggles placeholder)
-- `/relationships` — Relationships Browser (table placeholder)
-- `/conversations` — Conversations Viewer (list placeholder)
-- `/groups` — Group Chat Manager (list placeholder)
+- `heartbeat_runs` table: `id, automation_id, kind, recipient_user_id, recipient_chat_id, system_prompt, seed_prompt, tool_calls jsonb, intermediate_thoughts jsonb, final_message text, tokens_used, duration_ms, status, error, created_at`
+- `heartbeat_subscriptions` table: `user_id, kind ('morning'|'evening'), enabled, telegram_chat_id` — defaults to enabled-on-create for all current Telegram-linked users via a seed insert.
 
-Each page gets a heading + description + empty state UI, styled consistently. No real data yet.
+**Edge functions**
 
-## PWA Setup
-- Add `manifest.json` (name: "Vibey", icons, `display: standalone`, theme color matching the dark palette)
-- **No service worker / no vite-plugin-pwa** — just manifest for installability
-- Mobile meta tags in `index.html` (viewport, theme-color, apple-mobile-web-app)
+- New `scheduled-heartbeat/index.ts` — accepts `{ kind, automation_id?, dry_run?, user_id? }`. Loads opted-in recipients, runs the agent loop per recipient, persists trace, delivers.
+- Refactor: extract the agent loop from `chat-with-vibey/index.ts` into `supabase/functions/_shared/vibey-agent.ts` so heartbeat can reuse tool-calling. (You already have this file — I'll extend it.)
+- `daily-recap` stays for now but gets deprecated in the UI; can delete later.
 
-## Dependencies to Add
-- `framer-motion` (for subtle page transitions, matching Vibe Ventures feel)
+**Cron**
 
-## What's NOT in this phase
-- Supabase data connections (next phase)
-- Authentication / login
-- Public landing page
-- Real edge function calls for chat
+- Two `pg_cron` jobs: `0 13 * * *` (6am PT) and `0 4 * * *` (9pm PT), both `net.http_post` to `scheduled-heartbeat` with `{ kind }`.
 
+**Frontend**
+
+- New `src/pages/Heartbeats.tsx` admin page listing `heartbeat_runs` grouped by day, expandable to see reasoning trace (reuse the styling pattern from `AutomationRunsPanel`).
+- New sidebar link.
+- Telegram Mini app: new "heartbeats" row in settings/preferences tab with two toggles (morning / evening).
+
+**Prompting**
+
+- Drop the `defaultInstructions` block. Use `agent.system_prompt` straight.
+- Seed prompt per kind, ~2 sentences of *task* context only:
+  - morning: "it's 6am pacific. write jack his morning brief — what's coming up today, who he should check in with, anything to bring to the daily call. use your tools to look things up."
+  - evening: "it's 9pm pacific. text jack a reflection on the day — what happened, who showed up, what's worth remembering, anything to follow up on tomorrow."
+
+## What I'm NOT doing in this pass
+
+- Won't delete `daily-recap` yet (keep as fallback during rollout)
+- Won't build per-user *custom* prompts — same seed for everyone, her soul handles the personalization
+- Won't wire RSS/email/anything beyond Telegram
+
+## Open questions before I build
+
+1. Recipients: should evening go to the **same** list as morning, or do you want them configured independently from day one? (My default: same list, both default-on.)
+2. Should the agent loop actually fetch *live* Granola + events + recent chats as tools she calls (slower, ~15-30s per run, more honest), or pre-stuff that context into the seed prompt like today (fast, dumber)? My strong preference: real tool loop.
+
+If both default answers work, just say "go" and I'll ship it.
