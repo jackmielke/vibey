@@ -2087,6 +2087,17 @@ export default function TelegramMini() {
             )}
           </section>
         )}
+
+        {/* ===== CHATS TAB (admin only) ===== */}
+        {tab === "chats" && isAdmin && (
+          <section className="space-y-2">
+            <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
+              <MessagesSquare className="w-3 h-3" />
+              chat history · admin
+            </h2>
+            <ConversationsSection />
+          </section>
+        )}
       </div>
 
       {editingMemory && (
