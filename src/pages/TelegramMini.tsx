@@ -1078,7 +1078,7 @@ export default function TelegramMini() {
       const now = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from("events")
-        .select("id, title, description, event_start_time, event_end_time, event_location, event_type, event_image_url, hosted_by, is_featured, tags")
+        .select(EVENT_SELECT)
         .eq("community_id", VIBEY_COMMUNITY_ID)
         .gte("event_end_time", now)
         .order("event_start_time", { ascending: true })
