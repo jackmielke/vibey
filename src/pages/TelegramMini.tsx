@@ -825,6 +825,7 @@ export default function TelegramMini() {
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<ProfileDetail | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<EventEditRow | null>(null);
   const [directoryQuery, setDirectoryQuery] = useState("");
 
   // Current user mini-profile (for header avatar popover)
