@@ -26,6 +26,7 @@ import {
   MessagesSquare,
 } from "lucide-react";
 import { ConversationsSection } from "@/components/sections/ConversationsSection";
+import { EventEditModal, type EventEditRow } from "@/components/EventEditModal";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { format, formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -114,7 +115,17 @@ type EventRow = {
   hosted_by: string | null;
   is_featured: boolean | null;
   tags: string[] | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  current_attendees: number | null;
+  max_attendees: number | null;
+  is_public: boolean | null;
+  registration_required: boolean | null;
 };
+
+const EVENT_SELECT =
+  "id, title, description, event_start_time, event_end_time, event_location, event_type, event_image_url, hosted_by, is_featured, tags, created_by, created_at, updated_at, current_attendees, max_attendees, is_public, registration_required";
 
 type ChatLogRow = {
   id: string;
@@ -814,6 +825,7 @@ export default function TelegramMini() {
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<ProfileDetail | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<EventEditRow | null>(null);
   const [directoryQuery, setDirectoryQuery] = useState("");
 
   // Current user mini-profile (for header avatar popover)
@@ -1068,7 +1080,7 @@ export default function TelegramMini() {
       const now = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from("events")
-        .select("id, title, description, event_start_time, event_end_time, event_location, event_type, event_image_url, hosted_by, is_featured, tags")
+        .select(EVENT_SELECT)
         .eq("community_id", VIBEY_COMMUNITY_ID)
         .gte("event_end_time", now)
         .order("event_start_time", { ascending: true })
@@ -1348,7 +1360,7 @@ export default function TelegramMini() {
         tags: ["vibey"],
         metadata: { source: "telegram_mini" },
       })
-      .select("id, title, description, event_start_time, event_end_time, event_location, event_type, event_image_url, hosted_by, is_featured, tags")
+      .select(EVENT_SELECT)
       .single();
     setSavingEvent(false);
     if (error) {
@@ -1999,10 +2011,13 @@ export default function TelegramMini() {
                   const start = new Date(event.event_start_time);
                   const end = new Date(event.event_end_time);
                   const sameDay = start.toDateString() === end.toDateString();
+                  const canEdit = isAdmin || (myProfile?.id != null && event.created_by === myProfile.id);
                   return (
-                    <article
+                    <button
+                      type="button"
                       key={event.id}
-                      className="rounded-lg bg-card border border-border overflow-hidden"
+                      onClick={() => setSelectedEvent(event as EventEditRow)}
+                      className="text-left rounded-lg bg-card border border-border overflow-hidden hover:border-primary/40 transition-colors w-full"
                     >
                       {event.event_image_url && (
                         <div className="aspect-[16/9] bg-muted overflow-hidden">
@@ -2018,40 +2033,51 @@ export default function TelegramMini() {
                         </div>
                       )}
                       <div className="p-3 space-y-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold leading-snug">{event.title}</p>
-                          <p className="font-mono text-[10px] uppercase tracking-widest text-primary mt-1">
-                            {format(start, "EEE, MMM d")} · {format(start, "h:mm a")}
-                            {" - "}
-                            {sameDay ? format(end, "h:mm a") : format(end, "EEE h:mm a")}
-                          </p>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold leading-snug">{event.title}</p>
+                            <p className="font-mono text-[10px] uppercase tracking-widest text-primary mt-1">
+                              {format(start, "EEE, MMM d")} · {format(start, "h:mm a")}
+                              {" - "}
+                              {sameDay ? format(end, "h:mm a") : format(end, "EEE h:mm a")}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {canEdit && (
+                              <span className="rounded bg-primary/10 border border-primary/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary inline-flex items-center gap-1">
+                                <Pencil className="w-2.5 h-2.5" /> edit
+                              </span>
+                            )}
+                            {event.is_featured && (
+                              <span className="rounded bg-primary/10 border border-primary/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary">
+                                featured
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        {event.is_featured && (
-                          <span className="shrink-0 rounded bg-primary/10 border border-primary/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary">
-                            featured
-                          </span>
+                        {event.description && (
+                          <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap line-clamp-3">
+                            {event.description}
+                          </p>
                         )}
-                      </div>
-                      {event.description && (
-                        <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                          {event.description}
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                        {event.event_location && (
+                        <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                          {event.event_location && (
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {event.event_location}
+                            </span>
+                          )}
                           <span className="inline-flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {event.event_location}
+                            <Clock className="w-3 h-3" />
+                            {formatDistanceToNow(start, { addSuffix: true })}
                           </span>
-                        )}
-                        <span className="inline-flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {formatDistanceToNow(start, { addSuffix: true })}
-                        </span>
+                          <span className="inline-flex items-center gap-1">
+                            <UsersIcon className="w-3 h-3" />
+                            {event.current_attendees ?? 0} rsvp
+                          </span>
+                        </div>
                       </div>
-                      </div>
-                    </article>
+                    </button>
                   );
                 })}
               </div>
@@ -2112,6 +2138,23 @@ export default function TelegramMini() {
         <ProfileDetailModal
           profile={selectedProfile}
           onClose={() => setSelectedProfile(null)}
+        />
+      )}
+
+      {selectedEvent && (
+        <EventEditModal
+          event={selectedEvent}
+          canEdit={isAdmin || (myProfile?.id != null && selectedEvent.created_by === myProfile.id)}
+          canDelete={isAdmin || (myProfile?.id != null && selectedEvent.created_by === myProfile.id)}
+          onClose={() => setSelectedEvent(null)}
+          onSaved={(updated) => {
+            setEvents((prev) => prev.map((e) => (e.id === updated.id ? (updated as EventRow) : e)));
+            setSelectedEvent(updated);
+          }}
+          onDeleted={(id) => {
+            setEvents((prev) => prev.filter((e) => e.id !== id));
+            setSelectedEvent(null);
+          }}
         />
       )}
     </div>
