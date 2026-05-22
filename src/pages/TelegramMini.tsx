@@ -26,6 +26,7 @@ import {
   MessagesSquare,
 } from "lucide-react";
 import { ConversationsSection } from "@/components/sections/ConversationsSection";
+import { EventEditModal, type EventEditRow } from "@/components/EventEditModal";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { format, formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
