@@ -108,15 +108,15 @@ export function VibeyPortal({ open, onClose, agentName = "Vibey", isAdmin }: Vib
 
           {/* Stage */}
           <div className="relative flex-1 min-h-0 flex items-center justify-center">
-            {/* Constrain the 3D stage so the robot doesn't fill huge laptop screens */}
-            <div className="relative w-full max-w-[280px] sm:max-w-xs h-full mx-auto">
+            {/* Wide stage — let the canvas breathe so the robot isn't clipped */}
+            <div className="relative w-full h-full mx-auto">
               <RobotScene
                 theme="dark"
                 initialAction={current.move}
                 moves={moves}
-                scale={0.32}
-                yOffset={-1.3}
-                cameraZ={8}
+                scale={0.55}
+                yOffset={-1.2}
+                cameraZ={6}
                 showControls={false}
               />
             </div>
