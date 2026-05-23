@@ -1268,6 +1268,24 @@ Deno.serve(async (req) => {
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", { chat_id: chatId, text: body });
   }
 
+  if (wantsVoice) {
+    await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "record_voice" });
+    const mp3 = await elevenLabsTts(body);
+    if (mp3) {
+      await sendTelegramAudio(TELEGRAM_BOT_TOKEN, chatId, mp3, "vibey", msg.message_id);
+    } else {
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: "(voice gen failed)",
+        reply_to_message_id: msg.message_id,
+      });
+    }
+  }
+  } catch (e) {
+    console.warn("HTML send failed, falling back to plain:", e);
+    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", { chat_id: chatId, text: body });
+  }
+
   const dmUsageData = usageSummary(dmUsage);
   supabase.from("agent_chat_logs").insert({
     agent_id: VIBEY_AGENT_ID,
