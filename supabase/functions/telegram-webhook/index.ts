@@ -924,10 +924,31 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200 });
   }
 
-  // Prepend any parsed PDF text to the user message.
+  // If the user replied to another message, surface that context to the model
+  // so it knows what they're referring to.
+  let replyContext = "";
+  const repliedTo = msg.reply_to_message;
+  if (repliedTo) {
+    const repliedText = (repliedTo.text ?? repliedTo.caption ?? "").trim();
+    if (repliedText) {
+      const isBot = !!repliedTo.from?.is_bot;
+      const author = isBot
+        ? "you (Vibey, earlier)"
+        : repliedTo.from?.first_name
+          ? `${repliedTo.from.first_name}${repliedTo.from.username ? ` (@${repliedTo.from.username})` : ""}`
+          : repliedTo.from?.username
+            ? `@${repliedTo.from.username}`
+            : "someone earlier";
+      const snippet = repliedText.length > 1200 ? repliedText.slice(0, 1200) + "…" : repliedText;
+      replyContext = `[The user is replying to a message from ${author}:\n"""${snippet}"""]\n\n`;
+    }
+  }
+
+  // Prepend any parsed PDF text and reply context to the user message.
+  const baseUserText = replyContext + userText;
   const userTextForModel = attachmentExtraText.length > 0
-    ? `${attachmentExtraText.join("\n\n")}\n\n---\n\n${userText}`
-    : userText;
+    ? `${attachmentExtraText.join("\n\n")}\n\n---\n\n${baseUserText}`
+    : baseUserText;
 
   // Best-effort: cache the user's Telegram profile photo so the mini app can
   // display it next to their memories. Fire-and-forget.
