@@ -63,7 +63,7 @@ export default function Heartbeats() {
     if (filter !== "all") q = q.eq("kind", filter);
     const { data, error } = await q;
     if (error) toast.error("Failed to load runs", { description: error.message });
-    setRuns((data ?? []) as Run[]);
+    setRuns((data ?? []) as unknown as Run[]);
     setLoading(false);
   };
 
