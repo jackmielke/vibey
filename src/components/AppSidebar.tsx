@@ -49,6 +49,7 @@ const navItems = [
   { title: "Tools", url: "/tools", icon: Wrench },
   { title: "Preferences", url: "/relationships", icon: Users },
   { title: "Scheduled Heartbeat", url: "/automations", icon: Heart },
+  { title: "Heartbeat Runs", url: "/heartbeats", icon: Activity },
   { title: "Interfaces", url: "/interfaces", icon: Settings2 },
   { title: "Identity", url: "/identity", icon: IdCard },
   { title: "Chat History", url: "/conversations", icon: MessagesSquare },
