@@ -69,15 +69,15 @@ function VoiceModeInner({ open, onClose, agentName }: VoiceModeProps) {
       if (error) throw error;
       if (!data?.signed_url && !data?.token) throw new Error("No voice session returned");
 
-      if (data?.signed_url) {
-        await conversation.startSession({
-          signedUrl: data.signed_url,
-          connectionType: "websocket",
-        });
-      } else {
+      if (data?.token) {
         await conversation.startSession({
           conversationToken: data.token,
           connectionType: "webrtc",
+        });
+      } else {
+        await conversation.startSession({
+          signedUrl: data.signed_url,
+          connectionType: "websocket",
         });
       }
     } catch (e) {

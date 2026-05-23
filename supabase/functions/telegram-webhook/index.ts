@@ -638,8 +638,9 @@ function isVibeyCommand(text: string | undefined, command: string): boolean {
 
 // ── ElevenLabs TTS + Telegram audio ──────────────────────────────────────────
 
-// Default voice — Sarah. Override with VIBEY_VOICE_ID secret when you pick one.
-const FALLBACK_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
+// Pinned Vibey voice — gender-neutral robotic voice requested by the project owner.
+// Keep this explicit so Telegram TTS cannot silently fall back to a different voice.
+const VIBEY_VOICE_ID = "5nKWJuFC6bX0w7HcS5KI";
 
 async function elevenLabsTts(text: string): Promise<Uint8Array | null> {
   const apiKey = Deno.env.get("ELEVENLABS_API_KEY");
@@ -647,7 +648,8 @@ async function elevenLabsTts(text: string): Promise<Uint8Array | null> {
     console.error("ELEVENLABS_API_KEY not configured for /voice");
     return null;
   }
-  const voiceId = Deno.env.get("VIBEY_VOICE_ID") || FALLBACK_VOICE_ID;
+  const voiceId = VIBEY_VOICE_ID;
+  console.log("elevenlabs tts voice_id", voiceId);
   // Trim very long replies — voice should be short anyway.
   const safe = text.length > 2500 ? text.slice(0, 2500) : text;
   const resp = await fetch(
