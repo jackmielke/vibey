@@ -2172,6 +2172,12 @@ export default function TelegramMini() {
           }}
         />
       )}
+      <VibeyPortal
+        open={portalOpen}
+        onClose={() => setPortalOpen(false)}
+        agentName={agent?.name ?? "Vibey"}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }
