@@ -681,13 +681,18 @@ async function sendTelegramAudio(
   form.append("title", title);
   form.append("performer", "Vibey");
   if (replyTo) form.append("reply_to_message_id", String(replyTo));
+  if (replyTo) form.append("allow_sending_without_reply", "true");
   form.append("audio", new Blob([mp3], { type: "audio/mpeg" }), "vibey.mp3");
   const res = await fetch(`https://api.telegram.org/bot${token}/sendAudio`, {
     method: "POST",
     body: form,
   });
   if (!res.ok) {
-    console.error("sendAudio failed", res.status, await res.text().catch(() => ""));
+    const errorText = await res.text().catch(() => "");
+    console.error("sendAudio failed", res.status, errorText);
+    if (replyTo && errorText.includes("message to be replied not found")) {
+      await sendTelegramAudio(token, chatId, mp3, title);
+    }
   }
 }
 
