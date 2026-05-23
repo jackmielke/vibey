@@ -107,16 +107,19 @@ export function VibeyPortal({ open, onClose, agentName = "Vibey", isAdmin }: Vib
           </div>
 
           {/* Stage */}
-          <div className="relative flex-1 min-h-0">
-            <RobotScene
-              theme="dark"
-              initialAction={current.move}
-              moves={moves}
-              scale={0.7}
-              yOffset={-1.2}
-              cameraZ={5}
-              showControls={false}
-            />
+          <div className="relative flex-1 min-h-0 flex items-center justify-center">
+            {/* Constrain the 3D stage so the robot doesn't fill huge laptop screens */}
+            <div className="relative w-full max-w-md md:max-w-sm h-full mx-auto">
+              <RobotScene
+                theme="dark"
+                initialAction={current.move}
+                moves={moves}
+                scale={0.45}
+                yOffset={-1.0}
+                cameraZ={6.5}
+                showControls={false}
+              />
+            </div>
 
             {/* Floating emoji badge */}
             <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-none">
