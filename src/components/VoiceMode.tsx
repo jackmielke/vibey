@@ -67,12 +67,19 @@ function VoiceModeInner({ open, onClose, agentName }: VoiceModeProps) {
 
       const { data, error } = await supabase.functions.invoke("elevenlabs-voice-setup");
       if (error) throw error;
-      if (!data?.token) throw new Error("No token returned");
+      if (!data?.signed_url && !data?.token) throw new Error("No voice session returned");
 
-      await conversation.startSession({
-        conversationToken: data.token,
-        connectionType: "webrtc",
-      });
+      if (data?.signed_url) {
+        await conversation.startSession({
+          signedUrl: data.signed_url,
+          connectionType: "websocket",
+        });
+      } else {
+        await conversation.startSession({
+          conversationToken: data.token,
+          connectionType: "webrtc",
+        });
+      }
     } catch (e) {
       console.error(e);
       toast.error("Couldn't start voice", {

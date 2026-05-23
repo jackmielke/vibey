@@ -30,7 +30,7 @@ async function elevenFetch(path: string, apiKey: string, init: RequestInit = {})
   });
 }
 
-async function createAgent(apiKey: string, prompt: string, firstMessage: string, name: string) {
+async function createAgent(apiKey: string, prompt: string, firstMessage: string, name: string, voiceId: string) {
   const resp = await elevenFetch("/convai/agents/create", apiKey, {
     method: "POST",
     body: JSON.stringify({
@@ -42,7 +42,7 @@ async function createAgent(apiKey: string, prompt: string, firstMessage: string,
           language: "en",
         },
         tts: {
-          voice_id: DEFAULT_VOICE_ID,
+          voice_id: voiceId,
         },
       },
     }),
@@ -55,7 +55,7 @@ async function createAgent(apiKey: string, prompt: string, firstMessage: string,
   return json.agent_id as string;
 }
 
-async function updateAgent(apiKey: string, agentId: string, prompt: string, firstMessage: string) {
+async function updateAgent(apiKey: string, agentId: string, prompt: string, firstMessage: string, voiceId: string) {
   const resp = await elevenFetch(`/convai/agents/${agentId}`, apiKey, {
     method: "PATCH",
     body: JSON.stringify({
@@ -64,6 +64,9 @@ async function updateAgent(apiKey: string, agentId: string, prompt: string, firs
           prompt: { prompt },
           first_message: firstMessage,
           language: "en",
+        },
+        tts: {
+          voice_id: voiceId,
         },
       },
     }),
@@ -85,6 +88,19 @@ async function getConversationToken(apiKey: string, agentId: string): Promise<st
   }
   const json = await resp.json();
   return json.token as string;
+}
+
+async function getConversationSignedUrl(apiKey: string, agentId: string): Promise<string> {
+  const resp = await fetch(
+    `${ELEVEN_BASE}/convai/conversation/get-signed-url?agent_id=${agentId}`,
+    { headers: { "xi-api-key": apiKey } }
+  );
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`signed url request failed (${resp.status}): ${txt}`);
+  }
+  const json = await resp.json();
+  return json.signed_url as string;
 }
 
 Deno.serve(async (req) => {
@@ -122,9 +138,10 @@ You're talking out loud right now. Keep replies conversational and concise — u
       `Hey, it's ${agent.name}. What's on your mind?`;
 
     let agentId = agent.elevenlabs_agent_id as string | null;
+    const voiceId = Deno.env.get("VIBEY_VOICE_ID") || DEFAULT_VOICE_ID;
 
     if (!agentId) {
-      agentId = await createAgent(apiKey, voicePrompt, firstMessage, agent.name);
+      agentId = await createAgent(apiKey, voicePrompt, firstMessage, agent.name, voiceId);
       const { error: updErr } = await supabase
         .from("agents")
         .update({ elevenlabs_agent_id: agentId })
@@ -132,13 +149,16 @@ You're talking out loud right now. Keep replies conversational and concise — u
       if (updErr) console.warn("could not store agent id:", updErr.message);
     } else {
       // Sync soul changes up to ElevenLabs every time.
-      await updateAgent(apiKey, agentId, voicePrompt, firstMessage);
+      await updateAgent(apiKey, agentId, voicePrompt, firstMessage, voiceId);
     }
 
-    const token = await getConversationToken(apiKey, agentId);
+    const [token, signedUrl] = await Promise.all([
+      getConversationToken(apiKey, agentId),
+      getConversationSignedUrl(apiKey, agentId),
+    ]);
 
     return new Response(
-      JSON.stringify({ token, agent_id: agentId }),
+      JSON.stringify({ token, signed_url: signedUrl, agent_id: agentId }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

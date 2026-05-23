@@ -681,13 +681,18 @@ async function sendTelegramAudio(
   form.append("title", title);
   form.append("performer", "Vibey");
   if (replyTo) form.append("reply_to_message_id", String(replyTo));
+  if (replyTo) form.append("allow_sending_without_reply", "true");
   form.append("audio", new Blob([mp3], { type: "audio/mpeg" }), "vibey.mp3");
   const res = await fetch(`https://api.telegram.org/bot${token}/sendAudio`, {
     method: "POST",
     body: form,
   });
   if (!res.ok) {
-    console.error("sendAudio failed", res.status, await res.text().catch(() => ""));
+    const errorText = await res.text().catch(() => "");
+    console.error("sendAudio failed", res.status, errorText);
+    if (replyTo && errorText.includes("message to be replied not found")) {
+      await sendTelegramAudio(token, chatId, mp3, title);
+    }
   }
 }
 
@@ -758,9 +763,9 @@ Deno.serve(async (req) => {
   // Idempotency: if Telegram retries this update (e.g. because our response
   // took longer than its timeout), short-circuit so we don't double-reply.
   // We do this BEFORE doing any other work.
-  const dedupClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   if (typeof update.update_id === "number") {
-    const updateDedup = await markTelegramDedup(dedupClient, update.update_id, "update_id");
+    const updateDedup = await markTelegramDedup(supabase, update.update_id, "update_id");
     if (updateDedup === "duplicate") return new Response("ok", { status: 200 });
   }
 
@@ -771,12 +776,23 @@ Deno.serve(async (req) => {
   const isGroup = chatType === "group" || chatType === "supergroup";
   const fallbackSessionKey = `telegram:${chatId}`;
 
+  // Resolve unified Vibe identity early so slash commands can use the same
+  // session as normal Telegram DMs.
+  const vibeUserId = await resolveVibeUserId(supabase, {
+    telegram_user_id: userId,
+    telegram_username: msg.from?.username ?? null,
+  });
+  let sessionKey = fallbackSessionKey;
+  if (!isGroup) {
+    sessionKey = unifiedSessionKey(vibeUserId, fallbackSessionKey);
+  }
+
   // In group chats, duplicate-looking responses can come from two bot accounts
   // whose webhooks both target this function. Telegram gives each bot a unique
   // update_id, so update_id-only dedup won't catch that. chat_id/message_id will.
   if (isGroup && typeof msg.message_id === "number") {
     const messageDedup = await markTelegramDedup(
-      dedupClient,
+      supabase,
       telegramMessageDedupKey(chatId, msg.message_id),
       "group message"
     );
@@ -912,20 +928,6 @@ Deno.serve(async (req) => {
   const userTextForModel = attachmentExtraText.length > 0
     ? `${attachmentExtraText.join("\n\n")}\n\n---\n\n${userText}`
     : userText;
-
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-  // Resolve unified Vibe identity so web + Telegram share one conversation.
-  // Group chats stay isolated per-group (multiple people in one room).
-  const vibeUserId = await resolveVibeUserId(supabase, {
-    telegram_user_id: userId,
-    telegram_username: msg.from?.username ?? null,
-  });
-  let sessionKey = fallbackSessionKey;
-  if (!isGroup) {
-    sessionKey = unifiedSessionKey(vibeUserId, fallbackSessionKey);
-  }
 
   // Best-effort: cache the user's Telegram profile photo so the mini app can
   // display it next to their memories. Fire-and-forget.
