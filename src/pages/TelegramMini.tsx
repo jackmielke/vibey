@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { ConversationsSection } from "@/components/sections/ConversationsSection";
 import { EventEditModal, type EventEditRow } from "@/components/EventEditModal";
+import { VibeyPortal } from "@/components/VibeyPortal";
 import { HeartbeatToggles } from "@/components/HeartbeatToggles";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { format, formatDistanceToNow } from "date-fns";
