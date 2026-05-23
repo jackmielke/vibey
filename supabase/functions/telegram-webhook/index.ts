@@ -1281,10 +1281,7 @@ Deno.serve(async (req) => {
       });
     }
   }
-  } catch (e) {
-    console.warn("HTML send failed, falling back to plain:", e);
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", { chat_id: chatId, text: body });
-  }
+
 
   const dmUsageData = usageSummary(dmUsage);
   supabase.from("agent_chat_logs").insert({
