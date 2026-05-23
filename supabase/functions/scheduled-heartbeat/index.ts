@@ -125,9 +125,20 @@ Deno.serve(async (req) => {
       });
     }
     if (!seedPrompt) {
+      const sharedRitual = `
+do real work before writing — don't fake it:
+1. look through recent community chats (last ~24h) for what's actually happening — vibes, threads, anything unresolved.
+2. skim granola notes from the last week if relevant — meetings, decisions, things to follow up on.
+3. check the calendar / upcoming events.
+4. if something genuinely needs research (a name dropped, a tool mentioned, a question floated), do a quick search. don't over-research.
+5. if you know almost nothing about this person, ask one small genuine question to learn about them (what they're building, what they care about). don't interrogate.
+6. then write the message.
+
+write like a friend texting, not an assistant reporting. short paragraphs, lowercase ok, no bullet lists or headers. be proactive — flag the thing they'd want flagged, name the person they should check in with, suggest the one thing worth doing. always end with a real question that invites them in (how's the morning / how'd today land / anything on your mind). max ~6 short sentences.`;
+
       seedPrompt = kind === "morning"
-        ? "it's morning pacific. write jack his morning brief — what's coming up today, who he should check in with. text him like a friend."
-        : "it's evening pacific. text jack a reflection on the day — what happened, who showed up, anything to follow up on tomorrow. text him like a friend.";
+        ? `it's early morning pacific time. do your morning ritual for them.${sharedRitual}\n\nfocus: what's coming up today, who to check in with, the one thing worth doing first. ask how the morning is going.`
+        : `it's evening pacific time. do your evening ritual for them.${sharedRitual}\n\nfocus: what actually happened today, who showed up, anything worth carrying into tomorrow. ask how the day landed and if anything's on their mind.`;
     }
 
     // 2. Resolve recipients
