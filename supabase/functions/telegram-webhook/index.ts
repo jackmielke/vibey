@@ -896,8 +896,8 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Re-declare for the /voice command branch below.
-  // (kept above for clarity — value carries through)
+
+
   if (!isGroup && isAdminTelegramUser(userId)) {
     const voicePrompt = parseVoiceCommand(userText);
     if (voicePrompt !== null) {
