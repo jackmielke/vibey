@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { ConversationsSection } from "@/components/sections/ConversationsSection";
 import { EventEditModal, type EventEditRow } from "@/components/EventEditModal";
+import { VibeyPortal } from "@/components/VibeyPortal";
 import { HeartbeatToggles } from "@/components/HeartbeatToggles";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { format, formatDistanceToNow } from "date-fns";
@@ -797,6 +798,7 @@ export default function TelegramMini() {
   // Admin
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminMode, setAdminMode] = useState(false);
+  const [portalOpen, setPortalOpen] = useState(false);
   const [editingMemory, setEditingMemory] = useState<MemoryRow | null>(null);
   const [allPrefs, setAllPrefs] = useState<PreferenceRow[]>([]);
   const [chatLogs, setChatLogs] = useState<ChatLogRow[]>([]);
@@ -1441,9 +1443,15 @@ export default function TelegramMini() {
     <div className="h-screen flex flex-col bg-background text-foreground">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-        <div className="w-8 h-8 rounded-lg overflow-hidden ring-1 ring-primary/30">
-          <img src={vibeyAvatar} alt="Vibey" className="w-full h-full object-cover" />
-        </div>
+        <button
+          type="button"
+          onClick={() => setPortalOpen(true)}
+          aria-label={`Open ${agent?.name ?? "Vibey"} portal`}
+          className="relative w-8 h-8 rounded-lg overflow-hidden ring-1 ring-primary/30 hover:ring-primary/80 transition-all hover:shadow-[0_0_18px_-4px_hsl(var(--primary))] active:scale-95 group"
+        >
+          <img src={vibeyAvatar} alt="Vibey" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+          <span className="absolute inset-0 ring-1 ring-inset ring-primary/0 group-hover:ring-primary/40 rounded-lg" />
+        </button>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold leading-tight truncate">
             {agent?.name ?? "Vibey"}'s Brain
@@ -2164,6 +2172,12 @@ export default function TelegramMini() {
           }}
         />
       )}
+      <VibeyPortal
+        open={portalOpen}
+        onClose={() => setPortalOpen(false)}
+        agentName={agent?.name ?? "Vibey"}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }
