@@ -1920,6 +1920,137 @@ export type Database = {
         }
         Relationships: []
       }
+      heartbeat_runs: {
+        Row: {
+          automation_id: string | null
+          created_at: string
+          delivery_status: string | null
+          dry_run: boolean
+          duration_ms: number | null
+          error: string | null
+          final_message: string | null
+          finished_at: string | null
+          id: string
+          intermediate_thoughts: Json
+          kind: string
+          model: string | null
+          recipient_chat_id: string | null
+          recipient_label: string | null
+          recipient_user_id: string | null
+          seed_prompt: string | null
+          status: string
+          system_prompt: string | null
+          tokens_completion: number | null
+          tokens_prompt: number | null
+          tokens_total: number | null
+          tool_calls: Json
+          triggered_by: string
+        }
+        Insert: {
+          automation_id?: string | null
+          created_at?: string
+          delivery_status?: string | null
+          dry_run?: boolean
+          duration_ms?: number | null
+          error?: string | null
+          final_message?: string | null
+          finished_at?: string | null
+          id?: string
+          intermediate_thoughts?: Json
+          kind: string
+          model?: string | null
+          recipient_chat_id?: string | null
+          recipient_label?: string | null
+          recipient_user_id?: string | null
+          seed_prompt?: string | null
+          status?: string
+          system_prompt?: string | null
+          tokens_completion?: number | null
+          tokens_prompt?: number | null
+          tokens_total?: number | null
+          tool_calls?: Json
+          triggered_by?: string
+        }
+        Update: {
+          automation_id?: string | null
+          created_at?: string
+          delivery_status?: string | null
+          dry_run?: boolean
+          duration_ms?: number | null
+          error?: string | null
+          final_message?: string | null
+          finished_at?: string | null
+          id?: string
+          intermediate_thoughts?: Json
+          kind?: string
+          model?: string | null
+          recipient_chat_id?: string | null
+          recipient_label?: string | null
+          recipient_user_id?: string | null
+          seed_prompt?: string | null
+          status?: string
+          system_prompt?: string | null
+          tokens_completion?: number | null
+          tokens_prompt?: number | null
+          tokens_total?: number | null
+          tool_calls?: Json
+          triggered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "heartbeat_runs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "heartbeat_runs_recipient_user_id_fkey"
+            columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      heartbeat_subscriptions: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          kind: string
+          telegram_chat_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          kind: string
+          telegram_chat_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          kind?: string
+          telegram_chat_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "heartbeat_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       magic_link_tokens: {
         Row: {
           community_id: string
