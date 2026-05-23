@@ -876,8 +876,6 @@ async function fetchUrl(args: { url: string }): Promise<string> {
     }
   } catch { /* ignore */ }
 
-  try {
-  }
 
   try {
     const resp = await fetch(url, {

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { ConversationsSection } from "@/components/sections/ConversationsSection";
 import { EventEditModal, type EventEditRow } from "@/components/EventEditModal";
+import { HeartbeatToggles } from "@/components/HeartbeatToggles";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { format, formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -1657,6 +1658,11 @@ export default function TelegramMini() {
             <p className="text-[11px] text-muted-foreground px-0.5 leading-relaxed">
               tell vibey how you want to be talked to. tone, length, nicknames, vibe.
             </p>
+
+            {myProfile?.id && tgUserId && (
+              <HeartbeatToggles userId={myProfile.id} telegramChatId={String(tgUserId)} />
+            )}
+
             {prefsLoading || !tgUserId ? (
               <div className="flex items-center py-4">
                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -1677,6 +1683,7 @@ export default function TelegramMini() {
             )}
           </section>
         )}
+
 
         {/* ===== PROFILES TAB ===== */}
         {tab === "profiles" && (
