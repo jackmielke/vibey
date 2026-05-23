@@ -904,27 +904,39 @@ Deno.serve(async (req) => {
     const voicePrompt = parseVoiceCommand(userText);
     if (voicePrompt !== null) {
       if (voicePrompt.length === 0) {
-        // Replay the last assistant reply in this session as audio.
-        const { data: lastLog } = await supabase
-          .from("agent_chat_logs")
-          .select("agent_response")
-          .eq("session_key", sessionKey)
-          .not("agent_response", "is", null)
-          .neq("agent_response", "")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const lastReply = lastLog?.agent_response as string | undefined;
-        if (!lastReply) {
+        // If this /voice is a reply to another message, TTS that message's text.
+        const repliedText =
+          msg.reply_to_message?.text?.trim() ||
+          msg.reply_to_message?.caption?.trim() ||
+          "";
+        let sourceText = repliedText;
+        let label = "vibey · voice";
+
+        if (!sourceText) {
+          // Fallback: replay the last assistant reply in this session as audio.
+          const { data: lastLog } = await supabase
+            .from("agent_chat_logs")
+            .select("agent_response")
+            .eq("session_key", sessionKey)
+            .not("agent_response", "is", null)
+            .neq("agent_response", "")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          sourceText = (lastLog?.agent_response as string | undefined) ?? "";
+          label = "vibey · replay";
+        }
+
+        if (!sourceText) {
           await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
             chat_id: chatId,
-            text: "nothing to replay yet — say something and i'll voice my reply with /voice <text>",
+            text: "nothing to voice — reply to a message with /voice, or use /voice <text>",
             reply_to_message_id: msg.message_id,
           });
           return new Response("ok", { status: 200 });
         }
         await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "record_voice" });
-        const mp3 = await elevenLabsTts(lastReply);
+        const mp3 = await elevenLabsTts(sourceText);
         if (!mp3) {
           await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
             chat_id: chatId,
@@ -933,8 +945,9 @@ Deno.serve(async (req) => {
           });
           return new Response("ok", { status: 200 });
         }
-        await sendTelegramAudio(TELEGRAM_BOT_TOKEN, chatId, mp3, "vibey · replay", msg.message_id);
+        await sendTelegramAudio(TELEGRAM_BOT_TOKEN, chatId, mp3, label, msg.reply_to_message?.message_id ?? msg.message_id);
         return new Response("ok", { status: 200 });
+
       }
       // /voice <prompt> — run the agent on the prompt and also send audio.
       userText = voicePrompt;
