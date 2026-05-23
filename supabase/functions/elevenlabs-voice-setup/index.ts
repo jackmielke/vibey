@@ -138,9 +138,10 @@ You're talking out loud right now. Keep replies conversational and concise — u
       `Hey, it's ${agent.name}. What's on your mind?`;
 
     let agentId = agent.elevenlabs_agent_id as string | null;
+    const voiceId = Deno.env.get("VIBEY_VOICE_ID") || DEFAULT_VOICE_ID;
 
     if (!agentId) {
-      agentId = await createAgent(apiKey, voicePrompt, firstMessage, agent.name);
+      agentId = await createAgent(apiKey, voicePrompt, firstMessage, agent.name, voiceId);
       const { error: updErr } = await supabase
         .from("agents")
         .update({ elevenlabs_agent_id: agentId })
@@ -148,7 +149,7 @@ You're talking out loud right now. Keep replies conversational and concise — u
       if (updErr) console.warn("could not store agent id:", updErr.message);
     } else {
       // Sync soul changes up to ElevenLabs every time.
-      await updateAgent(apiKey, agentId, voicePrompt, firstMessage);
+      await updateAgent(apiKey, agentId, voicePrompt, firstMessage, voiceId);
     }
 
     const [token, signedUrl] = await Promise.all([
