@@ -798,6 +798,7 @@ export default function TelegramMini() {
   // Admin
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminMode, setAdminMode] = useState(false);
+  const [portalOpen, setPortalOpen] = useState(false);
   const [editingMemory, setEditingMemory] = useState<MemoryRow | null>(null);
   const [allPrefs, setAllPrefs] = useState<PreferenceRow[]>([]);
   const [chatLogs, setChatLogs] = useState<ChatLogRow[]>([]);
