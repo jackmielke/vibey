@@ -16,6 +16,7 @@ import {
   Bot,
   Zap,
   CalendarDays,
+  Activity,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useLocation } from "react-router-dom";
