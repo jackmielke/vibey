@@ -758,9 +758,9 @@ Deno.serve(async (req) => {
   // Idempotency: if Telegram retries this update (e.g. because our response
   // took longer than its timeout), short-circuit so we don't double-reply.
   // We do this BEFORE doing any other work.
-  const dedupClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   if (typeof update.update_id === "number") {
-    const updateDedup = await markTelegramDedup(dedupClient, update.update_id, "update_id");
+    const updateDedup = await markTelegramDedup(supabase, update.update_id, "update_id");
     if (updateDedup === "duplicate") return new Response("ok", { status: 200 });
   }
 
@@ -771,12 +771,23 @@ Deno.serve(async (req) => {
   const isGroup = chatType === "group" || chatType === "supergroup";
   const fallbackSessionKey = `telegram:${chatId}`;
 
+  // Resolve unified Vibe identity early so slash commands can use the same
+  // session as normal Telegram DMs.
+  const vibeUserId = await resolveVibeUserId(supabase, {
+    telegram_user_id: userId,
+    telegram_username: msg.from?.username ?? null,
+  });
+  let sessionKey = fallbackSessionKey;
+  if (!isGroup) {
+    sessionKey = unifiedSessionKey(vibeUserId, fallbackSessionKey);
+  }
+
   // In group chats, duplicate-looking responses can come from two bot accounts
   // whose webhooks both target this function. Telegram gives each bot a unique
   // update_id, so update_id-only dedup won't catch that. chat_id/message_id will.
   if (isGroup && typeof msg.message_id === "number") {
     const messageDedup = await markTelegramDedup(
-      dedupClient,
+      supabase,
       telegramMessageDedupKey(chatId, msg.message_id),
       "group message"
     );
