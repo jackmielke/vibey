@@ -87,6 +87,19 @@ async function getConversationToken(apiKey: string, agentId: string): Promise<st
   return json.token as string;
 }
 
+async function getConversationSignedUrl(apiKey: string, agentId: string): Promise<string> {
+  const resp = await fetch(
+    `${ELEVEN_BASE}/convai/conversation/get-signed-url?agent_id=${agentId}`,
+    { headers: { "xi-api-key": apiKey } }
+  );
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`signed url request failed (${resp.status}): ${txt}`);
+  }
+  const json = await resp.json();
+  return json.signed_url as string;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -135,10 +148,13 @@ You're talking out loud right now. Keep replies conversational and concise — u
       await updateAgent(apiKey, agentId, voicePrompt, firstMessage);
     }
 
-    const token = await getConversationToken(apiKey, agentId);
+    const [token, signedUrl] = await Promise.all([
+      getConversationToken(apiKey, agentId),
+      getConversationSignedUrl(apiKey, agentId),
+    ]);
 
     return new Response(
-      JSON.stringify({ token, agent_id: agentId }),
+      JSON.stringify({ token, signed_url: signedUrl, agent_id: agentId }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
