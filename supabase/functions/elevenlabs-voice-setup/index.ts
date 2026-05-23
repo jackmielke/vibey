@@ -30,7 +30,7 @@ async function elevenFetch(path: string, apiKey: string, init: RequestInit = {})
   });
 }
 
-async function createAgent(apiKey: string, prompt: string, firstMessage: string, name: string) {
+async function createAgent(apiKey: string, prompt: string, firstMessage: string, name: string, voiceId: string) {
   const resp = await elevenFetch("/convai/agents/create", apiKey, {
     method: "POST",
     body: JSON.stringify({
@@ -42,7 +42,7 @@ async function createAgent(apiKey: string, prompt: string, firstMessage: string,
           language: "en",
         },
         tts: {
-          voice_id: DEFAULT_VOICE_ID,
+          voice_id: voiceId,
         },
       },
     }),
@@ -55,7 +55,7 @@ async function createAgent(apiKey: string, prompt: string, firstMessage: string,
   return json.agent_id as string;
 }
 
-async function updateAgent(apiKey: string, agentId: string, prompt: string, firstMessage: string) {
+async function updateAgent(apiKey: string, agentId: string, prompt: string, firstMessage: string, voiceId: string) {
   const resp = await elevenFetch(`/convai/agents/${agentId}`, apiKey, {
     method: "PATCH",
     body: JSON.stringify({
@@ -64,6 +64,9 @@ async function updateAgent(apiKey: string, agentId: string, prompt: string, firs
           prompt: { prompt },
           first_message: firstMessage,
           language: "en",
+        },
+        tts: {
+          voice_id: voiceId,
         },
       },
     }),
