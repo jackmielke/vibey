@@ -877,6 +877,27 @@ Deno.serve(async (req) => {
   // normal agent flow runs, then set a flag so we also send a TTS audio reply.
   // Empty "/voice" replays the most recent assistant message as audio.
   let wantsVoice = false;
+
+  // Natural-language voice request: if the user asks for a voice note / voice
+  // reply / audio response (and they're an admin in DMs), flip wantsVoice so the
+  // normal reply is also sent as TTS audio — no /voice command needed.
+  if (!isGroup && isAdminTelegramUser(userId) && userText) {
+    const lower = userText.toLowerCase();
+    const voiceIntentPatterns = [
+      /\bvoice\s*(note|message|memo|reply|response|answer)\b/,
+      /\b(reply|respond|answer|say it|tell me)\s+(back\s+)?(with|in|using|as)\s+(a\s+)?voice\b/,
+      /\b(send|leave|record|drop)\s+(me\s+)?(a\s+)?(voice|audio)\b/,
+      /\bspeak\s+(it|your\s+(reply|response|answer))\b/,
+      /\bsay\s+it\s+out\s+loud\b/,
+      /\b(use|with)\s+your\s+voice\b/,
+    ];
+    if (voiceIntentPatterns.some((re) => re.test(lower))) {
+      wantsVoice = true;
+    }
+  }
+
+
+
   if (!isGroup && isAdminTelegramUser(userId)) {
     const voicePrompt = parseVoiceCommand(userText);
     if (voicePrompt !== null) {
