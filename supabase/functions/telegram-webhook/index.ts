@@ -924,20 +924,6 @@ Deno.serve(async (req) => {
     ? `${attachmentExtraText.join("\n\n")}\n\n---\n\n${userText}`
     : userText;
 
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-  // Resolve unified Vibe identity so web + Telegram share one conversation.
-  // Group chats stay isolated per-group (multiple people in one room).
-  const vibeUserId = await resolveVibeUserId(supabase, {
-    telegram_user_id: userId,
-    telegram_username: msg.from?.username ?? null,
-  });
-  let sessionKey = fallbackSessionKey;
-  if (!isGroup) {
-    sessionKey = unifiedSessionKey(vibeUserId, fallbackSessionKey);
-  }
-
   // Best-effort: cache the user's Telegram profile photo so the mini app can
   // display it next to their memories. Fire-and-forget.
   ensureTelegramAvatar(supabase, TELEGRAM_BOT_TOKEN, vibeUserId, userId).catch(
