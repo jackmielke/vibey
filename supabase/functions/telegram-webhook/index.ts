@@ -857,6 +857,52 @@ Deno.serve(async (req) => {
     }
   }
 
+  // /voice command (admin only, private DM only): rewrite userText so the
+  // normal agent flow runs, then set a flag so we also send a TTS audio reply.
+  // Empty "/voice" replays the most recent assistant message as audio.
+  let wantsVoice = false;
+  if (!isGroup && isAdminTelegramUser(userId)) {
+    const voicePrompt = parseVoiceCommand(userText);
+    if (voicePrompt !== null) {
+      if (voicePrompt.length === 0) {
+        // Replay the last assistant reply in this session as audio.
+        const { data: lastLog } = await supabase
+          .from("agent_chat_logs")
+          .select("agent_response")
+          .eq("session_key", sessionKey)
+          .not("agent_response", "is", null)
+          .neq("agent_response", "")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const lastReply = lastLog?.agent_response as string | undefined;
+        if (!lastReply) {
+          await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+            chat_id: chatId,
+            text: "nothing to replay yet — say something and i'll voice my reply with /voice <text>",
+            reply_to_message_id: msg.message_id,
+          });
+          return new Response("ok", { status: 200 });
+        }
+        await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "record_voice" });
+        const mp3 = await elevenLabsTts(lastReply);
+        if (!mp3) {
+          await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+            chat_id: chatId,
+            text: "voice generation failed — check ELEVENLABS_API_KEY",
+            reply_to_message_id: msg.message_id,
+          });
+          return new Response("ok", { status: 200 });
+        }
+        await sendTelegramAudio(TELEGRAM_BOT_TOKEN, chatId, mp3, "vibey · replay", msg.message_id);
+        return new Response("ok", { status: 200 });
+      }
+      // /voice <prompt> — run the agent on the prompt and also send audio.
+      userText = voicePrompt;
+      wantsVoice = true;
+    }
+  }
+
   // No text and no attachments — nothing to do.
   if (!userText && attachmentImages.length === 0 && attachmentExtraText.length === 0) {
     return new Response("ok", { status: 200 });
