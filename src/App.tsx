@@ -26,6 +26,7 @@ import TelegramMini from "@/pages/TelegramMini";
 import PublicChat from "@/pages/PublicChat";
 import PublicDocs from "@/pages/PublicDocs";
 import Automations from "@/pages/Automations";
+import Heartbeats from "@/pages/Heartbeats";
 import CalendarPage from "@/pages/Calendar";
 import NotFound from "@/pages/NotFound";
 import { isSupabaseConfigured } from "@/integrations/supabase/client";
