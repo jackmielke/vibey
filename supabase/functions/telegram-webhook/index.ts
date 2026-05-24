@@ -671,6 +671,34 @@ async function elevenLabsTts(text: string): Promise<Uint8Array | null> {
   return new Uint8Array(await resp.arrayBuffer());
 }
 
+// Send as a true Telegram "voice message" (round waveform bubble) rather than
+// a music-file audio attachment. Modern Telegram clients accept MP3 here and
+// render the voice-message UI. Used for the /voice-reply flow where the user
+// wants a quick voice bubble of whatever message they're replying to.
+async function sendTelegramVoice(
+  token: string,
+  chatId: number,
+  mp3: Uint8Array,
+  replyTo?: number,
+): Promise<void> {
+  const form = new FormData();
+  form.append("chat_id", String(chatId));
+  if (replyTo) form.append("reply_to_message_id", String(replyTo));
+  if (replyTo) form.append("allow_sending_without_reply", "true");
+  form.append("voice", new Blob([mp3], { type: "audio/mpeg" }), "vibey.mp3");
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendVoice`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => "");
+    console.error("sendVoice failed", res.status, errorText);
+    if (replyTo && errorText.includes("message to be replied not found")) {
+      await sendTelegramVoice(token, chatId, mp3);
+    }
+  }
+}
+
 async function sendTelegramAudio(
   token: string,
   chatId: number,
@@ -900,7 +928,8 @@ Deno.serve(async (req) => {
 
 
 
-  if (!isGroup && isAdminTelegramUser(userId)) {
+  // Admin-only — works in DMs and groups. Standard users see no response.
+  if (isAdminTelegramUser(userId)) {
     const voicePrompt = parseVoiceCommand(userText);
     if (voicePrompt !== null) {
       if (voicePrompt.length === 0) {
@@ -911,6 +940,7 @@ Deno.serve(async (req) => {
           "";
         let sourceText = repliedText;
         let label = "vibey · voice";
+        const isReplyVoice = repliedText.length > 0;
 
         if (!sourceText) {
           // Fallback: replay the last assistant reply in this session as audio.
@@ -945,7 +975,13 @@ Deno.serve(async (req) => {
           });
           return new Response("ok", { status: 200 });
         }
-        await sendTelegramAudio(TELEGRAM_BOT_TOKEN, chatId, mp3, label, msg.reply_to_message?.message_id ?? msg.message_id);
+        // Reply-to-message → send as a true voice-message bubble.
+        // Replay-last-reply fallback → send as audio file (longer content, music UI fits better).
+        if (isReplyVoice) {
+          await sendTelegramVoice(TELEGRAM_BOT_TOKEN, chatId, mp3, msg.reply_to_message?.message_id ?? msg.message_id);
+        } else {
+          await sendTelegramAudio(TELEGRAM_BOT_TOKEN, chatId, mp3, label, msg.message_id);
+        }
         return new Response("ok", { status: 200 });
 
       }
