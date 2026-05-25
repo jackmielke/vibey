@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
     // Load Vibey row
     const { data: agent, error: agentErr } = await supabase
       .from("agents")
-      .select("id, name, system_prompt, intro_message, elevenlabs_agent_id")
+      .select("id, name, system_prompt, intro_message, elevenlabs_agent_id, elevenlabs_voice_id")
       .eq("id", VIBEY_AGENT_ID)
       .maybeSingle();
 
