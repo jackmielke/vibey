@@ -25,7 +25,7 @@ export function isAdminTelegramUser(telegramUserId: number | null | undefined): 
 
 // Auto-load this many recent memories into the system prompt every turn.
 // (We can swap this for a `recall_memories` tool later when the corpus grows.)
-export const MEMORY_PRELOAD_LIMIT = 50;
+export const MEMORY_PRELOAD_LIMIT = 100;
 
 export type ImageInput = { url: string; detail?: "low" | "high" | "auto" };
 
