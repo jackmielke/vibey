@@ -271,7 +271,7 @@ Focus on what actually happened today, who showed up, and anything worth carryin
           temperature: agent.temperature ?? 0.7,
           maxTokens: Math.min(agent.max_tokens ?? 2048, 1500),
           systemPrompt,
-          history: [],
+          history: recentHistory,
           userText: seedPrompt,
           toolMetadata: { source: "heartbeat", kind, automation_id: automationId },
           callerVibeUserId: r.user_id ?? null,
