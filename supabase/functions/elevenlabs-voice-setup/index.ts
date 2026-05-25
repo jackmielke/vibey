@@ -139,7 +139,10 @@ You're talking out loud right now. Keep replies conversational and concise — u
       `Hey, it's ${agent.name}. What's on your mind?`;
 
     let agentId = agent.elevenlabs_agent_id as string | null;
-    const voiceId = VIBEY_VOICE_ID;
+    const voiceId =
+      (agent.elevenlabs_voice_id as string | null)?.trim() ||
+      Deno.env.get("VIBEY_VOICE_ID")?.trim() ||
+      DEFAULT_VIBEY_VOICE_ID;
     console.log("elevenlabs agent voice_id", voiceId, "agent_id", agentId ?? "new");
 
     if (!agentId) {
