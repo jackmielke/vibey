@@ -16,9 +16,9 @@ const corsHeaders = {
 const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
 const ELEVEN_BASE = "https://api.elevenlabs.io/v1";
 
-// Pinned Vibey voice — gender-neutral robotic voice requested by the project owner.
-// This is applied to the live ElevenLabs Conversational AI agent on every session.
-const VIBEY_VOICE_ID = "5nKWJuFC6bX0w7HcS5KI";
+// Fallback voice if the agent row has no elevenlabs_voice_id set.
+// The live voice is now driven by `agents.elevenlabs_voice_id` (editable in Identity).
+const DEFAULT_VIBEY_VOICE_ID = "5nKWJuFC6bX0w7HcS5KI";
 
 async function elevenFetch(path: string, apiKey: string, init: RequestInit = {}) {
   return fetch(`${ELEVEN_BASE}${path}`, {
