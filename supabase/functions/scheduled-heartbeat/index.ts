@@ -15,10 +15,12 @@ import {
   buildUserContextBlock,
   isAdminTelegramUser,
   loadEnabledSkills,
+  loadRecentChatHistory,
   loadRecentMemories,
   loadUpcomingEvents,
   loadUserPreferences,
   runAgentLoop,
+  unifiedSessionKey,
 } from "../_shared/vibey-agent.ts";
 
 const corsHeaders = {
