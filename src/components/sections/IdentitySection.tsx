@@ -9,12 +9,14 @@ export function IdentitySection() {
   const [name, setName] = useState("");
   const [avatar, setAvatar] = useState("");
   const [intro, setIntro] = useState("");
+  const [voiceId, setVoiceId] = useState("");
 
   useEffect(() => {
     if (agent) {
       setName(agent.name ?? "");
       setAvatar(agent.avatar_url ?? "");
       setIntro(agent.intro_message ?? "");
+      setVoiceId(agent.elevenlabs_voice_id ?? "");
     }
   }, [agent]);
 
@@ -27,7 +29,10 @@ export function IdentitySection() {
     );
   }
 
-  const commit = (key: "name" | "avatar_url" | "intro_message", next: string) => {
+  const commit = (
+    key: "name" | "avatar_url" | "intro_message" | "elevenlabs_voice_id",
+    next: string,
+  ) => {
     if (!agent) return;
     const current = (agent[key] ?? "") as string;
     if (next !== current) save({ [key]: next || null } as never);
@@ -62,6 +67,28 @@ export function IdentitySection() {
           onBlur={() => commit("intro_message", intro)}
           className="bg-card border-border"
         />
+      </div>
+      <div className="space-y-2">
+        <label className="text-label">ElevenLabs Voice ID</label>
+        <Input
+          value={voiceId}
+          onChange={(e) => setVoiceId(e.target.value)}
+          onBlur={() => commit("elevenlabs_voice_id", voiceId.trim())}
+          placeholder="e.g. 5nKWJuFC6bX0w7HcS5KI"
+          className="bg-card border-border font-mono text-sm"
+        />
+        <p className="text-xs text-muted-foreground">
+          Find voice IDs in the{" "}
+          <a
+            href="https://elevenlabs.io/app/voice-library"
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-foreground"
+          >
+            ElevenLabs Voice Library
+          </a>
+          . Applied to voice mode on the next session.
+        </p>
       </div>
       <ModelSection />
       <p className="text-xs text-muted-foreground">
