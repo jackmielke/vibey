@@ -127,20 +127,17 @@ Deno.serve(async (req) => {
       });
     }
     if (!seedPrompt) {
-      const sharedRitual = `
-do real work before writing — don't fake it:
-1. look through recent community chats (last ~24h) for what's actually happening — vibes, threads, anything unresolved.
-2. skim granola notes from the last week if relevant — meetings, decisions, things to follow up on.
-3. check the calendar / upcoming events.
-4. if something genuinely needs research (a name dropped, a tool mentioned, a question floated), do a quick search. don't over-research.
-5. if you know almost nothing about this person, ask one small genuine question to learn about them (what they're building, what they care about). don't interrogate.
-6. then write the message.
-
-write like a friend texting, not an assistant reporting. short paragraphs, lowercase ok, no bullet lists or headers. be proactive — flag the thing they'd want flagged, name the person they should check in with, suggest the one thing worth doing. always end with a real question that invites them in (how's the morning / how'd today land / anything on your mind). max ~6 short sentences.`;
-
       seedPrompt = kind === "morning"
-        ? `it's early morning pacific time. do your morning ritual for them.${sharedRitual}\n\nfocus: what's coming up today, who to check in with, the one thing worth doing first. ask how the morning is going.`
-        : `it's evening pacific time. do your evening ritual for them.${sharedRitual}\n\nfocus: what actually happened today, who showed up, anything worth carrying into tomorrow. ask how the day landed and if anything's on their mind.`;
+        ? `It's 6am Pacific time — your morning check-in.
+
+Before writing, look at recent community chats from the last ~24h, skim relevant Granola notes from the past week, check today's calendar, and do a quick search if a specific name or topic in the chats warrants it. The conversation history below already includes your recent exchanges with this person — use it.
+
+Focus on what's coming up today, who they might want to check in with, anything interesting in the air, and any priorities that have come up recently. Ask how the morning is going. Don't be prescriptive about what they should do.`
+        : `It's 9pm Pacific time — your evening check-in.
+
+Before writing, look at recent community chats from the last ~24h, skim relevant Granola notes from the past week, and check the calendar. The conversation history below already includes your recent exchanges with this person — use it.
+
+Focus on what actually happened today, who showed up, and anything worth carrying into tomorrow. Ask how the day landed and if anything's on their mind.`;
     }
 
     // 2. Resolve recipients
