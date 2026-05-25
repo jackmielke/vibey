@@ -1255,6 +1255,56 @@ Deno.serve(async (req) => {
 
   // ── Private chat: always respond ─────────────────────────────────────────
 
+  // Scripted /start onboarding: instant reply + quick-action keyboard, then
+  // a short follow-up. Skip the LLM entirely so first impression is snappy.
+  if (userText === "/start" || userText.startsWith("/start ") || userText === `/start@${BOT_USERNAME}`) {
+    const firstName = msg.from?.first_name?.trim();
+    const greeting = firstName ? `Hey ${firstName}, I'm Vibey.` : `Hey, I'm Vibey.`;
+    const welcome =
+      `${greeting} A community AI for Edge Esmeralda, built by the Vibe Ventures crew. ` +
+      `Think of me as a friend who knows everyone here.`;
+
+    const quickActions = {
+      keyboard: [
+        [{ text: "What's happening today?" }, { text: "Who's around?" }],
+        [{ text: "What is Vibey?" }, { text: "Try a voice note 🎙" }],
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: true,
+      input_field_placeholder: "ask me anything…",
+    };
+
+    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+      chat_id: chatId,
+      text: welcome,
+      reply_markup: quickActions,
+    });
+
+    await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
+    await new Promise((r) => setTimeout(r, 1200));
+
+    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+      chat_id: chatId,
+      text: "Ask me what's on today, who's around, or anything about Edge Esmeralda. Tap a button below or just type.",
+      reply_markup: quickActions,
+    });
+
+    supabase.from("agent_chat_logs").insert({
+      agent_id: VIBEY_AGENT_ID,
+      community_id: VIBEY_COMMUNITY_ID,
+      user_message: "/start",
+      agent_response: welcome,
+      session_key: sessionKey,
+      telegram_chat_id: chatId,
+      telegram_user_id: userId,
+      telegram_username: username,
+    }).then(({ error }: { error: unknown }) => {
+      if (error) console.error("Failed to log /start:", error);
+    });
+
+    return new Response("ok", { status: 200 });
+  }
+
   await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
 
   const { data: agent, error: agentError } = await supabase
