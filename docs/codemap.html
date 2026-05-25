@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Vibey — CODEMAP</title>
+<style>
+  body { margin: 0; padding: 32px; background: #0f0f10; color: #eee; font-family: -apple-system, system-ui, sans-serif; max-width: 1200px; margin: 0 auto; }
+  h1 { font-weight: 500; font-size: 22px; color: #fff; margin: 0 0 8px; }
+  h2 { font-weight: 500; font-size: 14px; color: #888; margin: 32px 0 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  p.lede { color: #aaa; margin: 0 0 24px; max-width: 760px; }
+  .mermaid { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+<h1>Vibey — CODEMAP</h1>
+<p class="lede">How a message travels from someone typing it to Vibey replying. The brain lives in <b>one file</b>: <code style="color:#fff">supabase/functions/_shared/vibey-agent.ts</code>.</p>
+
+<h2>1. The surface map — where messages come in</h2>
+<div class="mermaid">
+flowchart LR
+    subgraph Surfaces ["SURFACES"]
+        S1["Web admin chat<br/>src/pages/Chat.tsx"]
+        S2["Telegram (DM or group)<br/>via vibey_ai_bot"]
+        S3["Public chat<br/>src/pages/PublicChat.tsx"]
+        S4["Telegram Mini App<br/>src/pages/TelegramMini.tsx"]
+    end
+
+    subgraph Edge ["EDGE FUNCTIONS (the adapters)"]
+        E1["chat-with-vibey<br/>streams SSE"]
+        E2["telegram-webhook<br/>sendMessage / sendVoice"]
+    end
+
+    subgraph Brain ["THE BRAIN (shared)"]
+        B["_shared/vibey-agent.ts<br/>runAgentLoop"]
+    end
+
+    S1 --> E1
+    S3 --> E1
+    S2 --> E2
+    S4 -.uses Supabase + helpers.-> Brain
+
+    E1 --> B
+    E2 --> B
+</div>
+
+<h2>2. One request, step by step</h2>
+<div class="mermaid">
+flowchart TD
+    M["User message arrives<br/>(text + maybe images / voice)"]
+
+    subgraph Hydrate ["HYDRATE — parallel"]
+        H1["agents row<br/>system_prompt + model"]
+        H2["recent memories"]
+        H3["upcoming events"]
+        H4["user prefs<br/>(vibey_relationships)"]
+        H5["enabled skills"]
+        H6["chat history<br/>(last 10 exchanges)"]
+        H7["current Pacific time"]
+    end
+
+    A["buildSystemPromptWithMemories()"]
+    L["OpenRouter call<br/>anthropic/claude-sonnet-4.5"]
+    D{"Tool calls?"}
+    T["Execute tools"]
+    R["Append results"]
+    F["Final text reply"]
+    Log[("agent_chat_logs<br/>persist")]
+    Send["Send to surface"]
+    Cap["MAX 25 iterations"]
+
+    M --> Hydrate
+    Hydrate --> A
+    A --> L
+    L --> D
+    D -->|yes| T
+    T --> R
+    R --> L
+    D -->|no| F
+    F --> Log
+    F --> Send
+    D -.-> Cap
+</div>
+
+<h2>3. Where the code lives</h2>
+<div class="mermaid">
+flowchart LR
+    subgraph Frontend ["FRONTEND"]
+        F1["src/pages/Chat.tsx"]
+        F2["src/pages/TelegramMini.tsx"]
+        F3["src/pages/PublicChat.tsx"]
+        F4["src/pages/Soul.tsx<br/>(edits system_prompt live)"]
+        F5["other pages: Memory, Skills,<br/>Tools, Relationships, Events,<br/>Heartbeats, Calendar, etc."]
+    end
+
+    subgraph EdgeFns ["EDGE FUNCTIONS"]
+        E1["chat-with-vibey"]
+        E2["telegram-webhook"]
+        E3["_shared/vibey-agent.ts<br/>THE BRAIN"]
+        E4["scheduled-heartbeat,<br/>daily-recap, vibey-cron"]
+    end
+
+    subgraph DB ["SUPABASE"]
+        D1["agents<br/>system_prompt, model"]
+        D2["memories"]
+        D3["events"]
+        D4["vibey_relationships"]
+        D5["agent_chat_logs"]
+        D6["github_agent_actions"]
+    end
+
+    F1 --> E1
+    F2 --> E1
+    F3 --> E1
+    F4 -- edits --> D1
+    E1 --> E3
+    E2 --> E3
+    E3 --> D1
+    E3 --> D2
+    E3 --> D3
+    E3 --> D4
+    E3 --> D5
+    E3 --> D6
+</div>
+
+<h2>4. Tools Vibey can call (admin gated marked 🔒)</h2>
+<div class="mermaid">
+flowchart LR
+    R["runAgentLoop"]
+
+    R --> M1["save_memory"]
+    R --> M2["update_memory"]
+    R --> W1["web_search"]
+    R --> W2["fetch_url"]
+    R --> W3["get_vibe_price"]
+    R --> G1["🔒 github_read_file"]
+    R --> G2["🔒 github_list_dir"]
+    R --> G3["🔒 github_search_code<br/>(unreliable on this repo)"]
+    R --> G4["🔒 github_commit_file"]
+    R --> G5["🔒 github_delete_file"]
+    R --> G6["🔒 github_list_recent_commits"]
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'default', flowchart: { useMaxWidth: true } });
+</script>
+</body>
+</html>
