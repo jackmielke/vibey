@@ -91,9 +91,13 @@ function mdToTelegramHtml(input: string): string {
     `<a href="${url}">${label}</a>`,
   );
 
-  text = text.replace(/\*\*([^*\n]+?)\*\*/g, "<b>$1</b>");
+  // Bold first, allowing single `*` (italic) inside — match anything that
+  // isn't a literal `**` so we don't get tripped up by `**foo *bar* baz**`.
+  text = text.replace(/\*\*((?:(?!\*\*)[\s\S])+?)\*\*/g, "<b>$1</b>");
   text = text.replace(/__([^_\n]+?)__/g, "<b>$1</b>");
-  text = text.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>");
+  // Italic: single `*` not adjacent to another `*` (so we don't re-match the
+  // bold tags we just emitted), and not inside an HTML tag.
+  text = text.replace(/(^|[^*<\w])\*([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>");
   text = text.replace(/(^|[^_\w])_([^_\n]+?)_(?!_)/g, "$1<i>$2</i>");
   text = text.replace(/~~([^~\n]+?)~~/g, "<s>$1</s>");
   text = text.replace(/^#{1,6}\s+(.+)$/gm, "<b>$1</b>");
