@@ -227,6 +227,17 @@ Focus on what actually happened today, who showed up, and anything worth carryin
         `${buildSystemPromptWithMemories(baseSystemPrompt, memories, r.user_id, isAdmin)}` +
         `${buildEventsBlock(events)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
+      // Recent conversation context (last ~24h, up to 10 exchanges) so the
+      // heartbeat isn't blind to what was just discussed.
+      const sessionKey = unifiedSessionKey(
+        r.user_id ?? null,
+        `telegram:${r.telegram_chat_id}`
+      );
+      const recentHistory = await loadRecentChatHistory(supabase, sessionKey, {
+        limit: 10,
+        sinceHours: 24,
+      });
+
       // Open run row
       const { data: runRow } = await supabase
         .from("heartbeat_runs")
