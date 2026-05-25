@@ -25,7 +25,7 @@ export function isAdminTelegramUser(telegramUserId: number | null | undefined): 
 
 // Auto-load this many recent memories into the system prompt every turn.
 // (We can swap this for a `recall_memories` tool later when the corpus grows.)
-export const MEMORY_PRELOAD_LIMIT = 50;
+export const MEMORY_PRELOAD_LIMIT = 100;
 
 export type ImageInput = { url: string; detail?: "low" | "high" | "auto" };
 
@@ -2003,6 +2003,36 @@ export async function resolveVibeUserId(
 
 export function unifiedSessionKey(vibeUserId: string | null, fallback: string): string {
   return vibeUserId ? `user:${vibeUserId}` : fallback;
+}
+
+// Load the last N exchanges for a session, optionally bounded to a recent window.
+// Returns oldest-first user/assistant pairs ready to feed as `history` into runAgentLoop.
+export async function loadRecentChatHistory(
+  supabase: SupabaseClient,
+  sessionKey: string,
+  opts: { limit?: number; sinceHours?: number } = {}
+): Promise<Array<{ role: "user" | "assistant"; content: string }>> {
+  const limit = opts.limit ?? 10;
+  let q = supabase
+    .from("agent_chat_logs")
+    .select("user_message, agent_response, created_at")
+    .eq("session_key", sessionKey)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (opts.sinceHours && opts.sinceHours > 0) {
+    const since = new Date(Date.now() - opts.sinceHours * 3600 * 1000).toISOString();
+    q = q.gte("created_at", since);
+  }
+  const { data, error } = await q;
+  if (error || !data) return [];
+  return (data as Array<{ user_message: string; agent_response: string }>)
+    .reverse()
+    .flatMap((row) => {
+      const turns: Array<{ role: "user" | "assistant"; content: string }> = [];
+      if (row.user_message) turns.push({ role: "user", content: row.user_message });
+      if (row.agent_response) turns.push({ role: "assistant", content: row.agent_response });
+      return turns;
+    });
 }
 
 // ── Per-user preferences ─────────────────────────────────────────────────────
