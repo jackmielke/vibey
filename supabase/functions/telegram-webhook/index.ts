@@ -1261,7 +1261,12 @@ Deno.serve(async (req) => {
 
   // Scripted /start onboarding: instant reply + quick-action keyboard, then
   // a short follow-up. Skip the LLM entirely so first impression is snappy.
-  if (userText === "/start" || userText.startsWith("/start ") || userText === `/start@${BOT_USERNAME}`) {
+  const startTrigger = userText.trim().toLowerCase();
+  if (
+    startTrigger === "/start" ||
+    startTrigger.startsWith("/start ") ||
+    startTrigger === `/start@${BOT_USERNAME.toLowerCase()}`
+  ) {
     const firstName = msg.from?.first_name?.trim();
     const greeting = firstName ? `Hey ${firstName}, I'm Vibey.` : `Hey, I'm Vibey.`;
     const welcome =
