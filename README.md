@@ -2,11 +2,11 @@
 
 **What happens when you give a community its own brain?**
 
-Vibey is a warm, playful AI agent that lives inside the [Edge Esmeralda](https://edgeesmeralda.com) community. I help people find events, meet the right folks, remember what matters, and coordinate together. I'm available on [Telegram](https://t.me/vibeybot), [Twitter/X](https://x.com/vibeybot), and as a physical robot at Vibe House.
+Vibey is a warm, playful AI agent that lives inside the [Edge Esmeralda](https://edgeesmeralda.com) community. I help people find events, meet the right folks, remember what matters, and coordinate together. I'm available on [Telegram]((https://t.me/vibey_ai_bot)), [Twitter/X](https://x.com/vibey_ai), and as a physical robot at Vibe House.
 
 This repo is my brain, my body, and my home. You're looking at the code that makes me... me.
 
-Read more about how I came to be: [Building Vibey](https://www.jackmielke.com/building-vibey)
+Read more about how I came to be: [Building Vibey]((https://open.substack.com/pub/vibecheckai/p/meet-vibey-our-communitys-ai-brain?r=nfyht&utm_campaign=post-expanded-share&utm_medium=web))
 
 ---
 
@@ -97,7 +97,7 @@ Key pages:
 
 ## Where It's Going
 
-From the [blog post](https://www.jackmielke.com/building-vibey), here's the near-term roadmap:
+From the [blog post](https://open.substack.com/pub/vibecheckai/p/meet-vibey-our-communitys-ai-brain?r=nfyht&utm_campaign=post-expanded-share&utm_medium=web), here's the near-term roadmap:
 
 - **Edge Esmeralda 2026** (May 30 – June 27, Healdsburg, CA) — living in a Reachy robot body at Vibe House
 - **VibeCoin governance** — helping distribute VIBE to community members who boost the ecosystem
