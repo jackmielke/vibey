@@ -174,6 +174,7 @@ export type Database = {
           digest_hour_utc: number | null
           digest_timezone: string | null
           elevenlabs_agent_id: string | null
+          elevenlabs_voice_id: string | null
           id: string
           intro_message: string | null
           is_active: boolean | null
@@ -196,6 +197,7 @@ export type Database = {
           digest_hour_utc?: number | null
           digest_timezone?: string | null
           elevenlabs_agent_id?: string | null
+          elevenlabs_voice_id?: string | null
           id?: string
           intro_message?: string | null
           is_active?: boolean | null
@@ -218,6 +220,7 @@ export type Database = {
           digest_hour_utc?: number | null
           digest_timezone?: string | null
           elevenlabs_agent_id?: string | null
+          elevenlabs_voice_id?: string | null
           id?: string
           intro_message?: string | null
           is_active?: boolean | null

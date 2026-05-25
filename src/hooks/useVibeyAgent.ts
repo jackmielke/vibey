@@ -12,6 +12,7 @@ type AgentRow = {
   model: string;
   temperature: number | null;
   max_tokens: number | null;
+  elevenlabs_voice_id: string | null;
 };
 
 export function useVibeyAgent() {
