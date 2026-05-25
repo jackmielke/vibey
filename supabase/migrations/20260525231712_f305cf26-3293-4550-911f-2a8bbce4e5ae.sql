@@ -1,0 +1,2 @@
+ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS elevenlabs_voice_id TEXT;
+UPDATE public.agents SET elevenlabs_voice_id = '5nKWJuFC6bX0w7HcS5KI' WHERE id = 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e' AND elevenlabs_voice_id IS NULL;

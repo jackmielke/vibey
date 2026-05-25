@@ -12,6 +12,7 @@ type AgentRow = {
   model: string;
   temperature: number | null;
   max_tokens: number | null;
+  elevenlabs_voice_id: string | null;
 };
 
 export function useVibeyAgent() {
@@ -24,7 +25,7 @@ export function useVibeyAgent() {
     (async () => {
       const { data, error } = await supabase
         .from("agents")
-        .select("id, name, intro_message, avatar_url, system_prompt, model, temperature, max_tokens")
+        .select("id, name, intro_message, avatar_url, system_prompt, model, temperature, max_tokens, elevenlabs_voice_id")
         .eq("id", VIBEY_AGENT_ID)
         .maybeSingle();
 
