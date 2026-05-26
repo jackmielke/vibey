@@ -240,16 +240,34 @@ async function sendTypingThenWait(token: string, chatId: number, ms = 650): Prom
 // Create a live-updating status message in Telegram. Steps are appended as
 // they happen via `update(step)`; `finalize(summary)` replaces it with a
 // compact one-line collapsed summary (or deletes it if `summary` is empty).
+const THINKING_PHRASES = [
+  "✨ thinking…",
+  "🤖 beep boop…",
+  "🧠 let me cook…",
+  "📚 rummaging through memories…",
+  "🔍 sniffing around…",
+  "⚙️ spinning up some neurons…",
+  "🌀 vibing on it…",
+  "🪄 consulting the oracle…",
+  "🛰️ pinging the cosmos…",
+  "🫧 brewing thoughts…",
+];
+
+function pickThinkingPhrase(): string {
+  return THINKING_PHRASES[Math.floor(Math.random() * THINKING_PHRASES.length)];
+}
+
 function createStatusMessage(token: string, chatId: number, reply_to_message_id?: number) {
   let messageId: number | null = null;
   const steps: string[] = [];
   let initPromise: Promise<void> | null = null;
   let lastEdit: Promise<void> = Promise.resolve();
+  const thinkingHeader = pickThinkingPhrase();
 
   const init = async () => {
     const res = await tg(token, "sendMessage", {
       chat_id: chatId,
-      text: "✨ thinking…",
+      text: thinkingHeader,
       reply_to_message_id,
       disable_notification: true,
     });
@@ -260,7 +278,7 @@ function createStatusMessage(token: string, chatId: number, reply_to_message_id?
   };
 
   const render = () => {
-    if (steps.length === 0) return "✨ thinking…";
+    if (steps.length === 0) return thinkingHeader;
     // Keep last ~12 steps so the message doesn't blow past 4096 chars.
     const shown = steps.slice(-12);
     // Run each line through the same markdown -> HTML converter the final
@@ -268,8 +286,9 @@ function createStatusMessage(token: string, chatId: number, reply_to_message_id?
     // instead of showing as literal asterisks until finalize swaps in the
     // already-converted trace block.
     const lines = shown.map((line) => mdToTelegramHtml(line));
-    return `✨ thinking…\n${lines.join("\n")}`;
+    return `${thinkingHeader}\n${lines.join("\n")}`;
   };
+
 
   const flush = () => {
     lastEdit = lastEdit.then(async () => {
