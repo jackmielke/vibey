@@ -651,17 +651,34 @@ function isVibeyCommand(text: string | undefined, command: string): boolean {
 
 // ── ElevenLabs TTS + Telegram audio ──────────────────────────────────────────
 
-// Pinned Vibey voice — gender-neutral robotic voice requested by the project owner.
-// Keep this explicit so Telegram TTS cannot silently fall back to a different voice.
-const VIBEY_VOICE_ID = "5nKWJuFC6bX0w7HcS5KI";
+// Fallback voice if the agent row has no elevenlabs_voice_id set.
+// The live voice is driven by `agents.elevenlabs_voice_id` (editable in Identity).
+const DEFAULT_VIBEY_VOICE_ID = "5nKWJuFC6bX0w7HcS5KI";
 
-async function elevenLabsTts(text: string): Promise<Uint8Array | null> {
+// Tiny in-memory cache so we don't hit the agents row on every TTS call within
+// a single function instance.
+let cachedVibeyVoiceId: { value: string; expires: number } | null = null;
+async function getVibeyVoiceId(supabase: ReturnType<typeof createClient>): Promise<string> {
+  const now = Date.now();
+  if (cachedVibeyVoiceId && cachedVibeyVoiceId.expires > now) return cachedVibeyVoiceId.value;
+  const { data } = await supabase
+    .from("agents")
+    .select("elevenlabs_voice_id")
+    .eq("id", VIBEY_AGENT_ID)
+    .maybeSingle();
+  const fromRow = (data?.elevenlabs_voice_id as string | null | undefined)?.trim();
+  const fromEnv = Deno.env.get("VIBEY_VOICE_ID")?.trim();
+  const voiceId = fromRow || fromEnv || DEFAULT_VIBEY_VOICE_ID;
+  cachedVibeyVoiceId = { value: voiceId, expires: now + 30_000 };
+  return voiceId;
+}
+
+async function elevenLabsTts(text: string, voiceId: string): Promise<Uint8Array | null> {
   const apiKey = Deno.env.get("ELEVENLABS_API_KEY");
   if (!apiKey) {
     console.error("ELEVENLABS_API_KEY not configured for /voice");
     return null;
   }
-  const voiceId = VIBEY_VOICE_ID;
   console.log("elevenlabs tts voice_id", voiceId);
   // Trim very long replies — voice should be short anyway.
   const safe = text.length > 2500 ? text.slice(0, 2500) : text;
