@@ -1307,7 +1307,7 @@ Deno.serve(async (req) => {
         [{ text: "Tell me about yourself" }, { text: "What's the vibe right now?" }],
       ],
       resize_keyboard: true,
-      one_time_keyboard: false,
+      one_time_keyboard: true,
       input_field_placeholder: "Message Vibey…",
     };
 
