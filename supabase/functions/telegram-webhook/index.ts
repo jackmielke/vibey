@@ -1268,33 +1268,26 @@ Deno.serve(async (req) => {
     startTrigger === `/start@${BOT_USERNAME.toLowerCase()}`
   ) {
     const firstName = msg.from?.first_name?.trim();
-    const greeting = firstName ? `Hey ${firstName}, I'm Vibey.` : `Hey, I'm Vibey.`;
+    const greeting = firstName ? `Hey ${firstName}! I'm Vibey 👋` : `Hey! I'm Vibey 👋`;
     const welcome =
-      `${greeting} A community AI for Edge Esmeralda, built by the Vibe Ventures crew. ` +
-      `Think of me as a friend who knows everyone here.`;
+      `${greeting}\n\n` +
+      `I'm here to help you understand Edge Esmeralda, from the people and events to whatever else you're curious about!\n\n` +
+      `Ping me anytime and I'll respond, or get started below.`;
 
     const quickActions = {
       keyboard: [
-        [{ text: "What's happening today?" }, { text: "Who's around?" }],
-        [{ text: "What is Vibey?" }, { text: "Try a voice note 🎙" }],
+        [{ text: "What's happening today?" }, { text: "Who should I meet?" }],
+        [{ text: "Tell me about yourself" }, { text: "Send me a voice note 🎙" }],
+        [{ text: "Surprise me" }],
       ],
       resize_keyboard: true,
-      one_time_keyboard: true,
+      one_time_keyboard: false,
       input_field_placeholder: "ask me anything…",
     };
 
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
       chat_id: chatId,
       text: welcome,
-      reply_markup: quickActions,
-    });
-
-    await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
-    await new Promise((r) => setTimeout(r, 1200));
-
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-      chat_id: chatId,
-      text: "Ask me what's on today, who's around, or anything about Edge Esmeralda. Tap a button below or just type.",
       reply_markup: quickActions,
     });
 
