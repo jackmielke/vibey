@@ -1288,7 +1288,6 @@ Deno.serve(async (req) => {
       keyboard: [
         [{ text: "What's happening today?" }, { text: "Who should I meet?" }],
         [{ text: "Tell me about yourself" }, { text: "What's the vibe right now?" }],
-        [{ text: "Send me a voice note 🎙" }],
       ],
       resize_keyboard: true,
       one_time_keyboard: false,
