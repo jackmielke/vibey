@@ -883,6 +883,13 @@ Deno.serve(async (req) => {
   let wasVoice = false;
 
   if (!userText && (msg.voice || msg.audio)) {
+    // In group chats, never auto-transcribe or react to voice notes —
+    // even if the group is "enabled", voice notes should be silent context only.
+    if (isGroup) {
+      console.log(`Group ${chatId}: ignoring voice/audio (no auto-transcription in groups)`);
+      return new Response("ok", { status: 200 });
+    }
+
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) {
       console.error("Voice received but OPENAI_API_KEY not configured");
