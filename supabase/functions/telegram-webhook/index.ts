@@ -232,8 +232,8 @@ function pause(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function sendTypingThenWait(chatId: number, ms = 650): Promise<void> {
-  await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
+async function sendTypingThenWait(token: string, chatId: number, ms = 650): Promise<void> {
+  await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" });
   await pause(ms);
 }
 
@@ -1274,7 +1274,8 @@ Deno.serve(async (req) => {
   if (
     startTrigger === "/start" ||
     startTrigger.startsWith("/start ") ||
-    startTrigger === `/start@${BOT_USERNAME.toLowerCase()}`
+    startTrigger === `/start@${BOT_USERNAME.toLowerCase()}` ||
+    startTrigger.startsWith(`/start@${BOT_USERNAME.toLowerCase()} `)
   ) {
     const firstName = msg.from?.first_name?.trim();
     const greeting = firstName ? `Hey ${firstName}! I'm Vibey 👋` : `Hey! I'm Vibey 👋`;
@@ -1291,22 +1292,22 @@ Deno.serve(async (req) => {
       ],
       resize_keyboard: true,
       one_time_keyboard: false,
-      input_field_placeholder: "ask me anything…",
+      input_field_placeholder: "Message Vibey…",
     };
 
-    await sendTypingThenWait(chatId, 700);
+    await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 700);
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
       chat_id: chatId,
       text: greeting,
     });
 
-    await sendTypingThenWait(chatId, 900);
+    await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 900);
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
       chat_id: chatId,
       text: contextLine,
     });
 
-    await sendTypingThenWait(chatId, 650);
+    await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 650);
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
       chat_id: chatId,
       text: actionLine,
