@@ -1268,8 +1268,8 @@ Deno.serve(async (req) => {
 
   // ── Private chat: always respond ─────────────────────────────────────────
 
-  // Scripted /start onboarding: instant reply + quick-action keyboard, then
-  // a short follow-up. Skip the LLM entirely so first impression is snappy.
+  // Scripted /start onboarding. Always skip the LLM so /start is predictable,
+  // repeatable, and sends the exact first-impression sequence.
   const startTrigger = userText.trim().toLowerCase();
   if (
     startTrigger === "/start" ||
@@ -1278,25 +1278,38 @@ Deno.serve(async (req) => {
   ) {
     const firstName = msg.from?.first_name?.trim();
     const greeting = firstName ? `Hey ${firstName}! I'm Vibey 👋` : `Hey! I'm Vibey 👋`;
-    const welcome =
-      `${greeting}\n\n` +
-      `I'm here to help you understand Edge Esmeralda, from the people and events to whatever else you're curious about!\n\n` +
-      `Ping me anytime and I'll respond, or get started below.`;
+    const contextLine =
+      `I'm here to help you understand Edge Esmeralda, from the people and events to whatever else you're curious about!`;
+    const actionLine = `Ping me anytime and I'll respond, or get started below.`;
+    const welcome = [greeting, contextLine, actionLine].join("\n\n");
 
     const quickActions = {
       keyboard: [
         [{ text: "What's happening today?" }, { text: "Who should I meet?" }],
-        [{ text: "Tell me about yourself" }, { text: "Send me a voice note 🎙" }],
-        [{ text: "Surprise me" }],
+        [{ text: "Tell me about yourself" }, { text: "What's the vibe right now?" }],
+        [{ text: "Send me a voice note 🎙" }],
       ],
       resize_keyboard: true,
       one_time_keyboard: false,
       input_field_placeholder: "ask me anything…",
     };
 
+    await sendTypingThenWait(chatId, 700);
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
       chat_id: chatId,
-      text: welcome,
+      text: greeting,
+    });
+
+    await sendTypingThenWait(chatId, 900);
+    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+      chat_id: chatId,
+      text: contextLine,
+    });
+
+    await sendTypingThenWait(chatId, 650);
+    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+      chat_id: chatId,
+      text: actionLine,
       reply_markup: quickActions,
     });
 
