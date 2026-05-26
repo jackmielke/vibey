@@ -996,7 +996,7 @@ Deno.serve(async (req) => {
           return new Response("ok", { status: 200 });
         }
         await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "record_voice" });
-        const mp3 = await elevenLabsTts(sourceText);
+        const mp3 = await elevenLabsTts(sourceText, await getVibeyVoiceId(supabase));
         if (!mp3) {
           await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
             chat_id: chatId,
