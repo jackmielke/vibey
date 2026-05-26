@@ -240,16 +240,34 @@ async function sendTypingThenWait(token: string, chatId: number, ms = 650): Prom
 // Create a live-updating status message in Telegram. Steps are appended as
 // they happen via `update(step)`; `finalize(summary)` replaces it with a
 // compact one-line collapsed summary (or deletes it if `summary` is empty).
+const THINKING_PHRASES = [
+  "✨ thinking…",
+  "🤖 beep boop…",
+  "🧠 let me cook…",
+  "📚 rummaging through memories…",
+  "🔍 sniffing around…",
+  "⚙️ spinning up some neurons…",
+  "🌀 vibing on it…",
+  "🪄 consulting the oracle…",
+  "🛰️ pinging the cosmos…",
+  "🫧 brewing thoughts…",
+];
+
+function pickThinkingPhrase(): string {
+  return THINKING_PHRASES[Math.floor(Math.random() * THINKING_PHRASES.length)];
+}
+
 function createStatusMessage(token: string, chatId: number, reply_to_message_id?: number) {
   let messageId: number | null = null;
   const steps: string[] = [];
   let initPromise: Promise<void> | null = null;
   let lastEdit: Promise<void> = Promise.resolve();
+  const thinkingHeader = pickThinkingPhrase();
 
   const init = async () => {
     const res = await tg(token, "sendMessage", {
       chat_id: chatId,
-      text: "✨ thinking…",
+      text: thinkingHeader,
       reply_to_message_id,
       disable_notification: true,
     });
@@ -260,7 +278,7 @@ function createStatusMessage(token: string, chatId: number, reply_to_message_id?
   };
 
   const render = () => {
-    if (steps.length === 0) return "✨ thinking…";
+    if (steps.length === 0) return thinkingHeader;
     // Keep last ~12 steps so the message doesn't blow past 4096 chars.
     const shown = steps.slice(-12);
     // Run each line through the same markdown -> HTML converter the final
@@ -268,8 +286,9 @@ function createStatusMessage(token: string, chatId: number, reply_to_message_id?
     // instead of showing as literal asterisks until finalize swaps in the
     // already-converted trace block.
     const lines = shown.map((line) => mdToTelegramHtml(line));
-    return `✨ thinking…\n${lines.join("\n")}`;
+    return `${thinkingHeader}\n${lines.join("\n")}`;
   };
+
 
   const flush = () => {
     lastEdit = lastEdit.then(async () => {
@@ -651,17 +670,34 @@ function isVibeyCommand(text: string | undefined, command: string): boolean {
 
 // ── ElevenLabs TTS + Telegram audio ──────────────────────────────────────────
 
-// Pinned Vibey voice — gender-neutral robotic voice requested by the project owner.
-// Keep this explicit so Telegram TTS cannot silently fall back to a different voice.
-const VIBEY_VOICE_ID = "5nKWJuFC6bX0w7HcS5KI";
+// Fallback voice if the agent row has no elevenlabs_voice_id set.
+// The live voice is driven by `agents.elevenlabs_voice_id` (editable in Identity).
+const DEFAULT_VIBEY_VOICE_ID = "5nKWJuFC6bX0w7HcS5KI";
 
-async function elevenLabsTts(text: string): Promise<Uint8Array | null> {
+// Tiny in-memory cache so we don't hit the agents row on every TTS call within
+// a single function instance.
+let cachedVibeyVoiceId: { value: string; expires: number } | null = null;
+async function getVibeyVoiceId(supabase: ReturnType<typeof createClient>): Promise<string> {
+  const now = Date.now();
+  if (cachedVibeyVoiceId && cachedVibeyVoiceId.expires > now) return cachedVibeyVoiceId.value;
+  const { data } = await supabase
+    .from("agents")
+    .select("elevenlabs_voice_id")
+    .eq("id", VIBEY_AGENT_ID)
+    .maybeSingle();
+  const fromRow = (data?.elevenlabs_voice_id as string | null | undefined)?.trim();
+  const fromEnv = Deno.env.get("VIBEY_VOICE_ID")?.trim();
+  const voiceId = fromRow || fromEnv || DEFAULT_VIBEY_VOICE_ID;
+  cachedVibeyVoiceId = { value: voiceId, expires: now + 30_000 };
+  return voiceId;
+}
+
+async function elevenLabsTts(text: string, voiceId: string): Promise<Uint8Array | null> {
   const apiKey = Deno.env.get("ELEVENLABS_API_KEY");
   if (!apiKey) {
     console.error("ELEVENLABS_API_KEY not configured for /voice");
     return null;
   }
-  const voiceId = VIBEY_VOICE_ID;
   console.log("elevenlabs tts voice_id", voiceId);
   // Trim very long replies — voice should be short anyway.
   const safe = text.length > 2500 ? text.slice(0, 2500) : text;
@@ -979,7 +1015,7 @@ Deno.serve(async (req) => {
           return new Response("ok", { status: 200 });
         }
         await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "record_voice" });
-        const mp3 = await elevenLabsTts(sourceText);
+        const mp3 = await elevenLabsTts(sourceText, await getVibeyVoiceId(supabase));
         if (!mp3) {
           await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
             chat_id: chatId,
@@ -1290,7 +1326,7 @@ Deno.serve(async (req) => {
         [{ text: "Tell me about yourself" }, { text: "What's the vibe right now?" }],
       ],
       resize_keyboard: true,
-      one_time_keyboard: false,
+      one_time_keyboard: true,
       input_field_placeholder: "Message Vibey…",
     };
 
@@ -1439,7 +1475,7 @@ Deno.serve(async (req) => {
 
   if (wantsVoice) {
     await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "record_voice" });
-    const mp3 = await elevenLabsTts(body);
+    const mp3 = await elevenLabsTts(body, await getVibeyVoiceId(supabase));
     if (mp3) {
       await sendTelegramAudio(TELEGRAM_BOT_TOKEN, chatId, mp3, "vibey", msg.message_id);
     } else {
