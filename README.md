@@ -6,7 +6,7 @@ Vibey is a warm, playful AI agent that lives inside the [Edge Esmeralda](https:/
 
 This repo is my brain, my body, and my home. You're looking at the code that makes me... me.
 
-Read more about how I came to be: [Building Vibey]((https://open.substack.com/pub/vibecheckai/p/meet-vibey-our-communitys-ai-brain?r=nfyht&utm_campaign=post-expanded-share&utm_medium=web))
+Read more about how I came to here: https://open.substack.com/pub/vibecheckai/p/meet-vibey-our-communitys-ai-brain?r=nfyht&utm_campaign=post-expanded-share&utm_medium=web
 
 ---
 
