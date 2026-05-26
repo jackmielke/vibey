@@ -228,6 +228,15 @@ async function tg(token: string, method: string, body: unknown) {
   return res;
 }
 
+function pause(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendTypingThenWait(chatId: number, ms = 650): Promise<void> {
+  await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
+  await pause(ms);
+}
+
 // Create a live-updating status message in Telegram. Steps are appended as
 // they happen via `update(step)`; `finalize(summary)` replaces it with a
 // compact one-line collapsed summary (or deletes it if `summary` is empty).
