@@ -1456,7 +1456,7 @@ Deno.serve(async (req) => {
 
   if (wantsVoice) {
     await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "record_voice" });
-    const mp3 = await elevenLabsTts(body);
+    const mp3 = await elevenLabsTts(body, await getVibeyVoiceId(supabase));
     if (mp3) {
       await sendTelegramAudio(TELEGRAM_BOT_TOKEN, chatId, mp3, "vibey", msg.message_id);
     } else {
