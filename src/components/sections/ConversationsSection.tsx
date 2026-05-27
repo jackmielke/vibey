@@ -300,34 +300,37 @@ export function ConversationsSection() {
 
     return (
       <div className="space-y-4 max-w-3xl w-full min-w-0 overflow-hidden">
-        <Button variant="ghost" size="sm" className="gap-1.5 -ml-2" onClick={() => setSelected(null)}>
-          <ArrowLeft className="w-4 h-4" /> Back
-        </Button>
-        <div className="flex items-center gap-3">
-          {selected.kind === "group" ? (
-            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-              <UsersRound className="w-4 h-4 text-muted-foreground" />
+        <div className="sticky -top-5 -mx-5 px-5 pt-5 pb-3 z-10 bg-background/95 backdrop-blur-sm border-b border-border space-y-3">
+          <Button variant="ghost" size="sm" className="gap-1.5 -ml-2" onClick={() => setSelected(null)}>
+            <ArrowLeft className="w-4 h-4" /> Back
+          </Button>
+          <div className="flex items-center gap-3">
+            {selected.kind === "group" ? (
+              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                <UsersRound className="w-4 h-4 text-muted-foreground" />
+              </div>
+            ) : (() => {
+              const dm = dmConversations.find((d) => d.telegramUserId === selected.telegramUserId);
+              const url = dm?.user?.telegram_photo_url || dm?.user?.avatar_url || undefined;
+              return (
+                <Avatar className="h-10 w-10 rounded-lg ring-1 ring-border">
+                  {url && <AvatarImage src={url} alt={headerLabel} />}
+                  <AvatarFallback className="rounded-lg text-[11px] font-mono">{initialsOf(headerLabel)}</AvatarFallback>
+                </Avatar>
+              );
+            })()}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium truncate">{headerLabel}</p>
+              <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5 min-w-0">
+                <TelegramIcon className="w-3 h-3 text-[#229ED9] shrink-0" />
+                <span className="truncate">
+                  {selected.kind === "group" ? selected.chatId : selected.telegramUserId} · {threadMessages.length} messages
+                </span>
+              </p>
             </div>
-          ) : (() => {
-            const dm = dmConversations.find((d) => d.telegramUserId === selected.telegramUserId);
-            const url = dm?.user?.telegram_photo_url || dm?.user?.avatar_url || undefined;
-            return (
-              <Avatar className="h-10 w-10 rounded-lg ring-1 ring-border">
-                {url && <AvatarImage src={url} alt={headerLabel} />}
-                <AvatarFallback className="rounded-lg text-[11px] font-mono">{initialsOf(headerLabel)}</AvatarFallback>
-              </Avatar>
-            );
-          })()}
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate">{headerLabel}</p>
-            <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5 min-w-0">
-              <TelegramIcon className="w-3 h-3 text-[#229ED9] shrink-0" />
-              <span className="truncate">
-                {selected.kind === "group" ? selected.chatId : selected.telegramUserId} · {threadMessages.length} messages
-              </span>
-            </p>
           </div>
         </div>
+
 
         {threadMessages.length === 0 && (
           <p className="text-sm text-muted-foreground py-8 text-center">No messages yet.</p>
