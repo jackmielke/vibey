@@ -77,7 +77,7 @@ const App = () => (
             <Route path="skills" element={<Skills />} />
             <Route path="relationships" element={<Relationships />} />
             <Route path="conversations" element={<Conversations />} />
-            <Route path="groups" element={<Groups />} />
+            <Route path="groups" element={<Navigate to="/conversations?tab=groups" replace />} />
             <Route path="automations" element={<Automations />} />
             <Route path="heartbeats" element={<Heartbeats />} />
             <Route path="calendar" element={<CalendarPage />} />
