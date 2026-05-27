@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Loader2, RefreshCw, ChevronDown, ChevronRight, Activity, Play, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
+import { HeartbeatSeedEditor } from "@/components/HeartbeatSeedEditor";
 
 type ToolCall = {
   name: string;
