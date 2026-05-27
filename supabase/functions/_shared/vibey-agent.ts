@@ -548,6 +548,21 @@ export const ADMIN_TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_describe_gallery_photos",
+      description:
+        "ADMIN ONLY. Auto-caption photos in the gallery that are missing a description, using GPT-4o vision. Generates a short description + 3-5 tags per photo, in Vibey's voice. Use when an admin says 'describe the gallery', 'caption the photos', 'tag the pics', etc. Returns a summary of how many were processed.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "integer", description: "Max photos to caption in this run (1-50). Default 20.", minimum: 1, maximum: 50 },
+          overwrite: { type: "boolean", description: "If true, re-caption photos even if they already have a description. Default false.", default: false },
+        },
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
