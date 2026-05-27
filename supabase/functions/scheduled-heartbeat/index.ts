@@ -376,7 +376,9 @@ ${sharedFormat}`;
       const dayPeriod = (headerFmt.find((p) => p.type === "dayPeriod")?.value ?? "").toUpperCase();
       const timeStr = minute === "00" ? `${hour} ${dayPeriod}` : `${hour}:${minute} ${dayPeriod}`;
       const header = `Heartbeat — ${weekday} ${timeStr}`;
-      const deliveredMessage = finalMessage ? `${header}\n\n${finalMessage.trim()}` : "";
+      const bodyHtml = finalMessage ? mdToTelegramHtml(finalMessage.trim()) : "";
+      const headerHtml = `<b>${header.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</b>`;
+      const deliveredMessage = bodyHtml ? `${headerHtml}\n\n${bodyHtml}` : "";
 
       // Deliver
       let deliveryStatus = "skipped";
