@@ -906,15 +906,9 @@ Deno.serve(async (req) => {
   const msg = update.message ?? update.edited_message;
   if (!msg) return new Response("ok", { status: 200 });
 
-  // ── GLOBAL KILL SWITCH ─────────────────────────────────────────────────────
-  // When VIBEY_MUTED env is "1"/"true"/"yes", Vibey silently ignores every
-  // incoming message across all chats (DMs + groups). Flip the secret off to
-  // re-enable. This exists so you can panic-mute Vibey without redeploying.
-  const muted = (Deno.env.get("VIBEY_MUTED") ?? "").toLowerCase();
-  if (muted === "1" || muted === "true" || muted === "yes") {
-    console.log(`[VIBEY_MUTED] ignoring update from chat ${msg.chat?.id}`);
-    return new Response("ok", { status: 200 });
-  }
+  // Group chat mute/reply behavior is controlled per-group via
+  // telegram_group_settings (enabled + mode). No global env kill switch —
+  // toggle groups off from the Groups page or send "/vibey off" in a group.
 
   // Idempotency: if Telegram retries this update (e.g. because our response
   // took longer than its timeout), short-circuit so we don't double-reply.

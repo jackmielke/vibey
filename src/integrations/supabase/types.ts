@@ -2886,6 +2886,7 @@ export type Database = {
           enabled: boolean
           enabled_at: string | null
           enabled_by: string | null
+          mode: string
         }
         Insert: {
           added_at?: string
@@ -2896,6 +2897,7 @@ export type Database = {
           enabled?: boolean
           enabled_at?: string | null
           enabled_by?: string | null
+          mode?: string
         }
         Update: {
           added_at?: string
@@ -2906,6 +2908,7 @@ export type Database = {
           enabled?: boolean
           enabled_at?: string | null
           enabled_by?: string | null
+          mode?: string
         }
         Relationships: []
       }
