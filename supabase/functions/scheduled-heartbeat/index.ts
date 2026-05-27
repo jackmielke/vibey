@@ -322,7 +322,7 @@ ${sharedFormat}`;
         hour: "numeric",
         minute: "2-digit",
         hour12: true,
-      }).formatToParts(finishedAtPlaceholder());
+      }).formatToParts(new Date());
       const weekday = headerFmt.find((p) => p.type === "weekday")?.value ?? "";
       const hour = headerFmt.find((p) => p.type === "hour")?.value ?? "";
       const minute = headerFmt.find((p) => p.type === "minute")?.value ?? "";
