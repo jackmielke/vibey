@@ -52,10 +52,9 @@ const navItems = [
   { title: "Heartbeat Runs", url: "/heartbeats", icon: Activity },
   { title: "Interfaces", url: "/interfaces", icon: Settings2 },
   { title: "Identity", url: "/identity", icon: IdCard },
-  { title: "Chat History", url: "/conversations", icon: MessagesSquare },
+  { title: "Conversations", url: "/conversations", icon: MessagesSquare },
   { title: "Calendar", url: "/calendar", icon: CalendarDays },
   { title: "Media Library", url: "/media", icon: Image },
-  { title: "Group Chats", url: "/groups", icon: UsersRound },
   { title: "Mission Control", url: "/dashboard", icon: Gauge },
   { title: "Sections", url: "/sections", icon: LayoutDashboard },
 ];
