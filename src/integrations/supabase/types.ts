@@ -2876,6 +2876,48 @@ export type Database = {
           },
         ]
       }
+      telegram_dm_settings: {
+        Row: {
+          created_at: string
+          disabled_at: string | null
+          display_name: string | null
+          enabled: boolean
+          enabled_at: string | null
+          enabled_by: string | null
+          mode: string
+          notes: string | null
+          telegram_user_id: number
+          telegram_username: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          disabled_at?: string | null
+          display_name?: string | null
+          enabled?: boolean
+          enabled_at?: string | null
+          enabled_by?: string | null
+          mode?: string
+          notes?: string | null
+          telegram_user_id: number
+          telegram_username?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          disabled_at?: string | null
+          display_name?: string | null
+          enabled?: boolean
+          enabled_at?: string | null
+          enabled_by?: string | null
+          mode?: string
+          notes?: string | null
+          telegram_user_id?: number
+          telegram_username?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       telegram_group_settings: {
         Row: {
           added_at: string
