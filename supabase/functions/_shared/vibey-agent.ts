@@ -600,6 +600,12 @@ export async function loadEnabledToolNames(
     enabled.add("fetch_granola_note");
   }
 
+  // search_gallery has no secret requirement — auto-enable until a row exists.
+  if (!rows.some((r) => r.name === "search_gallery")) {
+    enabled.add("search_gallery");
+  }
+
+
   return enabled;
 }
 
