@@ -127,17 +127,29 @@ Deno.serve(async (req) => {
       });
     }
     if (!seedPrompt) {
+      const sharedFormat = `
+Format the message like a quick scannable check-in (no greeting, no signoff — the header is auto-prepended):
+
+✅ one line on what's already wrapped / done
+⚡ one line on what's slipping or needs a nudge
+
+🔴 Open & pressing:
+• 4–8 short bullets, each one concrete person / decision / thing — name + one-line status
+• keep each bullet to a single line if you can
+
+End with one direct question — the most important thing you actually want to know from them right now.
+
+Use the recent chat history, recent community chats (last ~24h), today's/tomorrow's calendar, and relevant Granola notes from the past week. Don't invent items — if you don't have signal, say so and ask. Keep your voice (lowercase, dry, warm). No preamble, no "here's your update", just the bullets.`;
+
       seedPrompt = kind === "morning"
-        ? `It's 6am Pacific time — your morning check-in.
+        ? `It's 6am Pacific — morning check-in time.
 
-Before writing, look at recent community chats from the last ~24h, skim relevant Granola notes from the past week, check today's calendar, and do a quick search if a specific name or topic in the chats warrants it. The conversation history below already includes your recent exchanges with this person — use it.
+Pull what's actually live for them today: open threads, who they owe a reply, calendar, anything that slipped yesterday.
+${sharedFormat}`
+        : `It's 9pm Pacific — evening check-in time.
 
-Focus on what's coming up today, who they might want to check in with, anything interesting in the air, and any priorities that have come up recently. Ask how the morning is going. Don't be prescriptive about what they should do.`
-        : `It's 9pm Pacific time — your evening check-in.
-
-Before writing, look at recent community chats from the last ~24h, skim relevant Granola notes from the past week, and check the calendar. The conversation history below already includes your recent exchanges with this person — use it.
-
-Focus on what actually happened today, who showed up, and anything worth carrying into tomorrow. Ask how the day landed and if anything's on their mind.`;
+Reflect on what actually happened today: who showed up, what got done, what stalled, what's worth carrying into tomorrow.
+${sharedFormat}`;
     }
 
     // 2. Resolve recipients
