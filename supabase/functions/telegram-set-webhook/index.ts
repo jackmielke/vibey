@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         url: webhookUrl,
-        allowed_updates: ["message", "edited_message"],
+        allowed_updates: ["message", "edited_message", "my_chat_member"],
       }),
     }
   ).then((r) => r.json());
