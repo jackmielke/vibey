@@ -1789,10 +1789,170 @@ async function executeToolCall(
       }
       return JSON.stringify({ ok: false, error: "unreachable" });
     }
+    case "search_gallery":
+      return await searchGallery(supabase, parsed as { query?: string; limit?: number; residency?: string });
+    case "admin_describe_gallery_photos":
+      return await adminDescribeGalleryPhotos(supabase, parsed as { limit?: number; overwrite?: boolean });
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
 }
+
+// ── Gallery tools ────────────────────────────────────────────────────────────
+
+async function searchGallery(
+  supabase: SupabaseClient,
+  args: { query?: string; limit?: number; residency?: string }
+): Promise<string> {
+  const limit = Math.min(Math.max(args.limit ?? 6, 1), 12);
+  const q = (args.query ?? "").trim();
+  let builder = supabase
+    .from("gallery_photos")
+    .select("id, image_url, title, description, tags, residency_name, created_at")
+    .eq("is_visible", true);
+
+  if (args.residency) builder = builder.ilike("residency_name", `%${args.residency}%`);
+
+  if (q) {
+    // Match query against title / description / residency_name OR any tag.
+    const safe = q.replace(/[%,()]/g, " ");
+    builder = builder.or(
+      [
+        `title.ilike.%${safe}%`,
+        `description.ilike.%${safe}%`,
+        `residency_name.ilike.%${safe}%`,
+        `tags.cs.{${safe}}`,
+      ].join(",")
+    );
+  }
+
+  const { data, error } = await builder
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+
+  const photos = (data ?? []).map((p: any) => ({
+    id: p.id,
+    image_url: p.image_url,
+    title: p.title ?? null,
+    description: p.description ?? null,
+    tags: p.tags ?? [],
+    residency: p.residency_name ?? null,
+  }));
+
+  return JSON.stringify({
+    ok: true,
+    count: photos.length,
+    photos,
+    hint: photos.length
+      ? "To share a photo in chat, put its image_url on its own line. Telegram and the mini app will preview it inline."
+      : "No matches — try a broader query or drop the residency filter.",
+  });
+}
+
+async function adminDescribeGalleryPhotos(
+  supabase: SupabaseClient,
+  args: { limit?: number; overwrite?: boolean }
+): Promise<string> {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+  if (!OPENAI_API_KEY) {
+    return JSON.stringify({ ok: false, error: "OPENAI_API_KEY not configured" });
+  }
+  const limit = Math.min(Math.max(args.limit ?? 20, 1), 50);
+  const overwrite = !!args.overwrite;
+
+  let q = supabase
+    .from("gallery_photos")
+    .select("id, image_url, description")
+    .eq("is_visible", true);
+  if (!overwrite) {
+    q = q.or("description.is.null,description.eq.");
+  }
+  const { data: rows, error } = await q.limit(limit);
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+
+  const photos = (rows ?? []) as Array<{ id: string; image_url: string; description: string | null }>;
+  if (photos.length === 0) {
+    return JSON.stringify({ ok: true, processed: 0, message: "Nothing to describe — all photos already have descriptions." });
+  }
+
+  let success = 0;
+  const failures: string[] = [];
+
+  for (const photo of photos) {
+    try {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content:
+                "You caption community photos for a Telegram bot called Vibey. Reply ONLY with JSON: { \"description\": string (1-2 short sentences, casual lowercase, in Vibey's playful voice — describe what's literally happening so the bot can find it later), \"tags\": string[] (3-6 short lowercase tags, no #, single words or two-word phrases, useful for search: people / vibe / setting / activity) }",
+            },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "Describe this photo and tag it." },
+                { type: "image_url", image_url: { url: photo.image_url } },
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 250,
+          temperature: 0.5,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        failures.push(`${photo.id}: ${data?.error?.message ?? res.status}`);
+        continue;
+      }
+      const raw = data?.choices?.[0]?.message?.content;
+      let parsed: { description?: string; tags?: string[] } = {};
+      try {
+        parsed = JSON.parse(raw ?? "{}");
+      } catch {
+        failures.push(`${photo.id}: invalid JSON from model`);
+        continue;
+      }
+      const description = (parsed.description ?? "").toString().trim();
+      const tags = Array.isArray(parsed.tags)
+        ? parsed.tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 8)
+        : [];
+      if (!description) {
+        failures.push(`${photo.id}: empty description`);
+        continue;
+      }
+      const { error: upErr } = await supabase
+        .from("gallery_photos")
+        .update({ description, tags: tags.length ? tags : null })
+        .eq("id", photo.id);
+      if (upErr) {
+        failures.push(`${photo.id}: ${upErr.message}`);
+        continue;
+      }
+      success++;
+    } catch (e) {
+      failures.push(`${photo.id}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  return JSON.stringify({
+    ok: true,
+    processed: success,
+    failed: failures.length,
+    total_attempted: photos.length,
+    failures: failures.slice(0, 10),
+  });
+}
+
 
 // ── System prompt augmentation ───────────────────────────────────────────────
 
