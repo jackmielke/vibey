@@ -559,11 +559,34 @@ async function processAttachments(
       }
       const truncated = text.length > 60000 ? text.slice(0, 60000) + "\n…[truncated]" : text;
       extraText.push(`[Attached PDF: ${name}]\n\n${truncated}`);
+    } else if (
+      mime.startsWith("text/") ||
+      mime === "application/json" ||
+      mime === "application/xml" ||
+      mime === "application/javascript" ||
+      mime === "application/x-yaml" ||
+      mime === "application/sql" ||
+      /\.(csv|tsv|txt|md|markdown|log|json|jsonl|ndjson|xml|ya?ml|toml|ini|conf|html?|css|js|mjs|cjs|ts|tsx|jsx|py|rb|go|rs|java|c|cpp|h|sh|sql|env|gitignore)$/i.test(name)
+    ) {
+      const MAX_TEXT_BYTES = 5 * 1024 * 1024;
+      if ((doc.file_size ?? 0) > MAX_TEXT_BYTES) {
+        return { images, extraText, userError: `"${name}" is over 5MB — too chunky to read as text.` };
+      }
+      const file = await downloadTelegramFile(botToken, doc.file_id, mime || "text/plain");
+      if (!file) return { images, extraText, userError: `couldn't download "${name}".` };
+      let text: string;
+      try {
+        text = new TextDecoder("utf-8", { fatal: false }).decode(file.bytes);
+      } catch (_e) {
+        return { images, extraText, userError: `couldn't decode "${name}" as text.` };
+      }
+      const truncated = text.length > 60000 ? text.slice(0, 60000) + "\n…[truncated]" : text;
+      extraText.push(`[Attached file: ${name}${mime ? ` (${mime})` : ""}]\n\n${truncated}`);
     } else {
       return {
         images,
         extraText,
-        userError: `i can read images and PDFs — "${name}" (${mime || "unknown type"}) isn't something i can open yet.`,
+        userError: `i can read images, PDFs, and text-based files — "${name}" (${mime || "unknown type"}) isn't something i can open yet.`,
       };
     }
   }
