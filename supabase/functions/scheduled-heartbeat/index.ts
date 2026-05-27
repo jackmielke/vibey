@@ -41,9 +41,51 @@ type Recipient = {
   label: string | null;
 };
 
-async function sendTelegram(botToken: string, chatId: string, text: string): Promise<void> {
+// Convert markdown (as written by the LLM) to Telegram-flavored HTML.
+// Mirrors the converter used by telegram-webhook for regular chats so
+// heartbeats render identically (bold, italic, code, links, bullets).
+function mdToTelegramHtml(input: string): string {
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const blocks: string[] = [];
+  let text = input.replace(/```(\w*)\n?([\s\S]*?)```/g, (_m, lang, code) => {
+    const idx = blocks.length;
+    const langAttr = lang ? ` class="language-${escapeHtml(lang)}"` : "";
+    blocks.push(`<pre><code${langAttr}>${escapeHtml(code.replace(/\n$/, ""))}</code></pre>`);
+    return `\u0000BLOCK${idx}\u0000`;
+  });
+
+  const inlines: string[] = [];
+  text = text.replace(/`([^`\n]+)`/g, (_m, code) => {
+    const idx = inlines.length;
+    inlines.push(`<code>${escapeHtml(code)}</code>`);
+    return `\u0000INLINE${idx}\u0000`;
+  });
+
+  text = escapeHtml(text);
+
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label, url) =>
+    `<a href="${url}">${label}</a>`,
+  );
+
+  text = text.replace(/\*\*((?:(?!\*\*)[\s\S])+?)\*\*/g, "<b>$1</b>");
+  text = text.replace(/__([^_\n]+?)__/g, "<b>$1</b>");
+  text = text.replace(/(^|[^*<\w])\*([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>");
+  text = text.replace(/(^|[^_\w])_([^_\n]+?)_(?!_)/g, "$1<i>$2</i>");
+  text = text.replace(/~~([^~\n]+?)~~/g, "<s>$1</s>");
+  text = text.replace(/^#{1,6}\s+(.+)$/gm, "<b>$1</b>");
+  text = text.replace(/^[ \t]*[-*]\s+/gm, "• ");
+
+  text = text.replace(/\u0000INLINE(\d+)\u0000/g, (_m, i) => inlines[Number(i)] ?? "");
+  text = text.replace(/\u0000BLOCK(\d+)\u0000/g, (_m, i) => blocks[Number(i)] ?? "");
+
+  return text;
+}
+
+async function sendTelegram(botToken: string, chatId: string, html: string): Promise<void> {
   const chunks: string[] = [];
-  let remaining = text;
+  let remaining = html;
   while (remaining.length > 4000) {
     let cut = remaining.lastIndexOf("\n\n", 4000);
     if (cut < 1000) cut = 4000;
@@ -56,7 +98,12 @@ async function sendTelegram(botToken: string, chatId: string, text: string): Pro
     const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text: chunk, disable_web_page_preview: true }),
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: chunk,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      }),
     });
     if (!resp.ok) {
       const txt = await resp.text().catch(() => "");
