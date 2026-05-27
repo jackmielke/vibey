@@ -216,7 +216,7 @@ export default function Heartbeats() {
                     )}
 
                     {r.intermediate_thoughts && r.intermediate_thoughts.length > 0 && (
-                      <details>
+                      <details open>
                         <summary className="cursor-pointer text-label">Thoughts · {r.intermediate_thoughts.length}</summary>
                         <div className="mt-2 space-y-1.5">
                           {r.intermediate_thoughts.map((t, i) => (
