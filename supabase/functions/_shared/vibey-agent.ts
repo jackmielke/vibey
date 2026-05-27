@@ -331,6 +331,22 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "search_gallery",
+      description:
+        "Search the community photo gallery for memes, candids, event pics, residency moments, etc. Use this any time the user asks for a photo, meme, picture, or 'something from <residency/event>', or when sharing a visual would land better than words. Searches across title, description, tags, and residency_name. Returns up to `limit` photos with id, image_url, title, description, tags, residency_name. To share a photo in chat, just include its image_url on its own line in your reply — Telegram and the mini app will preview it inline. Pick the BEST match (or 2-3 if the user wants options); don't dump the whole list.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "What to look for — e.g. 'jack laughing', 'sunset', 'whiteboard', 'vibe house dinner'. Leave empty to get the most recent photos." },
+          limit: { type: "integer", description: "Max photos to return (1-12). Default 6.", minimum: 1, maximum: 12 },
+          residency: { type: "string", description: "Optional: filter to a specific residency_name (e.g. 'Edge Esmeralda', 'Vibe Residency 2026')." },
+        },
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
