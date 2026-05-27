@@ -358,7 +358,7 @@ ${sharedFormat}`;
         await supabase.from("heartbeat_runs").update({
           tool_calls: toolCalls,
           intermediate_thoughts: thoughts,
-          final_message: finalMessage,
+          final_message: deliveredMessage || finalMessage,
           tokens_prompt: promptTok || null,
           tokens_completion: completionTok || null,
           tokens_total: totalTok || null,
