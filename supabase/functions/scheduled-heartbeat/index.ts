@@ -314,15 +314,32 @@ ${sharedFormat}`;
         runError = e instanceof Error ? e.message : String(e);
       }
 
+      // Prepend a deterministic header so every heartbeat is unmistakable.
+      // e.g. "Heartbeat — Tuesday 2 PM"
+      const headerFmt = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Los_Angeles",
+        weekday: "long",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }).formatToParts(finishedAtPlaceholder());
+      const weekday = headerFmt.find((p) => p.type === "weekday")?.value ?? "";
+      const hour = headerFmt.find((p) => p.type === "hour")?.value ?? "";
+      const minute = headerFmt.find((p) => p.type === "minute")?.value ?? "";
+      const dayPeriod = (headerFmt.find((p) => p.type === "dayPeriod")?.value ?? "").toUpperCase();
+      const timeStr = minute === "00" ? `${hour} ${dayPeriod}` : `${hour}:${minute} ${dayPeriod}`;
+      const header = `Heartbeat — ${weekday} ${timeStr}`;
+      const deliveredMessage = finalMessage ? `${header}\n\n${finalMessage.trim()}` : "";
+
       // Deliver
       let deliveryStatus = "skipped";
-      if (!dryRun && finalMessage && !runError) {
+      if (!dryRun && deliveredMessage && !runError) {
         if (!TELEGRAM_BOT_TOKEN) {
           deliveryStatus = "failed";
           runError = "TELEGRAM_BOT_TOKEN missing";
         } else {
           try {
-            await sendTelegram(TELEGRAM_BOT_TOKEN, r.telegram_chat_id, finalMessage);
+            await sendTelegram(TELEGRAM_BOT_TOKEN, r.telegram_chat_id, deliveredMessage);
             deliveryStatus = "sent";
           } catch (e) {
             deliveryStatus = "failed";
