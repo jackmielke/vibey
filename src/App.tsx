@@ -21,7 +21,7 @@ import Tools from "@/pages/Tools";
 import Skills from "@/pages/Skills";
 import Relationships from "@/pages/Relationships";
 import Conversations from "@/pages/Conversations";
-import Groups from "@/pages/Groups";
+
 import TelegramMini from "@/pages/TelegramMini";
 import PublicChat from "@/pages/PublicChat";
 import PublicDocs from "@/pages/PublicDocs";
