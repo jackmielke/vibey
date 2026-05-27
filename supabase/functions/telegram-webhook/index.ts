@@ -1451,6 +1451,72 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200 });
   }
 
+  // ── DM permission gate ────────────────────────────────────────────────────
+  // Admins always get a reply (so they can test). For everyone else:
+  //   1. explicit telegram_dm_settings row wins (enabled + mode)
+  //   2. otherwise: reply if user shares an enabled group with Vibey
+  //   3. otherwise: silent — log as passive context but never reply
+  if (!isGroup) {
+    const isAdminUser = isAdminTelegramUser(userId);
+    if (!isAdminUser) {
+      const { data: dmSettings } = await supabase
+        .from("telegram_dm_settings")
+        .select("enabled, mode")
+        .eq("telegram_user_id", userId)
+        .maybeSingle();
+
+      let allowReply: boolean;
+      let logPassive = false;
+
+      if (dmSettings) {
+        if (!dmSettings.enabled) {
+          return new Response("ok", { status: 200 });
+        }
+        allowReply = dmSettings.mode === "reply";
+        logPassive = !allowReply;
+      } else {
+        // No explicit setting — check if user has posted in any enabled group
+        const { data: enabledGroups } = await supabase
+          .from("telegram_group_settings")
+          .select("chat_id")
+          .eq("enabled", true);
+        const enabledChatIds = (enabledGroups ?? []).map((g: { chat_id: number }) => g.chat_id);
+        if (enabledChatIds.length > 0) {
+          const { data: sharedHit } = await supabase
+            .from("agent_chat_logs")
+            .select("id")
+            .eq("telegram_user_id", userId)
+            .in("telegram_chat_id", enabledChatIds)
+            .limit(1)
+            .maybeSingle();
+          allowReply = !!sharedHit;
+        } else {
+          allowReply = false;
+        }
+        logPassive = !allowReply;
+      }
+
+      if (!allowReply) {
+        if (logPassive && (userText || msg.photo?.length || msg.sticker)) {
+          supabase.from("agent_chat_logs").insert({
+            agent_id: VIBEY_AGENT_ID,
+            community_id: VIBEY_COMMUNITY_ID,
+            user_message: userText || "(attachment)",
+            agent_response: "",
+            session_key: sessionKey,
+            telegram_chat_id: chatId,
+            telegram_user_id: userId,
+            telegram_username: username,
+          }).then(({ error }: { error: unknown }) => {
+            if (error) console.error("Failed to log passive DM:", error);
+          });
+        }
+        console.log(`DM from ${userId} (${username}) — muted (no shared enabled group, no override)`);
+        return new Response("ok", { status: 200 });
+      }
+    }
+  }
+
   await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
 
   const { data: agent, error: agentError } = await supabase
