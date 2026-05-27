@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Loader2, RefreshCw, ChevronDown, ChevronRight, Activity, Play, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
+import { HeartbeatSeedEditor } from "@/components/HeartbeatSeedEditor";
 
 type ToolCall = {
   name: string;
@@ -110,6 +111,7 @@ export default function Heartbeats() {
       description="Every scheduled run Vibey has done — what she thought, what tools she called, what she sent."
       actions={actions}
     >
+      <HeartbeatSeedEditor />
       <div className="flex items-center gap-2 mb-4">
         {(["all", "morning", "evening"] as const).map((k) => (
           <button
@@ -214,7 +216,7 @@ export default function Heartbeats() {
                     )}
 
                     {r.intermediate_thoughts && r.intermediate_thoughts.length > 0 && (
-                      <details>
+                      <details open>
                         <summary className="cursor-pointer text-label">Thoughts · {r.intermediate_thoughts.length}</summary>
                         <div className="mt-2 space-y-1.5">
                           {r.intermediate_thoughts.map((t, i) => (
