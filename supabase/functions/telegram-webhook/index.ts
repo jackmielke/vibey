@@ -1003,17 +1003,23 @@ Deno.serve(async (req) => {
 
     const { data: groupSettings } = await supabase
       .from("telegram_group_settings")
-      .select("enabled")
+      .select("enabled, mode")
       .eq("chat_id", chatId)
       .maybeSingle();
 
     const enabled = groupSettings?.enabled ?? false;
+    const groupMode = (groupSettings?.mode as "read_only" | "reply" | null) ?? "read_only";
+
     if (!enabled) {
       console.log(`Group ${chatId} not enabled — silent mode`);
       return new Response("ok", { status: 200 });
     }
 
-    if (!isMentioned(msg) && !isReplyToBot(msg)) {
+    // In read-only mode, Vibey listens (logs context) but never replies — even
+    // when @mentioned. Flip to "reply" mode from the Groups page to allow replies.
+    const shouldReply = groupMode === "reply" && (isMentioned(msg) || isReplyToBot(msg));
+
+    if (!shouldReply) {
       const hasRawAttachments = !!(
         msg.photo?.length || msg.document || msg.video || msg.video_note || msg.animation || msg.sticker
       );
