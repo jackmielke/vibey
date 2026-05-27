@@ -859,13 +859,55 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200 });
   }
 
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  // ── my_chat_member: fires the instant Vibey is added/removed from a chat ──
+  // Use this to auto-register groups so they appear on /groups with zero setup
+  // (no /init, no first message required). Default state: read-only (enabled=false).
+  const myChatMember = (update as any).my_chat_member;
+  if (myChatMember) {
+    try {
+      const chat = myChatMember.chat;
+      const newStatus = myChatMember.new_chat_member?.status;
+      const isGroupChat = chat?.type === "group" || chat?.type === "supergroup";
+      if (isGroupChat && chat?.id) {
+        if (newStatus === "member" || newStatus === "administrator") {
+          // Added (or promoted) — register the group silently in read-only mode.
+          await supabase.from("telegram_group_settings").upsert(
+            {
+              chat_id: chat.id,
+              chat_title: chat.title ?? null,
+              bot_username: BOT_USERNAME,
+              added_at: new Date().toISOString(),
+            },
+            { onConflict: "chat_id", ignoreDuplicates: true }
+          );
+          // Refresh title even if row already existed.
+          if (chat.title) {
+            await supabase
+              .from("telegram_group_settings")
+              .update({ chat_title: chat.title })
+              .eq("chat_id", chat.id);
+          }
+        } else if (newStatus === "left" || newStatus === "kicked") {
+          // Removed — mute it so we stop trying to send.
+          await supabase
+            .from("telegram_group_settings")
+            .update({ enabled: false, disabled_at: new Date().toISOString() })
+            .eq("chat_id", chat.id);
+        }
+      }
+    } catch (e) {
+      console.error("my_chat_member handler failed:", e);
+    }
+    return new Response("ok", { status: 200 });
+  }
+
   const msg = update.message ?? update.edited_message;
   if (!msg) return new Response("ok", { status: 200 });
 
   // Idempotency: if Telegram retries this update (e.g. because our response
   // took longer than its timeout), short-circuit so we don't double-reply.
-  // We do this BEFORE doing any other work.
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   if (typeof update.update_id === "number") {
     const updateDedup = await markTelegramDedup(supabase, update.update_id, "update_id");
     if (updateDedup === "duplicate") return new Response("ok", { status: 200 });
