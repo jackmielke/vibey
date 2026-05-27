@@ -3,7 +3,10 @@ import { ConversationsSection } from "@/components/sections/ConversationsSection
 
 export default function Conversations() {
   return (
-    <PageShell title="Chat History" description="View Vibey's conversation history with community members.">
+    <PageShell
+      title="Conversations"
+      description="Group chats and DMs in one place. Toggle who Vibey replies to."
+    >
       <ConversationsSection />
     </PageShell>
   );
