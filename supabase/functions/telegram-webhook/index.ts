@@ -970,6 +970,12 @@ Deno.serve(async (req) => {
       },
       { onConflict: "chat_id", ignoreDuplicates: true }
     );
+    if (msg.chat.title) {
+      await supabase
+        .from("telegram_group_settings")
+        .update({ chat_title: msg.chat.title, bot_username: BOT_USERNAME })
+        .eq("chat_id", chatId);
+    }
 
     if (isVibeyCommand(userText, "on")) {
       await supabase.from("telegram_group_settings").update({
