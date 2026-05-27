@@ -957,6 +957,84 @@ Deno.serve(async (req) => {
   let userText = (msg.text ?? msg.caption ?? "").trim();
   let wasVoice = false;
 
+  // ── Group chat: opt-in gate ───────────────────────────────────────────────
+  // This must run before any voice/media/sticker handling so disabled groups are
+  // truly read-only and no attachment fallback can accidentally reply.
+  if (isGroup) {
+    await supabase.from("telegram_group_settings").upsert(
+      {
+        chat_id: chatId,
+        chat_title: msg.chat.title ?? null,
+        bot_username: BOT_USERNAME,
+        added_at: new Date().toISOString(),
+      },
+      { onConflict: "chat_id", ignoreDuplicates: true }
+    );
+
+    if (isVibeyCommand(userText, "on")) {
+      await supabase.from("telegram_group_settings").update({
+        enabled: true,
+        enabled_at: new Date().toISOString(),
+        enabled_by: username,
+        disabled_at: null,
+      }).eq("chat_id", chatId);
+
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: "hey everyone 👋 vibey here. i'll be hanging out in this chat now — just @ me when you want to chat.",
+        reply_to_message_id: msg.message_id,
+      });
+      return new Response("ok", { status: 200 });
+    }
+
+    if (isVibeyCommand(userText, "off")) {
+      await supabase.from("telegram_group_settings").update({
+        enabled: false,
+        disabled_at: new Date().toISOString(),
+      }).eq("chat_id", chatId);
+
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: "going quiet. ping me with /vibey on whenever you want me back 🌀",
+        reply_to_message_id: msg.message_id,
+      });
+      return new Response("ok", { status: 200 });
+    }
+
+    const { data: groupSettings } = await supabase
+      .from("telegram_group_settings")
+      .select("enabled")
+      .eq("chat_id", chatId)
+      .maybeSingle();
+
+    const enabled = groupSettings?.enabled ?? false;
+    if (!enabled) {
+      console.log(`Group ${chatId} not enabled — silent mode`);
+      return new Response("ok", { status: 200 });
+    }
+
+    if (!isMentioned(msg) && !isReplyToBot(msg)) {
+      const hasRawAttachments = !!(
+        msg.photo?.length || msg.document || msg.video || msg.video_note || msg.animation || msg.sticker
+      );
+      if (userText || hasRawAttachments) {
+        supabase.from("agent_chat_logs").insert({
+          agent_id: VIBEY_AGENT_ID,
+          community_id: VIBEY_COMMUNITY_ID,
+          user_message: userText || "(attachment)",
+          agent_response: "",
+          session_key: sessionKey,
+          telegram_chat_id: chatId,
+          telegram_user_id: userId,
+          telegram_username: username,
+        }).then(({ error }: { error: unknown }) => {
+          if (error) console.error("Failed to log passive group message:", error);
+        });
+      }
+      return new Response("ok", { status: 200 });
+    }
+  }
+
   if (!userText && (msg.voice || msg.audio)) {
     // In group chats, never auto-transcribe or react to voice notes —
     // even if the group is "enabled", voice notes should be silent context only.
