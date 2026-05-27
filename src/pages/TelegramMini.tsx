@@ -1124,7 +1124,7 @@ export default function TelegramMini() {
       cancelled = true;
     };
   }, [authState, tgUserId]);
-  // Profiles directory (community members joined with users) — Vibe Code Residency
+  // Profiles directory (community members joined with users) — Vibey community
   useEffect(() => {
     if (authState !== "ready") return;
     let cancelled = false;
@@ -1135,7 +1135,7 @@ export default function TelegramMini() {
         .select(
           "user_id, users:users!community_members_user_id_fkey(id, auth_user_id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, instagram_handle, twitter_handle, source_url, headline, bio, intentions, interests_skills)",
         )
-        .eq("community_id", VIBE_CODE_RESIDENCY_COMMUNITY_ID)
+        .eq("community_id", VIBEY_COMMUNITY_ID)
         .order("joined_at", { ascending: true })
         .limit(1000);
       if (cancelled) return;
