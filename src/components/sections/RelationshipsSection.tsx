@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { VIBE_CODE_RESIDENCY_COMMUNITY_ID } from "@/lib/vibey";
+import { VIBEY_COMMUNITY_ID } from "@/lib/vibey";
 import {
   Sheet,
   SheetContent,
@@ -18,8 +18,8 @@ import { Loader2, Search, MessageSquare, Clock, Save, ExternalLink } from "lucid
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
-// Vibe Code Residency — the community whose members/preferences are managed here.
-const COMMUNITY_ID = VIBE_CODE_RESIDENCY_COMMUNITY_ID;
+// Vibey community — single source of truth for members/preferences in the admin app.
+const COMMUNITY_ID = VIBEY_COMMUNITY_ID;
 
 type Member = {
   id: string;
