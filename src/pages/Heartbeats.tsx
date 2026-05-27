@@ -111,6 +111,7 @@ export default function Heartbeats() {
       description="Every scheduled run Vibey has done — what she thought, what tools she called, what she sent."
       actions={actions}
     >
+      <HeartbeatSeedEditor />
       <div className="flex items-center gap-2 mb-4">
         {(["all", "morning", "evening"] as const).map((k) => (
           <button
