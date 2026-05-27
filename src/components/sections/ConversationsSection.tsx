@@ -299,7 +299,7 @@ export function ConversationsSection() {
       : dmConversations.find((d) => d.telegramUserId === selected.telegramUserId)?.label ?? `User ${selected.telegramUserId}`;
 
     return (
-      <div className="space-y-4 max-w-3xl w-full min-w-0 overflow-hidden">
+      <div className="space-y-4 max-w-3xl w-full min-w-0">
         <div className="sticky -top-5 -mx-5 px-5 pt-5 pb-3 z-10 bg-background/95 backdrop-blur-sm border-b border-border space-y-3">
           <Button variant="ghost" size="sm" className="gap-1.5 -ml-2" onClick={() => setSelected(null)}>
             <ArrowLeft className="w-4 h-4" /> Back
