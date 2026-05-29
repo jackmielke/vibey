@@ -2818,6 +2818,21 @@ export function describeToolDone(
       const msg = String(args?.message ?? "").slice(0, 200);
       return { label: `${emoji} Jack pinged on Telegram`, details: msg || undefined };
     }
+    case "search_gallery": {
+      const n = Array.isArray(result?.photos) ? result.photos.length : 0;
+      return { label: n > 0 ? `🖼️ found ${n} photo${n === 1 ? "" : "s"}` : `🪨 no photos matched` };
+    }
+    case "save_to_gallery": {
+      if (result?.ok === false) {
+        return { label: `📭 couldn't save to gallery`, details: result?.error ?? result?.message };
+      }
+      const n = Number(result?.saved_count ?? 0);
+      const first = Array.isArray(result?.saved) && result.saved[0]?.description ? result.saved[0].description : "";
+      return {
+        label: n > 0 ? `📸 saved ${n} photo${n === 1 ? "" : "s"} to gallery` : `🤷 nothing saved`,
+        details: first || undefined,
+      };
+    }
     default:
       return { label: `✅ ${name} done` };
   }
