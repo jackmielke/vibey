@@ -228,6 +228,70 @@ async function tg(token: string, method: string, body: unknown) {
   return res;
 }
 
+// Find image URLs in Vibey's reply that should be sent as native Telegram
+// photos instead of inline previews. We pull out URLs that either (a) end in
+// a common image extension, or (b) point at any Supabase storage gallery /
+// avatar / image bucket. Returns the stripped text + the list of URLs to
+// send via sendPhoto / sendMediaGroup.
+function extractPhotoUrls(text: string): { text: string; urls: string[] } {
+  if (!text) return { text, urls: [] };
+  const urls: string[] = [];
+  const lines = text.split(/\r?\n/);
+  const kept: string[] = [];
+  const urlRe = /^\s*<?(https?:\/\/[^\s<>"']+)>?\s*$/i;
+  const imageExtRe = /\.(jpe?g|png|gif|webp)(\?[^\s]*)?$/i;
+  const supabaseImageRe = /supabase\.co\/storage\/v1\/object\/public\/(gallery-photos|avatars|event-images|community-covers|portfolio-images|blog-images|workshop-covers)\//i;
+  for (const line of lines) {
+    const m = urlRe.exec(line);
+    if (m) {
+      const url = m[1];
+      if (imageExtRe.test(url) || supabaseImageRe.test(url)) {
+        if (!urls.includes(url) && urls.length < 10) urls.push(url);
+        continue; // drop this line from the text
+      }
+    }
+    kept.push(line);
+  }
+  // Collapse 3+ blank lines that the removed URLs left behind.
+  const cleaned = kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return { text: cleaned, urls };
+}
+
+// Send the extracted photos via Telegram. Uses sendMediaGroup for 2-10
+// photos, sendPhoto for a single one. Caption (optional) attaches to the
+// first photo. Falls back silently if Telegram rejects a URL.
+async function sendTelegramPhotos(
+  token: string,
+  chatId: number,
+  urls: string[],
+  caption: string | undefined,
+  reply_to_message_id: number | undefined,
+): Promise<boolean> {
+  if (urls.length === 0) return false;
+  const safeCaption = caption && caption.length > 1024 ? caption.slice(0, 1021) + "..." : caption;
+  if (urls.length === 1) {
+    const res = await tg(token, "sendPhoto", {
+      chat_id: chatId,
+      photo: urls[0],
+      caption: safeCaption || undefined,
+      parse_mode: safeCaption ? "HTML" : undefined,
+      reply_to_message_id,
+    });
+    return res.ok;
+  }
+  const media = urls.slice(0, 10).map((u, i) => ({
+    type: "photo",
+    media: u,
+    caption: i === 0 ? safeCaption || undefined : undefined,
+    parse_mode: i === 0 && safeCaption ? "HTML" : undefined,
+  }));
+  const res = await tg(token, "sendMediaGroup", {
+    chat_id: chatId,
+    media,
+    reply_to_message_id,
+  });
+  return res.ok;
+
 function pause(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
