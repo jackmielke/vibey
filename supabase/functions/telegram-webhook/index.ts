@@ -1699,19 +1699,34 @@ Deno.serve(async (req) => {
   }
 
   const body = reply.length > 4000 ? reply.slice(0, 3997) + "..." : reply;
-  const html = mdToTelegramHtml(body);
+  const { text: textBody, urls: photoUrls } = extractPhotoUrls(body);
+  const html = mdToTelegramHtml(textBody);
 
-  try {
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-      chat_id: chatId,
-      text: html,
-      parse_mode: "HTML",
-      disable_web_page_preview: true,
-    });
-  } catch (e) {
-    console.warn("HTML send failed, falling back to plain:", e);
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", { chat_id: chatId, text: body });
+  let photosSent = false;
+  if (photoUrls.length > 0) {
+    photosSent = await sendTelegramPhotos(
+      TELEGRAM_BOT_TOKEN,
+      chatId,
+      photoUrls,
+      textBody ? html : undefined,
+      undefined,
+    );
   }
+
+  if (!photosSent) {
+    try {
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: html,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      });
+    } catch (e) {
+      console.warn("HTML send failed, falling back to plain:", e);
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", { chat_id: chatId, text: textBody });
+    }
+  }
+
 
   if (wantsVoice) {
     await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "record_voice" });
