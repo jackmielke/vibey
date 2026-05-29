@@ -1,0 +1,1 @@
+SELECT cron.unschedule('daily-recap-830am-pt');
