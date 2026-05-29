@@ -2062,7 +2062,7 @@ async function saveToGallery(
   });
 }
 
-
+async function adminDescribeGalleryPhotos(
   supabase: SupabaseClient,
   args: { limit?: number; overwrite?: boolean }
 ): Promise<string> {
