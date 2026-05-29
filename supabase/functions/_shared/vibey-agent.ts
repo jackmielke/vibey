@@ -1884,7 +1884,185 @@ async function searchGallery(
   });
 }
 
-async function adminDescribeGalleryPhotos(
+// Save photo(s) the user just attached this turn to the community gallery.
+// The image(s) are passed in via toolMetadata.pending_images as data: URLs
+// (from telegram-webhook / chat-with-vibey). We re-upload them to the
+// public `gallery-photos` storage bucket so the gallery has a stable URL,
+// then optionally auto-caption via GPT-4o vision before inserting.
+async function saveToGallery(
+  supabase: SupabaseClient,
+  args: { title?: string; description?: string; tags?: string[]; residency?: string },
+  metadata: Record<string, unknown>,
+  callerVibeUserId: string | null
+): Promise<string> {
+  const pending = (metadata?.pending_images as Array<{ url: string }> | undefined) ?? [];
+  if (pending.length === 0) {
+    return JSON.stringify({
+      ok: false,
+      error: "no_attached_image",
+      message:
+        "There's no photo attached to this turn. Ask the user to send the photo in the same message as 'save to gallery'.",
+    });
+  }
+
+  const title = (args.title ?? "").trim() || null;
+  const givenDescription = (args.description ?? "").trim();
+  const givenTags = Array.isArray(args.tags)
+    ? args.tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 8)
+    : [];
+  const residency = (args.residency ?? "").trim() || null;
+
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+
+  const saved: Array<{
+    id: string;
+    image_url: string;
+    title: string | null;
+    description: string | null;
+    tags: string[];
+  }> = [];
+  const failures: string[] = [];
+
+  for (let i = 0; i < pending.length; i++) {
+    const img = pending[i];
+    try {
+      // Decode data: URL → bytes for storage upload.
+      const m = /^data:([^;]+);base64,(.+)$/.exec(img.url);
+      let bytes: Uint8Array;
+      let mime: string;
+      if (m) {
+        mime = m[1] || "image/jpeg";
+        const bin = atob(m[2]);
+        bytes = new Uint8Array(bin.length);
+        for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+      } else {
+        // Plain URL — fetch it.
+        const resp = await fetch(img.url);
+        if (!resp.ok) {
+          failures.push(`photo ${i + 1}: fetch failed ${resp.status}`);
+          continue;
+        }
+        mime = resp.headers.get("content-type") || "image/jpeg";
+        bytes = new Uint8Array(await resp.arrayBuffer());
+      }
+
+      const ext = mime.includes("png") ? "png"
+        : mime.includes("gif") ? "gif"
+        : mime.includes("webp") ? "webp"
+        : "jpg";
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const rand = Math.random().toString(36).slice(2, 8);
+      const path = `vibey-uploads/${stamp}-${rand}.${ext}`;
+
+      const { error: upErr } = await supabase.storage
+        .from("gallery-photos")
+        .upload(path, bytes, { contentType: mime, upsert: false });
+      if (upErr) {
+        failures.push(`photo ${i + 1}: upload failed — ${upErr.message}`);
+        continue;
+      }
+      const { data: pub } = supabase.storage.from("gallery-photos").getPublicUrl(path);
+      const publicUrl: string = pub?.publicUrl;
+      if (!publicUrl) {
+        failures.push(`photo ${i + 1}: no public URL`);
+        continue;
+      }
+
+      // Auto-caption if no description was passed.
+      let finalDescription: string | null = givenDescription || null;
+      let finalTags: string[] = givenTags;
+      if (!finalDescription && OPENAI_API_KEY) {
+        try {
+          const res = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "You caption community photos for a Telegram bot called Vibey. Reply ONLY with JSON: { \"description\": string (1-2 short sentences, casual lowercase, in Vibey's playful voice — describe what's literally happening so the bot can find it later), \"tags\": string[] (3-6 short lowercase tags, no #, single words or two-word phrases, useful for search: people / vibe / setting / activity) }",
+                },
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: "Describe this photo and tag it." },
+                    { type: "image_url", image_url: { url: img.url } },
+                  ],
+                },
+              ],
+              response_format: { type: "json_object" },
+              max_tokens: 250,
+              temperature: 0.5,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            const raw = data?.choices?.[0]?.message?.content;
+            try {
+              const parsedC = JSON.parse(raw ?? "{}");
+              if (typeof parsedC.description === "string" && parsedC.description.trim()) {
+                finalDescription = parsedC.description.trim();
+              }
+              if (!finalTags.length && Array.isArray(parsedC.tags)) {
+                finalTags = parsedC.tags
+                  .map((t: unknown) => String(t).trim().toLowerCase())
+                  .filter(Boolean)
+                  .slice(0, 6);
+              }
+            } catch { /* ignore */ }
+          }
+        } catch (e) {
+          console.warn("save_to_gallery auto-caption failed:", e);
+        }
+      }
+
+      const { data: row, error: insErr } = await supabase
+        .from("gallery_photos")
+        .insert({
+          community_id: VIBEY_COMMUNITY_ID,
+          uploaded_by: callerVibeUserId,
+          image_url: publicUrl,
+          title,
+          description: finalDescription,
+          tags: finalTags.length ? finalTags : null,
+          residency_name: residency,
+          is_visible: true,
+        })
+        .select("id, image_url, title, description, tags")
+        .single();
+      if (insErr) {
+        failures.push(`photo ${i + 1}: db insert failed — ${insErr.message}`);
+        continue;
+      }
+      saved.push({
+        id: row.id,
+        image_url: row.image_url,
+        title: row.title ?? null,
+        description: row.description ?? null,
+        tags: row.tags ?? [],
+      });
+    } catch (e) {
+      failures.push(`photo ${i + 1}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  return JSON.stringify({
+    ok: saved.length > 0,
+    saved_count: saved.length,
+    saved,
+    failures: failures.length ? failures : undefined,
+    hint: saved.length
+      ? "Tell the user what you saved, including the description you assigned (so they can correct it if needed). Don't paste the image_url back — they already sent the photo."
+      : "Nothing saved. Surface the failure reason to the user.",
+  });
+}
+
+
   supabase: SupabaseClient,
   args: { limit?: number; overwrite?: boolean }
 ): Promise<string> {
