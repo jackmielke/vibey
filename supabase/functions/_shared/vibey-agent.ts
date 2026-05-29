@@ -2731,6 +2731,12 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       const emoji = u === "blocked" ? "🔴" : u === "stuck" ? "🟡" : "🟢";
       return `${emoji} pinging Jack…`;
     }
+    case "search_gallery": {
+      const q = String(args?.query ?? "").trim();
+      return q ? `🖼️ digging through the gallery for "${q.slice(0, 60)}"…` : "🖼️ flipping through the gallery…";
+    }
+    case "save_to_gallery":
+      return "📸 saving that photo to the gallery…";
     default:
       return `⚙️ running ${name}…`;
   }
