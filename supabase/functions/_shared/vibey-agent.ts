@@ -1814,6 +1814,13 @@ async function executeToolCall(
     }
     case "search_gallery":
       return await searchGallery(supabase, parsed as { query?: string; limit?: number; residency?: string });
+    case "save_to_gallery":
+      return await saveToGallery(
+        supabase,
+        parsed as { title?: string; description?: string; tags?: string[]; residency?: string },
+        metadata,
+        callerVibeUserId
+      );
     case "admin_describe_gallery_photos":
       return await adminDescribeGalleryPhotos(supabase, parsed as { limit?: number; overwrite?: boolean });
     default:
