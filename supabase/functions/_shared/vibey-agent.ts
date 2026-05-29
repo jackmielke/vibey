@@ -347,6 +347,23 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "save_to_gallery",
+      description:
+        "Save the photo(s) the user just sent you in THIS turn to the community photo gallery. Use this whenever the user says things like 'save this to the gallery', 'add this to your gallery', 'remember this photo', 'put this in the photo gallery', etc. The tool automatically reads the image(s) attached to the current user message — you don't need to pass any image URL. If the user gives a title or context (e.g. 'save this — sunset at edge esmeralda'), pass it in. If they don't, leave fields empty and the tool will auto-generate a description and tags by looking at the image. Returns the saved photo(s) with their public URL and the description that was assigned, so you can tell the user what you saved and what you titled it.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Optional short title (e.g. 'sunset at edge esmeralda'). Leave empty to skip — most photos don't need a title." },
+          description: { type: "string", description: "Optional description. Leave empty to auto-generate from the image." },
+          tags: { type: "array", items: { type: "string" }, description: "Optional 3-6 lowercase tags. Leave empty to auto-generate." },
+          residency: { type: "string", description: "Optional residency / event name this photo belongs to (e.g. 'Edge Esmeralda', 'Vibe Residency 2026')." },
+        },
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
