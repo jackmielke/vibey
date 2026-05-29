@@ -1432,7 +1432,7 @@ export default function TelegramMini() {
 
   const TABS: { id: Tab; label: string; icon: typeof Brain }[] = [
     { id: "memories", label: "memories", icon: Brain },
-    { id: "profiles", label: "profiles", icon: UsersIcon },
+    { id: "profiles", label: "people", icon: UsersIcon },
     { id: "preferences", label: "you", icon: Heart },
     { id: "events", label: "events", icon: Calendar },
     ...(isAdmin ? [{ id: "chats" as Tab, label: "chats", icon: MessagesSquare }] : []),
