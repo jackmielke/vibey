@@ -1409,24 +1409,46 @@ Deno.serve(async (req) => {
     }
 
     const body = reply.length > 4000 ? reply.slice(0, 3997) + "..." : reply;
-    const html = mdToTelegramHtml(body);
+    const { text: textBody, urls: photoUrls } = extractPhotoUrls(body);
+    const html = mdToTelegramHtml(textBody);
 
-    try {
-      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-        chat_id: chatId,
-        text: html,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-        reply_to_message_id: msg.message_id, // thread the reply
-      });
-    } catch (e) {
-      console.warn("HTML send failed in group, falling back to plain:", e);
-      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-        chat_id: chatId,
-        text: body,
-        reply_to_message_id: msg.message_id,
-      });
+    // Native photo delivery — pull image URLs out of the reply and send them
+    // as real Telegram photos. If there's no remaining text after stripping,
+    // attach it as the caption of the (first) photo.
+    let photosSent = false;
+    if (photoUrls.length > 0) {
+      photosSent = await sendTelegramPhotos(
+        TELEGRAM_BOT_TOKEN,
+        chatId,
+        photoUrls,
+        textBody ? html : undefined,
+        msg.message_id,
+      );
     }
+
+    if (!photosSent || (photoUrls.length > 0 && !textBody)) {
+      // Either no photos to send, or we already attached the text as caption.
+    }
+
+    if (!photosSent) {
+      try {
+        await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+          chat_id: chatId,
+          text: html,
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+          reply_to_message_id: msg.message_id, // thread the reply
+        });
+      } catch (e) {
+        console.warn("HTML send failed in group, falling back to plain:", e);
+        await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+          chat_id: chatId,
+          text: textBody,
+          reply_to_message_id: msg.message_id,
+        });
+      }
+    }
+
 
     // Log the exchange.
     const usageData = usageSummary(usage);
