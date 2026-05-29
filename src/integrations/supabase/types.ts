@@ -14,6 +14,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_emails: {
+        Row: {
+          created_at: string
+          email: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+        }
+        Relationships: []
+      }
       agent_chat_logs: {
         Row: {
           agent_id: string
@@ -1677,6 +1692,93 @@ export type Database = {
         }
         Relationships: []
       }
+      email_send_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          message_id: string | null
+          metadata: Json | null
+          recipient_email: string
+          status: string
+          template_name: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_id?: string | null
+          metadata?: Json | null
+          recipient_email: string
+          status: string
+          template_name: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_id?: string | null
+          metadata?: Json | null
+          recipient_email?: string
+          status?: string
+          template_name?: string
+        }
+        Relationships: []
+      }
+      email_send_state: {
+        Row: {
+          auth_email_ttl_minutes: number
+          batch_size: number
+          id: number
+          retry_after_until: string | null
+          send_delay_ms: number
+          transactional_email_ttl_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          auth_email_ttl_minutes?: number
+          batch_size?: number
+          id?: number
+          retry_after_until?: string | null
+          send_delay_ms?: number
+          transactional_email_ttl_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          auth_email_ttl_minutes?: number
+          batch_size?: number
+          id?: number
+          retry_after_until?: string | null
+          send_delay_ms?: number
+          transactional_email_ttl_minutes?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_unsubscribe_tokens: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          token: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       event_attendees: {
         Row: {
           attended: boolean | null
@@ -2053,6 +2155,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inquiries: {
+        Row: {
+          business: string | null
+          created_at: string
+          email: string
+          id: string
+          message: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          sms_opt_in: boolean
+          source: string
+          status: string
+          workshop_weeks: number[]
+        }
+        Insert: {
+          business?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          message?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          sms_opt_in?: boolean
+          source?: string
+          status?: string
+          workshop_weeks?: number[]
+        }
+        Update: {
+          business?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          sms_opt_in?: boolean
+          source?: string
+          status?: string
+          workshop_weeks?: number[]
+        }
+        Relationships: []
       }
       magic_link_tokens: {
         Row: {
@@ -2730,6 +2877,39 @@ export type Database = {
           },
         ]
       }
+      sms_send_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          message: string
+          recipient_phone: string
+          sent_by: string | null
+          status: string
+          twilio_sid: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message: string
+          recipient_phone: string
+          sent_by?: string | null
+          status: string
+          twilio_sid?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message?: string
+          recipient_phone?: string
+          sent_by?: string | null
+          status?: string
+          twilio_sid?: string | null
+        }
+        Relationships: []
+      }
       sponsors: {
         Row: {
           company_name: string
@@ -2763,6 +2943,78 @@ export type Database = {
           phone?: string | null
           sponsorship_level?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      suppressed_emails: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          metadata: Json | null
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          metadata?: Json | null
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          metadata?: Json | null
+          reason?: string
+        }
+        Relationships: []
+      }
+      suppressed_phones: {
+        Row: {
+          created_at: string
+          metadata: Json | null
+          phone: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          metadata?: Json | null
+          phone: string
+          reason?: string
+        }
+        Update: {
+          created_at?: string
+          metadata?: Json | null
+          phone?: string
+          reason?: string
+        }
+        Relationships: []
+      }
+      survey_responses: {
+        Row: {
+          business_name: string | null
+          contact_email: string | null
+          contact_name: string | null
+          created_at: string
+          id: string
+          payload: Json
+        }
+        Insert: {
+          business_name?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          payload: Json
+        }
+        Update: {
+          business_name?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          payload?: Json
         }
         Relationships: []
       }
@@ -3541,6 +3793,69 @@ export type Database = {
         }
         Relationships: []
       }
+      workshops: {
+        Row: {
+          capacity: number
+          cover_image_url: string | null
+          created_at: string
+          date_label: string
+          id: string
+          is_published: boolean
+          live_demo: string | null
+          prototype_build: string | null
+          slug: string
+          sort_order: number
+          starts_at: string | null
+          subtitle: string | null
+          takeaway: string | null
+          title: string
+          tool: string | null
+          updated_at: string
+          week: number
+          what_it_is: string | null
+        }
+        Insert: {
+          capacity?: number
+          cover_image_url?: string | null
+          created_at?: string
+          date_label: string
+          id?: string
+          is_published?: boolean
+          live_demo?: string | null
+          prototype_build?: string | null
+          slug: string
+          sort_order?: number
+          starts_at?: string | null
+          subtitle?: string | null
+          takeaway?: string | null
+          title: string
+          tool?: string | null
+          updated_at?: string
+          week: number
+          what_it_is?: string | null
+        }
+        Update: {
+          capacity?: number
+          cover_image_url?: string | null
+          created_at?: string
+          date_label?: string
+          id?: string
+          is_published?: boolean
+          live_demo?: string | null
+          prototype_build?: string | null
+          slug?: string
+          sort_order?: number
+          starts_at?: string | null
+          subtitle?: string | null
+          takeaway?: string | null
+          title?: string
+          tool?: string | null
+          updated_at?: string
+          week?: number
+          what_it_is?: string | null
+        }
+        Relationships: []
+      }
       world_objects: {
         Row: {
           community_id: string
@@ -3746,6 +4061,14 @@ export type Database = {
         Args: { _auth_user_id: string; _community_id: string }
         Returns: boolean
       }
+      delete_email: {
+        Args: { message_id: number; queue_name: string }
+        Returns: boolean
+      }
+      enqueue_email: {
+        Args: { payload: Json; queue_name: string }
+        Returns: number
+      }
       ensure_unique_universal_id: {
         Args: { table_name: string }
         Returns: string
@@ -3810,7 +4133,20 @@ export type Database = {
           username: string
         }[]
       }
+      get_workshop_week_counts: {
+        Args: never
+        Returns: {
+          capacity: number
+          registered_count: number
+          seats_left: number
+          slug: string
+          title: string
+          week: number
+        }[]
+      }
       has_role: { Args: { _role: string; _user_id: string }; Returns: boolean }
+      invoke_process_email_queue: { Args: never; Returns: undefined }
+      is_admin: { Args: never; Returns: boolean }
       is_community_admin: {
         Args: { community_id_param: string; user_auth_id: string }
         Returns: boolean
@@ -3818,6 +4154,23 @@ export type Database = {
       is_community_member: {
         Args: { community_id_param: string; user_id_param: string }
         Returns: boolean
+      }
+      move_to_dlq: {
+        Args: {
+          dlq_name: string
+          message_id: number
+          payload: Json
+          source_queue: string
+        }
+        Returns: number
+      }
+      read_email_batch: {
+        Args: { batch_size: number; queue_name: string; vt: number }
+        Returns: {
+          message: Json
+          msg_id: number
+          read_ct: number
+        }[]
       }
       semantic_search_users: {
         Args: {
