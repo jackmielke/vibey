@@ -291,6 +291,9 @@ async function sendTelegramPhotos(
     reply_to_message_id,
   });
   return res.ok;
+}
+
+
 
 function pause(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
