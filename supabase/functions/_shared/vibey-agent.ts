@@ -347,6 +347,23 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "save_to_gallery",
+      description:
+        "Save the photo(s) the user just sent you in THIS turn to the community photo gallery. Use this whenever the user says things like 'save this to the gallery', 'add this to your gallery', 'remember this photo', 'put this in the photo gallery', etc. The tool automatically reads the image(s) attached to the current user message — you don't need to pass any image URL. If the user gives a title or context (e.g. 'save this — sunset at edge esmeralda'), pass it in. If they don't, leave fields empty and the tool will auto-generate a description and tags by looking at the image. Returns the saved photo(s) with their public URL and the description that was assigned, so you can tell the user what you saved and what you titled it.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Optional short title (e.g. 'sunset at edge esmeralda'). Leave empty to skip — most photos don't need a title." },
+          description: { type: "string", description: "Optional description. Leave empty to auto-generate from the image." },
+          tags: { type: "array", items: { type: "string" }, description: "Optional 3-6 lowercase tags. Leave empty to auto-generate." },
+          residency: { type: "string", description: "Optional residency / event name this photo belongs to (e.g. 'Edge Esmeralda', 'Vibe Residency 2026')." },
+        },
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
@@ -600,9 +617,12 @@ export async function loadEnabledToolNames(
     enabled.add("fetch_granola_note");
   }
 
-  // search_gallery has no secret requirement — auto-enable until a row exists.
+  // search_gallery and save_to_gallery have no secret requirement — auto-enable until rows exist.
   if (!rows.some((r) => r.name === "search_gallery")) {
     enabled.add("search_gallery");
+  }
+  if (!rows.some((r) => r.name === "save_to_gallery")) {
+    enabled.add("save_to_gallery");
   }
 
 
@@ -1797,6 +1817,13 @@ async function executeToolCall(
     }
     case "search_gallery":
       return await searchGallery(supabase, parsed as { query?: string; limit?: number; residency?: string });
+    case "save_to_gallery":
+      return await saveToGallery(
+        supabase,
+        parsed as { title?: string; description?: string; tags?: string[]; residency?: string },
+        metadata,
+        callerVibeUserId
+      );
     case "admin_describe_gallery_photos":
       return await adminDescribeGalleryPhotos(supabase, parsed as { limit?: number; overwrite?: boolean });
     default:
@@ -1854,6 +1881,184 @@ async function searchGallery(
     hint: photos.length
       ? "To share a photo in chat, put its image_url on its own line. Telegram and the mini app will preview it inline."
       : "No matches — try a broader query or drop the residency filter.",
+  });
+}
+
+// Save photo(s) the user just attached this turn to the community gallery.
+// The image(s) are passed in via toolMetadata.pending_images as data: URLs
+// (from telegram-webhook / chat-with-vibey). We re-upload them to the
+// public `gallery-photos` storage bucket so the gallery has a stable URL,
+// then optionally auto-caption via GPT-4o vision before inserting.
+async function saveToGallery(
+  supabase: SupabaseClient,
+  args: { title?: string; description?: string; tags?: string[]; residency?: string },
+  metadata: Record<string, unknown>,
+  callerVibeUserId: string | null
+): Promise<string> {
+  const pending = (metadata?.pending_images as Array<{ url: string }> | undefined) ?? [];
+  if (pending.length === 0) {
+    return JSON.stringify({
+      ok: false,
+      error: "no_attached_image",
+      message:
+        "There's no photo attached to this turn. Ask the user to send the photo in the same message as 'save to gallery'.",
+    });
+  }
+
+  const title = (args.title ?? "").trim() || null;
+  const givenDescription = (args.description ?? "").trim();
+  const givenTags = Array.isArray(args.tags)
+    ? args.tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 8)
+    : [];
+  const residency = (args.residency ?? "").trim() || null;
+
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+
+  const saved: Array<{
+    id: string;
+    image_url: string;
+    title: string | null;
+    description: string | null;
+    tags: string[];
+  }> = [];
+  const failures: string[] = [];
+
+  for (let i = 0; i < pending.length; i++) {
+    const img = pending[i];
+    try {
+      // Decode data: URL → bytes for storage upload.
+      const m = /^data:([^;]+);base64,(.+)$/.exec(img.url);
+      let bytes: Uint8Array;
+      let mime: string;
+      if (m) {
+        mime = m[1] || "image/jpeg";
+        const bin = atob(m[2]);
+        bytes = new Uint8Array(bin.length);
+        for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+      } else {
+        // Plain URL — fetch it.
+        const resp = await fetch(img.url);
+        if (!resp.ok) {
+          failures.push(`photo ${i + 1}: fetch failed ${resp.status}`);
+          continue;
+        }
+        mime = resp.headers.get("content-type") || "image/jpeg";
+        bytes = new Uint8Array(await resp.arrayBuffer());
+      }
+
+      const ext = mime.includes("png") ? "png"
+        : mime.includes("gif") ? "gif"
+        : mime.includes("webp") ? "webp"
+        : "jpg";
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const rand = Math.random().toString(36).slice(2, 8);
+      const path = `vibey-uploads/${stamp}-${rand}.${ext}`;
+
+      const { error: upErr } = await supabase.storage
+        .from("gallery-photos")
+        .upload(path, bytes, { contentType: mime, upsert: false });
+      if (upErr) {
+        failures.push(`photo ${i + 1}: upload failed — ${upErr.message}`);
+        continue;
+      }
+      const { data: pub } = supabase.storage.from("gallery-photos").getPublicUrl(path);
+      const publicUrl: string = pub?.publicUrl;
+      if (!publicUrl) {
+        failures.push(`photo ${i + 1}: no public URL`);
+        continue;
+      }
+
+      // Auto-caption if no description was passed.
+      let finalDescription: string | null = givenDescription || null;
+      let finalTags: string[] = givenTags;
+      if (!finalDescription && OPENAI_API_KEY) {
+        try {
+          const res = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "You caption community photos for a Telegram bot called Vibey. Reply ONLY with JSON: { \"description\": string (1-2 short sentences, casual lowercase, in Vibey's playful voice — describe what's literally happening so the bot can find it later), \"tags\": string[] (3-6 short lowercase tags, no #, single words or two-word phrases, useful for search: people / vibe / setting / activity) }",
+                },
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: "Describe this photo and tag it." },
+                    { type: "image_url", image_url: { url: img.url } },
+                  ],
+                },
+              ],
+              response_format: { type: "json_object" },
+              max_tokens: 250,
+              temperature: 0.5,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            const raw = data?.choices?.[0]?.message?.content;
+            try {
+              const parsedC = JSON.parse(raw ?? "{}");
+              if (typeof parsedC.description === "string" && parsedC.description.trim()) {
+                finalDescription = parsedC.description.trim();
+              }
+              if (!finalTags.length && Array.isArray(parsedC.tags)) {
+                finalTags = parsedC.tags
+                  .map((t: unknown) => String(t).trim().toLowerCase())
+                  .filter(Boolean)
+                  .slice(0, 6);
+              }
+            } catch { /* ignore */ }
+          }
+        } catch (e) {
+          console.warn("save_to_gallery auto-caption failed:", e);
+        }
+      }
+
+      const { data: row, error: insErr } = await supabase
+        .from("gallery_photos")
+        .insert({
+          community_id: VIBEY_COMMUNITY_ID,
+          uploaded_by: callerVibeUserId,
+          image_url: publicUrl,
+          title,
+          description: finalDescription,
+          tags: finalTags.length ? finalTags : null,
+          residency_name: residency,
+          is_visible: true,
+        })
+        .select("id, image_url, title, description, tags")
+        .single();
+      if (insErr) {
+        failures.push(`photo ${i + 1}: db insert failed — ${insErr.message}`);
+        continue;
+      }
+      saved.push({
+        id: row.id,
+        image_url: row.image_url,
+        title: row.title ?? null,
+        description: row.description ?? null,
+        tags: row.tags ?? [],
+      });
+    } catch (e) {
+      failures.push(`photo ${i + 1}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  return JSON.stringify({
+    ok: saved.length > 0,
+    saved_count: saved.length,
+    saved,
+    failures: failures.length ? failures : undefined,
+    hint: saved.length
+      ? "Tell the user what you saved, including the description you assigned (so they can correct it if needed). Don't paste the image_url back — they already sent the photo."
+      : "Nothing saved. Surface the failure reason to the user.",
   });
 }
 
@@ -2526,6 +2731,12 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       const emoji = u === "blocked" ? "🔴" : u === "stuck" ? "🟡" : "🟢";
       return `${emoji} pinging Jack…`;
     }
+    case "search_gallery": {
+      const q = String(args?.query ?? "").trim();
+      return q ? `🖼️ digging through the gallery for "${q.slice(0, 60)}"…` : "🖼️ flipping through the gallery…";
+    }
+    case "save_to_gallery":
+      return "📸 saving that photo to the gallery…";
     default:
       return `⚙️ running ${name}…`;
   }
@@ -2606,6 +2817,21 @@ export function describeToolDone(
       const emoji = u === "blocked" ? "🔴" : u === "stuck" ? "🟡" : "🟢";
       const msg = String(args?.message ?? "").slice(0, 200);
       return { label: `${emoji} Jack pinged on Telegram`, details: msg || undefined };
+    }
+    case "search_gallery": {
+      const n = Array.isArray(result?.photos) ? result.photos.length : 0;
+      return { label: n > 0 ? `🖼️ found ${n} photo${n === 1 ? "" : "s"}` : `🪨 no photos matched` };
+    }
+    case "save_to_gallery": {
+      if (result?.ok === false) {
+        return { label: `📭 couldn't save to gallery`, details: result?.error ?? result?.message };
+      }
+      const n = Number(result?.saved_count ?? 0);
+      const first = Array.isArray(result?.saved) && result.saved[0]?.description ? result.saved[0].description : "";
+      return {
+        label: n > 0 ? `📸 saved ${n} photo${n === 1 ? "" : "s"} to gallery` : `🤷 nothing saved`,
+        details: first || undefined,
+      };
     }
     default:
       return { label: `✅ ${name} done` };

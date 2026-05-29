@@ -228,6 +228,73 @@ async function tg(token: string, method: string, body: unknown) {
   return res;
 }
 
+// Find image URLs in Vibey's reply that should be sent as native Telegram
+// photos instead of inline previews. We pull out URLs that either (a) end in
+// a common image extension, or (b) point at any Supabase storage gallery /
+// avatar / image bucket. Returns the stripped text + the list of URLs to
+// send via sendPhoto / sendMediaGroup.
+function extractPhotoUrls(text: string): { text: string; urls: string[] } {
+  if (!text) return { text, urls: [] };
+  const urls: string[] = [];
+  const lines = text.split(/\r?\n/);
+  const kept: string[] = [];
+  const urlRe = /^\s*<?(https?:\/\/[^\s<>"']+)>?\s*$/i;
+  const imageExtRe = /\.(jpe?g|png|gif|webp)(\?[^\s]*)?$/i;
+  const supabaseImageRe = /supabase\.co\/storage\/v1\/object\/public\/(gallery-photos|avatars|event-images|community-covers|portfolio-images|blog-images|workshop-covers)\//i;
+  for (const line of lines) {
+    const m = urlRe.exec(line);
+    if (m) {
+      const url = m[1];
+      if (imageExtRe.test(url) || supabaseImageRe.test(url)) {
+        if (!urls.includes(url) && urls.length < 10) urls.push(url);
+        continue; // drop this line from the text
+      }
+    }
+    kept.push(line);
+  }
+  // Collapse 3+ blank lines that the removed URLs left behind.
+  const cleaned = kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return { text: cleaned, urls };
+}
+
+// Send the extracted photos via Telegram. Uses sendMediaGroup for 2-10
+// photos, sendPhoto for a single one. Caption (optional) attaches to the
+// first photo. Falls back silently if Telegram rejects a URL.
+async function sendTelegramPhotos(
+  token: string,
+  chatId: number,
+  urls: string[],
+  caption: string | undefined,
+  reply_to_message_id: number | undefined,
+): Promise<boolean> {
+  if (urls.length === 0) return false;
+  const safeCaption = caption && caption.length > 1024 ? caption.slice(0, 1021) + "..." : caption;
+  if (urls.length === 1) {
+    const res = await tg(token, "sendPhoto", {
+      chat_id: chatId,
+      photo: urls[0],
+      caption: safeCaption || undefined,
+      parse_mode: safeCaption ? "HTML" : undefined,
+      reply_to_message_id,
+    });
+    return res.ok;
+  }
+  const media = urls.slice(0, 10).map((u, i) => ({
+    type: "photo",
+    media: u,
+    caption: i === 0 ? safeCaption || undefined : undefined,
+    parse_mode: i === 0 && safeCaption ? "HTML" : undefined,
+  }));
+  const res = await tg(token, "sendMediaGroup", {
+    chat_id: chatId,
+    media,
+    reply_to_message_id,
+  });
+  return res.ok;
+}
+
+
+
 function pause(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -1301,6 +1368,7 @@ Deno.serve(async (req) => {
         chat_title: msg.chat.title ?? null,
         telegram_user_id: userId,
         telegram_username: username,
+        pending_images: attachmentImages,
       },
       callerVibeUserId: vibeUserId,
       isAdmin,
@@ -1344,24 +1412,46 @@ Deno.serve(async (req) => {
     }
 
     const body = reply.length > 4000 ? reply.slice(0, 3997) + "..." : reply;
-    const html = mdToTelegramHtml(body);
+    const { text: textBody, urls: photoUrls } = extractPhotoUrls(body);
+    const html = mdToTelegramHtml(textBody);
 
-    try {
-      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-        chat_id: chatId,
-        text: html,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-        reply_to_message_id: msg.message_id, // thread the reply
-      });
-    } catch (e) {
-      console.warn("HTML send failed in group, falling back to plain:", e);
-      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-        chat_id: chatId,
-        text: body,
-        reply_to_message_id: msg.message_id,
-      });
+    // Native photo delivery — pull image URLs out of the reply and send them
+    // as real Telegram photos. If there's no remaining text after stripping,
+    // attach it as the caption of the (first) photo.
+    let photosSent = false;
+    if (photoUrls.length > 0) {
+      photosSent = await sendTelegramPhotos(
+        TELEGRAM_BOT_TOKEN,
+        chatId,
+        photoUrls,
+        textBody ? html : undefined,
+        msg.message_id,
+      );
     }
+
+    if (!photosSent || (photoUrls.length > 0 && !textBody)) {
+      // Either no photos to send, or we already attached the text as caption.
+    }
+
+    if (!photosSent) {
+      try {
+        await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+          chat_id: chatId,
+          text: html,
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+          reply_to_message_id: msg.message_id, // thread the reply
+        });
+      } catch (e) {
+        console.warn("HTML send failed in group, falling back to plain:", e);
+        await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+          chat_id: chatId,
+          text: textBody,
+          reply_to_message_id: msg.message_id,
+        });
+      }
+    }
+
 
     // Log the exchange.
     const usageData = usageSummary(usage);
@@ -1569,6 +1659,7 @@ Deno.serve(async (req) => {
       chat_id: chatId,
       telegram_user_id: userId,
       telegram_username: username,
+      pending_images: attachmentImages,
     },
     callerVibeUserId: vibeUserId,
     isAdmin: isAdminDm,
@@ -1611,19 +1702,34 @@ Deno.serve(async (req) => {
   }
 
   const body = reply.length > 4000 ? reply.slice(0, 3997) + "..." : reply;
-  const html = mdToTelegramHtml(body);
+  const { text: textBody, urls: photoUrls } = extractPhotoUrls(body);
+  const html = mdToTelegramHtml(textBody);
 
-  try {
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-      chat_id: chatId,
-      text: html,
-      parse_mode: "HTML",
-      disable_web_page_preview: true,
-    });
-  } catch (e) {
-    console.warn("HTML send failed, falling back to plain:", e);
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", { chat_id: chatId, text: body });
+  let photosSent = false;
+  if (photoUrls.length > 0) {
+    photosSent = await sendTelegramPhotos(
+      TELEGRAM_BOT_TOKEN,
+      chatId,
+      photoUrls,
+      textBody ? html : undefined,
+      undefined,
+    );
   }
+
+  if (!photosSent) {
+    try {
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: html,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      });
+    } catch (e) {
+      console.warn("HTML send failed, falling back to plain:", e);
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", { chat_id: chatId, text: textBody });
+    }
+  }
+
 
   if (wantsVoice) {
     await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "record_voice" });
