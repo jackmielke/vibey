@@ -1570,6 +1570,7 @@ Deno.serve(async (req) => {
       chat_id: chatId,
       telegram_user_id: userId,
       telegram_username: username,
+      pending_images: attachmentImages,
     },
     callerVibeUserId: vibeUserId,
     isAdmin: isAdminDm,
