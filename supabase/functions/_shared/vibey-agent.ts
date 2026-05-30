@@ -2230,7 +2230,114 @@ async function adminDescribeGalleryPhotos(
 }
 
 
+// ── EdgeOS Events API ────────────────────────────────────────────────────────
+// Portal-scoped wrapper around https://api.edgeos.world/api/v1.
+// Token issued by user at /portal/agentic-access, stored as EDGEOS_API_TOKEN.
+
+const EDGEOS_BASE = "https://api.edgeos.world/api/v1";
+
+async function edgeosFetch(
+  path: string,
+  init: RequestInit = {}
+): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+  const token = Deno.env.get("EDGEOS_API_TOKEN");
+  if (!token) {
+    return { ok: false, status: 0, data: null, error: "EDGEOS_API_TOKEN not configured" };
+  }
+  try {
+    const resp = await fetch(`${EDGEOS_BASE}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...(init.headers ?? {}),
+      },
+    });
+    const text = await resp.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (!resp.ok) {
+      const msg = (data && typeof data === "object" && (data.detail || data.message)) || `HTTP ${resp.status}`;
+      return { ok: false, status: resp.status, data, error: String(msg) };
+    }
+    return { ok: true, status: resp.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function compactEdgeEvent(e: any) {
+  if (!e || typeof e !== "object") return e;
+  return {
+    id: e.id,
+    title: e.title,
+    start_time: e.start_time,
+    end_time: e.end_time,
+    timezone: e.timezone,
+    location: e.location ?? e.venue?.title ?? e.custom_location_name ?? null,
+    venue_id: e.venue_id ?? e.venue?.id ?? null,
+    host: e.host_display_name ?? e.organizer?.name ?? null,
+    tags: e.tags ?? [],
+    rsvp_status: e.my_rsvp_status ?? e.rsvp_status ?? null,
+    url: e.url ?? null,
+    is_recurring: !!(e.recurrence || e.is_recurring),
+  };
+}
+
+async function listEdgeEvents(args: Record<string, unknown>): Promise<string> {
+  const params = new URLSearchParams();
+  const start_after = (args.start_after as string) || new Date().toISOString();
+  params.set("start_after", start_after);
+  if (args.start_before) params.set("start_before", String(args.start_before));
+  if (args.search) params.set("search", String(args.search));
+  if (args.rsvped_only) params.set("rsvped_only", "true");
+  if (Array.isArray(args.tags)) for (const t of args.tags) params.append("tags", String(t));
+  const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 50);
+  params.set("limit", String(limit));
+
+  const r = await edgeosFetch(`/events/portal/events?${params.toString()}`);
+  if (!r.ok) return JSON.stringify({ ok: false, error: r.error, status: r.status });
+  const results = Array.isArray(r.data?.results) ? r.data.results : [];
+  return JSON.stringify({
+    ok: true,
+    count: results.length,
+    events: results.map(compactEdgeEvent),
+    hint: results.length
+      ? "Summarize the events naturally — date, title, location, host. For recurring events, pass start_time as occurrence_start when RSVPing."
+      : "No upcoming events matched.",
+  });
+}
+
+async function getEdgeEvent(args: { event_id: string; occurrence_start?: string }): Promise<string> {
+  if (!args.event_id) return JSON.stringify({ ok: false, error: "event_id required" });
+  const qs = args.occurrence_start ? `?occurrence_start=${encodeURIComponent(args.occurrence_start)}` : "";
+  const r = await edgeosFetch(`/events/portal/events/${args.event_id}${qs}`);
+  if (!r.ok) return JSON.stringify({ ok: false, error: r.error, status: r.status });
+  return JSON.stringify({
+    ok: true,
+    event: { ...compactEdgeEvent(r.data), description: r.data?.content ?? r.data?.description ?? null },
+  });
+}
+
+async function rsvpEdgeEvent(args: { event_id: string; occurrence_start?: string; cancel?: boolean }): Promise<string> {
+  if (!args.event_id) return JSON.stringify({ ok: false, error: "event_id required" });
+  const action = args.cancel ? "cancel-registration" : "register";
+  const body: Record<string, unknown> = {};
+  if (args.occurrence_start) body.occurrence_start = args.occurrence_start;
+  const r = await edgeosFetch(`/event-participants/portal/${action}/${args.event_id}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) return JSON.stringify({ ok: false, error: r.error, status: r.status });
+  return JSON.stringify({
+    ok: true,
+    action: args.cancel ? "cancelled" : "rsvped",
+    result: r.data,
+  });
+}
+
 // ── System prompt augmentation ───────────────────────────────────────────────
+
 
 export function buildSystemPromptWithMemories(
   basePrompt: string,
