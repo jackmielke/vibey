@@ -3011,6 +3011,19 @@ export function describeToolDone(
         details: first || undefined,
       };
     }
+    case "list_edge_events": {
+      if (result?.ok === false) return { label: `🚫 Edge events failed`, details: result?.error };
+      const n = Number(result?.count ?? 0);
+      return { label: n > 0 ? `🗓️ found ${n} Edge event${n === 1 ? "" : "s"}` : `🗓️ no upcoming Edge events` };
+    }
+    case "get_edge_event": {
+      if (result?.ok === false) return { label: `🚫 couldn't load Edge event`, details: result?.error };
+      return { label: `🗓️ got "${String(result?.event?.title ?? "event").slice(0, 60)}"` };
+    }
+    case "rsvp_edge_event": {
+      if (result?.ok === false) return { label: `🚫 RSVP failed`, details: result?.error };
+      return { label: result?.action === "cancelled" ? `↩️ RSVP cancelled` : `✅ RSVP confirmed` };
+    }
     default:
       return { label: `✅ ${name} done` };
   }
