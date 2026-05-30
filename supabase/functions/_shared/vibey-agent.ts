@@ -647,6 +647,9 @@ export async function loadEnabledToolNames(
     return new Set(TOOLS.map((t) => t.function.name));
   }
 
+  const rows = (data ?? []) as Array<{ name: string; is_enabled?: boolean }>;
+  const enabled = new Set(rows.map((r) => r.name));
+
   // EdgeOS event tools auto-enable when the token secret is configured.
   if (Deno.env.get("EDGEOS_API_TOKEN")) {
     for (const name of ["list_edge_events", "get_edge_event", "rsvp_edge_event"]) {
@@ -654,9 +657,6 @@ export async function loadEnabledToolNames(
     }
   }
 
-
-  const rows = (data ?? []) as Array<{ name: string; is_enabled?: boolean }>;
-  const enabled = new Set(rows.map((r) => r.name));
 
   // The remote migration history for this project can lag behind the deployed
   // function code. Let Granola work as soon as its secrets exist, while still
