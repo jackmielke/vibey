@@ -364,6 +364,56 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "list_edge_events",
+      description:
+        "List upcoming events from the Edge Esmeralda / EdgeOS portal that the connected user can see. Use this when the user asks 'what's on at edge', 'any events tonight', 'what's happening this week at the popup', or wants the schedule. Returns events with id, title, start/end, location, host. To act on a single occurrence of a recurring event, pass its start_time as occurrence_start to rsvp_edge_event.",
+      parameters: {
+        type: "object",
+        properties: {
+          search: { type: "string", description: "Optional fuzzy title match." },
+          start_after: { type: "string", description: "ISO datetime — only events starting after this. Defaults to now if omitted." },
+          start_before: { type: "string", description: "ISO datetime — only events starting before this." },
+          tags: { type: "array", items: { type: "string" }, description: "Optional tag filter." },
+          rsvped_only: { type: "boolean", description: "If true, only events the user has RSVPed to." },
+          limit: { type: "integer", description: "Max events (1-50). Default 20.", minimum: 1, maximum: 50 },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_edge_event",
+      description: "Fetch full details for a single EdgeOS event by id, including the caller's RSVP status. Use after list_edge_events when the user wants more detail on a specific event.",
+      parameters: {
+        type: "object",
+        properties: {
+          event_id: { type: "string", description: "Event UUID from list_edge_events." },
+          occurrence_start: { type: "string", description: "ISO datetime — for recurring events, scopes the RSVP lookup to one occurrence." },
+        },
+        required: ["event_id"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "rsvp_edge_event",
+      description: "RSVP the connected user to an EdgeOS event. For recurring events, occurrence_start is required (use the start_time of the occurrence). Set cancel:true to cancel a previous RSVP instead.",
+      parameters: {
+        type: "object",
+        properties: {
+          event_id: { type: "string", description: "Event UUID." },
+          occurrence_start: { type: "string", description: "ISO datetime — required for recurring events, omit for one-offs." },
+          cancel: { type: "boolean", description: "If true, cancels the RSVP instead of creating one." },
+        },
+        required: ["event_id"],
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
