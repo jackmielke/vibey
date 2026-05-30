@@ -646,6 +646,15 @@ export async function loadEnabledToolNames(
     // fall back to allowing all built-in tools
     return new Set(TOOLS.map((t) => t.function.name));
   }
+
+  // EdgeOS event tools auto-enable when the token secret is configured.
+  if (Deno.env.get("EDGEOS_API_TOKEN")) {
+    for (const name of ["list_edge_events", "get_edge_event", "rsvp_edge_event"]) {
+      if (!rows.some((r) => r.name === name)) enabled.add(name);
+    }
+  }
+
+
   const rows = (data ?? []) as Array<{ name: string; is_enabled?: boolean }>;
   const enabled = new Set(rows.map((r) => r.name));
 
