@@ -364,6 +364,56 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "list_edge_events",
+      description:
+        "List upcoming events from the Edge Esmeralda / EdgeOS portal that the connected user can see. Use this when the user asks 'what's on at edge', 'any events tonight', 'what's happening this week at the popup', or wants the schedule. Returns events with id, title, start/end, location, host. To act on a single occurrence of a recurring event, pass its start_time as occurrence_start to rsvp_edge_event.",
+      parameters: {
+        type: "object",
+        properties: {
+          search: { type: "string", description: "Optional fuzzy title match." },
+          start_after: { type: "string", description: "ISO datetime — only events starting after this. Defaults to now if omitted." },
+          start_before: { type: "string", description: "ISO datetime — only events starting before this." },
+          tags: { type: "array", items: { type: "string" }, description: "Optional tag filter." },
+          rsvped_only: { type: "boolean", description: "If true, only events the user has RSVPed to." },
+          limit: { type: "integer", description: "Max events (1-50). Default 20.", minimum: 1, maximum: 50 },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_edge_event",
+      description: "Fetch full details for a single EdgeOS event by id, including the caller's RSVP status. Use after list_edge_events when the user wants more detail on a specific event.",
+      parameters: {
+        type: "object",
+        properties: {
+          event_id: { type: "string", description: "Event UUID from list_edge_events." },
+          occurrence_start: { type: "string", description: "ISO datetime — for recurring events, scopes the RSVP lookup to one occurrence." },
+        },
+        required: ["event_id"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "rsvp_edge_event",
+      description: "RSVP the connected user to an EdgeOS event. For recurring events, occurrence_start is required (use the start_time of the occurrence). Set cancel:true to cancel a previous RSVP instead.",
+      parameters: {
+        type: "object",
+        properties: {
+          event_id: { type: "string", description: "Event UUID." },
+          occurrence_start: { type: "string", description: "ISO datetime — required for recurring events, omit for one-offs." },
+          cancel: { type: "boolean", description: "If true, cancels the RSVP instead of creating one." },
+        },
+        required: ["event_id"],
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
@@ -596,8 +646,17 @@ export async function loadEnabledToolNames(
     // fall back to allowing all built-in tools
     return new Set(TOOLS.map((t) => t.function.name));
   }
+
   const rows = (data ?? []) as Array<{ name: string; is_enabled?: boolean }>;
   const enabled = new Set(rows.map((r) => r.name));
+
+  // EdgeOS event tools auto-enable when the token secret is configured.
+  if (Deno.env.get("EDGEOS_API_TOKEN")) {
+    for (const name of ["list_edge_events", "get_edge_event", "rsvp_edge_event"]) {
+      if (!rows.some((r) => r.name === name)) enabled.add(name);
+    }
+  }
+
 
   // The remote migration history for this project can lag behind the deployed
   // function code. Let Granola work as soon as its secrets exist, while still
@@ -1826,6 +1885,12 @@ async function executeToolCall(
       );
     case "admin_describe_gallery_photos":
       return await adminDescribeGalleryPhotos(supabase, parsed as { limit?: number; overwrite?: boolean });
+    case "list_edge_events":
+      return await listEdgeEvents(parsed as Record<string, unknown>);
+    case "get_edge_event":
+      return await getEdgeEvent(parsed as { event_id: string; occurrence_start?: string });
+    case "rsvp_edge_event":
+      return await rsvpEdgeEvent(parsed as { event_id: string; occurrence_start?: string; cancel?: boolean });
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
@@ -2165,7 +2230,114 @@ async function adminDescribeGalleryPhotos(
 }
 
 
+// ── EdgeOS Events API ────────────────────────────────────────────────────────
+// Portal-scoped wrapper around https://api.edgeos.world/api/v1.
+// Token issued by user at /portal/agentic-access, stored as EDGEOS_API_TOKEN.
+
+const EDGEOS_BASE = "https://api.edgeos.world/api/v1";
+
+async function edgeosFetch(
+  path: string,
+  init: RequestInit = {}
+): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+  const token = Deno.env.get("EDGEOS_API_TOKEN");
+  if (!token) {
+    return { ok: false, status: 0, data: null, error: "EDGEOS_API_TOKEN not configured" };
+  }
+  try {
+    const resp = await fetch(`${EDGEOS_BASE}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...(init.headers ?? {}),
+      },
+    });
+    const text = await resp.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (!resp.ok) {
+      const msg = (data && typeof data === "object" && (data.detail || data.message)) || `HTTP ${resp.status}`;
+      return { ok: false, status: resp.status, data, error: String(msg) };
+    }
+    return { ok: true, status: resp.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function compactEdgeEvent(e: any) {
+  if (!e || typeof e !== "object") return e;
+  return {
+    id: e.id,
+    title: e.title,
+    start_time: e.start_time,
+    end_time: e.end_time,
+    timezone: e.timezone,
+    location: e.location ?? e.venue?.title ?? e.custom_location_name ?? null,
+    venue_id: e.venue_id ?? e.venue?.id ?? null,
+    host: e.host_display_name ?? e.organizer?.name ?? null,
+    tags: e.tags ?? [],
+    rsvp_status: e.my_rsvp_status ?? e.rsvp_status ?? null,
+    url: e.url ?? null,
+    is_recurring: !!(e.recurrence || e.is_recurring),
+  };
+}
+
+async function listEdgeEvents(args: Record<string, unknown>): Promise<string> {
+  const params = new URLSearchParams();
+  const start_after = (args.start_after as string) || new Date().toISOString();
+  params.set("start_after", start_after);
+  if (args.start_before) params.set("start_before", String(args.start_before));
+  if (args.search) params.set("search", String(args.search));
+  if (args.rsvped_only) params.set("rsvped_only", "true");
+  if (Array.isArray(args.tags)) for (const t of args.tags) params.append("tags", String(t));
+  const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 50);
+  params.set("limit", String(limit));
+
+  const r = await edgeosFetch(`/events/portal/events?${params.toString()}`);
+  if (!r.ok) return JSON.stringify({ ok: false, error: r.error, status: r.status });
+  const results = Array.isArray(r.data?.results) ? r.data.results : [];
+  return JSON.stringify({
+    ok: true,
+    count: results.length,
+    events: results.map(compactEdgeEvent),
+    hint: results.length
+      ? "Summarize the events naturally — date, title, location, host. For recurring events, pass start_time as occurrence_start when RSVPing."
+      : "No upcoming events matched.",
+  });
+}
+
+async function getEdgeEvent(args: { event_id: string; occurrence_start?: string }): Promise<string> {
+  if (!args.event_id) return JSON.stringify({ ok: false, error: "event_id required" });
+  const qs = args.occurrence_start ? `?occurrence_start=${encodeURIComponent(args.occurrence_start)}` : "";
+  const r = await edgeosFetch(`/events/portal/events/${args.event_id}${qs}`);
+  if (!r.ok) return JSON.stringify({ ok: false, error: r.error, status: r.status });
+  return JSON.stringify({
+    ok: true,
+    event: { ...compactEdgeEvent(r.data), description: r.data?.content ?? r.data?.description ?? null },
+  });
+}
+
+async function rsvpEdgeEvent(args: { event_id: string; occurrence_start?: string; cancel?: boolean }): Promise<string> {
+  if (!args.event_id) return JSON.stringify({ ok: false, error: "event_id required" });
+  const action = args.cancel ? "cancel-registration" : "register";
+  const body: Record<string, unknown> = {};
+  if (args.occurrence_start) body.occurrence_start = args.occurrence_start;
+  const r = await edgeosFetch(`/event-participants/portal/${action}/${args.event_id}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) return JSON.stringify({ ok: false, error: r.error, status: r.status });
+  return JSON.stringify({
+    ok: true,
+    action: args.cancel ? "cancelled" : "rsvped",
+    result: r.data,
+  });
+}
+
 // ── System prompt augmentation ───────────────────────────────────────────────
+
 
 export function buildSystemPromptWithMemories(
   basePrompt: string,
@@ -2737,6 +2909,12 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
     }
     case "save_to_gallery":
       return "📸 saving that photo to the gallery…";
+    case "list_edge_events":
+      return "🗓️ checking the Edge events calendar…";
+    case "get_edge_event":
+      return "🗓️ pulling that Edge event…";
+    case "rsvp_edge_event":
+      return args?.cancel ? "↩️ cancelling that RSVP…" : "✋ RSVPing on Edge…";
     default:
       return `⚙️ running ${name}…`;
   }
@@ -2832,6 +3010,19 @@ export function describeToolDone(
         label: n > 0 ? `📸 saved ${n} photo${n === 1 ? "" : "s"} to gallery` : `🤷 nothing saved`,
         details: first || undefined,
       };
+    }
+    case "list_edge_events": {
+      if (result?.ok === false) return { label: `🚫 Edge events failed`, details: result?.error };
+      const n = Number(result?.count ?? 0);
+      return { label: n > 0 ? `🗓️ found ${n} Edge event${n === 1 ? "" : "s"}` : `🗓️ no upcoming Edge events` };
+    }
+    case "get_edge_event": {
+      if (result?.ok === false) return { label: `🚫 couldn't load Edge event`, details: result?.error };
+      return { label: `🗓️ got "${String(result?.event?.title ?? "event").slice(0, 60)}"` };
+    }
+    case "rsvp_edge_event": {
+      if (result?.ok === false) return { label: `🚫 RSVP failed`, details: result?.error };
+      return { label: result?.action === "cancelled" ? `↩️ RSVP cancelled` : `✅ RSVP confirmed` };
     }
     default:
       return { label: `✅ ${name} done` };
