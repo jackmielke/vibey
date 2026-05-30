@@ -2909,6 +2909,12 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
     }
     case "save_to_gallery":
       return "📸 saving that photo to the gallery…";
+    case "list_edge_events":
+      return "🗓️ checking the Edge events calendar…";
+    case "get_edge_event":
+      return "🗓️ pulling that Edge event…";
+    case "rsvp_edge_event":
+      return args?.cancel ? "↩️ cancelling that RSVP…" : "✋ RSVPing on Edge…";
     default:
       return `⚙️ running ${name}…`;
   }
