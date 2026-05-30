@@ -4049,6 +4049,25 @@ export type Database = {
       }
     }
     Functions: {
+      admin_list_workshop_inquiries: {
+        Args: { _password: string }
+        Returns: {
+          business: string
+          created_at: string
+          email: string
+          id: string
+          message: string
+          name: string
+          phone: string
+          sms_opt_in: boolean
+          status: string
+          workshop_weeks: number[]
+        }[]
+      }
+      admin_set_inquiry_status: {
+        Args: { _id: string; _password: string; _status: string }
+        Returns: undefined
+      }
       auto_join_community_as_admin: {
         Args: { target_community_id: string }
         Returns: boolean
@@ -4188,6 +4207,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      verify_admin_password: { Args: { _password: string }; Returns: boolean }
       verify_api_key: {
         Args: { key_hash: string; key_prefix: string }
         Returns: {
