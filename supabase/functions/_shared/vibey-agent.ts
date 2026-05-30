@@ -1885,6 +1885,12 @@ async function executeToolCall(
       );
     case "admin_describe_gallery_photos":
       return await adminDescribeGalleryPhotos(supabase, parsed as { limit?: number; overwrite?: boolean });
+    case "list_edge_events":
+      return await listEdgeEvents(parsed as Record<string, unknown>);
+    case "get_edge_event":
+      return await getEdgeEvent(parsed as { event_id: string; occurrence_start?: string });
+    case "rsvp_edge_event":
+      return await rsvpEdgeEvent(parsed as { event_id: string; occurrence_start?: string; cancel?: boolean });
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
