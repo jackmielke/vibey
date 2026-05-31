@@ -3197,6 +3197,18 @@ export async function runAgentLoopStreaming(opts: {
             return;
           }
 
+          // Surface intermediate reasoning (narration alongside tool calls)
+          // as a `thought` event so the web chat can render it inline.
+          const intermediateThought = (choice.content ?? "").trim();
+          if (intermediateThought) {
+            emitTool({
+              id: `thought-${iter}-${Date.now()}`,
+              name: "thought",
+              status: "thought",
+              label: intermediateThought,
+            });
+          }
+
           // Run each tool, emitting start + done frames.
           messages.push({
             role: "assistant",

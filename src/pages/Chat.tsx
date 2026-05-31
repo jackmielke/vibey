@@ -21,7 +21,7 @@ interface GalleryImage {
 interface ToolEvent {
   id: string;
   name: string;
-  status: "start" | "done";
+  status: "start" | "done" | "thought";
   label: string;
   details?: string;
 }
@@ -338,16 +338,25 @@ export default function Chat() {
                           exit={{ opacity: 0 }}
                           className="self-start max-w-full"
                         >
-                          <div className="inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded-md bg-muted/60 border border-border text-muted-foreground">
-                            {t.status === "start" && (
-                              <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                            )}
-                            <span className="truncate">{t.label}</span>
-                          </div>
-                          {t.details && (
-                            <pre className="mt-1 text-[10.5px] font-mono whitespace-pre-wrap leading-snug px-2 py-1.5 rounded-md bg-muted/40 border border-border/60 text-muted-foreground max-w-full overflow-x-auto">
+                          {t.status === "thought" ? (
+                            <div className="flex gap-1.5 text-[11px] italic leading-snug px-2 py-1 text-muted-foreground/70 max-w-full">
+                              <span className="shrink-0">💭</span>
+                              <span className="whitespace-pre-wrap">{t.label}</span>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded-md bg-muted/60 border border-border text-muted-foreground">
+                                {t.status === "start" && (
+                                  <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                                )}
+                                <span className="truncate">{t.label}</span>
+                              </div>
+                              {t.details && (
+                                <pre className="mt-1 text-[10.5px] font-mono whitespace-pre-wrap leading-snug px-2 py-1.5 rounded-md bg-muted/40 border border-border/60 text-muted-foreground max-w-full overflow-x-auto">
 {t.details}
-                            </pre>
+                                </pre>
+                              )}
+                            </>
                           )}
                         </motion.div>
                       ))}
