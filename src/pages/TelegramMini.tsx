@@ -839,11 +839,12 @@ export default function TelegramMini() {
     const q = directoryQuery.trim().toLowerCase();
     if (!q) return directory;
     return directory.filter((u) =>
-      [u.name, u.telegram_username, u.headline, u.bio]
+      [u.name, u.telegram_username, u.headline, u.bio, u.intentions, (u.interests_skills ?? []).join(" ")]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q)),
     );
   }, [directory, directoryQuery]);
+
 
   // 1. Telegram WebApp + auth (with preview/mock fallback)
   useEffect(() => {
