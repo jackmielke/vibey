@@ -1538,6 +1538,19 @@ Deno.serve(async (req) => {
       if (error) console.error("Failed to log /start:", error);
     });
 
+    // /start = explicit opt-in for DM replies. Without this, the DM gate
+    // below would mute every follow-up message from users who haven't posted
+    // in an enabled group yet.
+    supabase.from("telegram_dm_settings").upsert({
+      telegram_user_id: userId,
+      telegram_username: username,
+      enabled: true,
+      mode: "reply",
+    }, { onConflict: "telegram_user_id" }).then(({ error }: { error: unknown }) => {
+      if (error) console.error("Failed to opt-in DM settings on /start:", error);
+    });
+
+
     return new Response("ok", { status: 200 });
   }
 
