@@ -2266,27 +2266,60 @@ async function edgeosFetch(
   }
 }
 
+function formatLocalTime(iso: string | null | undefined, tz: string | null | undefined): string | null {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    const zone = tz || "America/Los_Angeles";
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(d);
+  } catch {
+    return null;
+  }
+}
+
 function compactEdgeEvent(e: any) {
   if (!e || typeof e !== "object") return e;
+  const tz = e.timezone ?? "America/Los_Angeles";
   return {
     id: e.id,
     title: e.title,
     start_time: e.start_time,
     end_time: e.end_time,
-    timezone: e.timezone,
-    location: e.location ?? e.venue?.title ?? e.custom_location_name ?? null,
+    timezone: tz,
+    local_start: formatLocalTime(e.start_time, tz),
+    local_end: formatLocalTime(e.end_time, tz),
+    location: e.venue_title ?? e.venue_location ?? e.custom_location_name ?? e.location ?? e.venue?.title ?? null,
     venue_id: e.venue_id ?? e.venue?.id ?? null,
     host: e.host_display_name ?? e.organizer?.name ?? null,
     tags: e.tags ?? [],
     rsvp_status: e.my_rsvp_status ?? e.rsvp_status ?? null,
     url: e.url ?? null,
-    is_recurring: !!(e.recurrence || e.is_recurring),
+    is_recurring: !!(e.rrule || e.recurrence_master_id || e.recurrence || e.is_recurring),
   };
 }
 
 async function listEdgeEvents(args: Record<string, unknown>): Promise<string> {
   const params = new URLSearchParams();
-  const start_after = (args.start_after as string) || new Date().toISOString();
+  // Default to start-of-today in PT so events earlier today still show up.
+  const defaultStart = (() => {
+    const now = new Date();
+    const ptDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric", month: "2-digit", day: "numeric",
+    }).format(now); // YYYY-MM-DD
+    // 00:00 PT ≈ 07:00 or 08:00 UTC; use 12:00 UTC the day before to be safe across DST.
+    const prev = new Date(`${ptDate}T00:00:00-08:00`);
+    return prev.toISOString();
+  })();
+  const start_after = (args.start_after as string) || defaultStart;
   params.set("start_after", start_after);
   if (args.start_before) params.set("start_before", String(args.start_before));
   if (args.search) params.set("search", String(args.search));
@@ -2298,12 +2331,20 @@ async function listEdgeEvents(args: Record<string, unknown>): Promise<string> {
   const r = await edgeosFetch(`/events/portal/events?${params.toString()}`);
   if (!r.ok) return JSON.stringify({ ok: false, error: r.error, status: r.status });
   const results = Array.isArray(r.data?.results) ? r.data.results : [];
+  const sorted = [...results].sort((a, b) => {
+    const ta = a?.start_time ? Date.parse(a.start_time) : 0;
+    const tb = b?.start_time ? Date.parse(b.start_time) : 0;
+    return ta - tb;
+  });
+  const nowIso = new Date().toISOString();
   return JSON.stringify({
     ok: true,
-    count: results.length,
-    events: results.map(compactEdgeEvent),
-    hint: results.length
-      ? "Summarize the events naturally — date, title, location, host. For recurring events, pass start_time as occurrence_start when RSVPing."
+    count: sorted.length,
+    now: nowIso,
+    now_local: formatLocalTime(nowIso, "America/Los_Angeles"),
+    events: sorted.map(compactEdgeEvent),
+    hint: sorted.length
+      ? "Events are sorted by start_time ascending. Use local_start (already in event's timezone) when telling the user what day/time something is — do NOT re-convert start_time yourself. For recurring events, pass start_time as occurrence_start when RSVPing."
       : "No upcoming events matched.",
   });
 }
