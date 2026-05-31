@@ -21,7 +21,7 @@ interface GalleryImage {
 interface ToolEvent {
   id: string;
   name: string;
-  status: "start" | "done";
+  status: "start" | "done" | "thought";
   label: string;
   details?: string;
 }
