@@ -1125,7 +1125,7 @@ export default function TelegramMini() {
       cancelled = true;
     };
   }, [authState, tgUserId]);
-  // Profiles directory (community members joined with users) — Vibey community
+  // Profiles directory (community members joined with users) — Vibey + Edge Esmerelda
   useEffect(() => {
     if (authState !== "ready") return;
     let cancelled = false;
@@ -1134,11 +1134,10 @@ export default function TelegramMini() {
       const { data, error } = await supabase
         .from("community_members")
         .select(
-          "user_id, users:users!community_members_user_id_fkey(id, auth_user_id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, instagram_handle, twitter_handle, source_url, headline, bio, intentions, interests_skills)",
+          "user_id, users:users!community_members_user_id_fkey(id, auth_user_id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, instagram_handle, twitter_handle, source_url, headline, bio, intentions, interests_skills, is_claimed)",
         )
-        .eq("community_id", VIBEY_COMMUNITY_ID)
-        .order("joined_at", { ascending: true })
-        .limit(1000);
+        .in("community_id", DIRECTORY_COMMUNITY_IDS)
+        .limit(2000);
       if (cancelled) return;
       if (error) {
         console.error("load directory failed", error.message);
@@ -1149,21 +1148,24 @@ export default function TelegramMini() {
           .filter((u): u is DirectoryEntry => !!u);
 
         // Dedupe by auth_user_id (when present) else by id. Prefer the row with the
-        // most complete profile (avatar, headline, telegram_username).
+        // most complete profile (avatar, bio, headline, telegram_username).
         const score = (u: DirectoryEntry) =>
-          (u.avatar_url || u.profile_picture_url || u.telegram_photo_url ? 4 : 0) +
+          (u.avatar_url || u.profile_picture_url || u.telegram_photo_url ? 8 : 0) +
+          (u.bio ? 4 : 0) +
           (u.telegram_username ? 2 : 0) +
-          (u.headline ? 1 : 0) +
-          (u.bio ? 1 : 0);
+          (u.headline ? 1 : 0);
         const byKey = new Map<string, DirectoryEntry>();
         for (const u of raw) {
           const key = u.auth_user_id ?? u.id;
           const existing = byKey.get(key);
           if (!existing || score(u) > score(existing)) byKey.set(key, u);
         }
-        const entries = Array.from(byKey.values()).sort((a, b) =>
-          (a.name ?? "~").localeCompare(b.name ?? "~"),
-        );
+        // Sort: people with the richest profiles first (avatar + bio), then alpha.
+        const entries = Array.from(byKey.values()).sort((a, b) => {
+          const diff = score(b) - score(a);
+          if (diff !== 0) return diff;
+          return (a.name ?? "~").localeCompare(b.name ?? "~");
+        });
         setDirectory(entries);
       }
       setDirectoryLoading(false);
@@ -1172,6 +1174,7 @@ export default function TelegramMini() {
       cancelled = true;
     };
   }, [authState]);
+
 
 
   // 4. Admin data — load all prefs + chat logs when admin mode is on
