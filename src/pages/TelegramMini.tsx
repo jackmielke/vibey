@@ -824,6 +824,7 @@ export default function TelegramMini() {
     bio: string | null;
     intentions: string | null;
     interests_skills: string[] | null;
+    is_claimed: boolean | null;
   };
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
