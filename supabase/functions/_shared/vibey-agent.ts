@@ -2309,14 +2309,18 @@ async function listEdgeEvents(args: Record<string, unknown>): Promise<string> {
     return ta - tb;
   });
   const nowIso = new Date().toISOString();
+  const todayWeekday = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "long" }).format(new Date());
+  const todayDate = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", year: "numeric", month: "long", day: "numeric" }).format(new Date());
+  const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "numeric" }).format(new Date());
   return JSON.stringify({
     ok: true,
     count: sorted.length,
     now: nowIso,
     now_local: formatLocalTime(nowIso, "America/Los_Angeles"),
+    today: `${todayWeekday}, ${todayDate} (${todayIso})`,
     events: sorted.map(compactEdgeEvent),
     hint: sorted.length
-      ? "Events are sorted by start_time ascending. Use local_start (already in event's timezone) when telling the user what day/time something is — do NOT re-convert start_time yourself. For recurring events, pass start_time as occurrence_start when RSVPing."
+      ? `TODAY is ${todayWeekday} ${todayIso} — use this weekday, do NOT recompute from the date. Events are sorted by start_time ascending. Use local_start (already in event's timezone) when telling the user what day/time something is — do NOT re-convert start_time yourself. For recurring events, pass start_time as occurrence_start when RSVPing.`
       : "No upcoming events matched.",
   });
 }
