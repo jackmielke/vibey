@@ -754,48 +754,20 @@ export async function loadRecentMemories(
 }
 
 export async function loadUpcomingEvents(
-  supabase: SupabaseClient,
-  limit = 12
+  _supabase: SupabaseClient,
+  _limit = 12
 ): Promise<CommunityEvent[]> {
-  const now = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await supabase
-    .from("events")
-    .select("id, title, description, event_start_time, event_end_time, event_location, hosted_by, event_type")
-    .eq("community_id", VIBEY_COMMUNITY_ID)
-    .gte("event_end_time", now)
-    .order("event_start_time", { ascending: true })
-    .limit(limit);
-
-  if (error) {
-    console.error("loadUpcomingEvents failed:", error.message);
-    return [];
-  }
-  return (data ?? []) as CommunityEvent[];
+  // Intentionally disabled: events come from EdgeOS only, via the
+  // list_edge_events / get_edge_event tool calls. We no longer inject the
+  // Supabase `events` table into the system prompt.
+  return [];
 }
 
-export function buildEventsBlock(events: CommunityEvent[]): string {
-  if (events.length === 0) return "";
-  const lines = events
-    .map((event) => {
-      const start = new Date(event.event_start_time).toLocaleString("en-US", {
-        timeZone: "America/Los_Angeles",
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      });
-      const end = new Date(event.event_end_time).toLocaleString("en-US", {
-        timeZone: "America/Los_Angeles",
-        hour: "numeric",
-        minute: "2-digit",
-      });
-      const location = event.event_location ? ` @ ${event.event_location}` : "";
-      const description = event.description ? ` — ${event.description}` : "";
-      return `- ${event.title}: ${start}-${end} PT${location}${description}`;
-    })
-    .join("\n");
-  return `\n\n## Upcoming community events\n\nUse this when people ask what's coming up, what to attend, or what Vibey can remind them about.\n\n${lines}`;
+export function buildEventsBlock(_events: CommunityEvent[]): string {
+  // Intentionally empty — EdgeOS is the single source of truth for
+  // "what's happening" questions. Vibey must call list_edge_events instead
+  // of relying on a prompt-injected list.
+  return "";
 }
 
 async function saveMemory(
