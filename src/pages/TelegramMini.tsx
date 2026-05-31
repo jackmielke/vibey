@@ -33,7 +33,7 @@ import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemor
 import { format, formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useVibeyAgent } from "@/hooks/useVibeyAgent";
-import { VIBEY_COMMUNITY_ID, VIBE_CODE_RESIDENCY_COMMUNITY_ID } from "@/lib/vibey";
+import { VIBEY_COMMUNITY_ID, VIBE_CODE_RESIDENCY_COMMUNITY_ID, DIRECTORY_COMMUNITY_IDS } from "@/lib/vibey";
 import { toast } from "sonner";
 import vibeyAvatar from "@/assets/vibey-avatar.png";
 // (popover no longer used in this file)
@@ -824,6 +824,7 @@ export default function TelegramMini() {
     bio: string | null;
     intentions: string | null;
     interests_skills: string[] | null;
+    is_claimed: boolean | null;
   };
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
@@ -838,11 +839,12 @@ export default function TelegramMini() {
     const q = directoryQuery.trim().toLowerCase();
     if (!q) return directory;
     return directory.filter((u) =>
-      [u.name, u.telegram_username, u.headline, u.bio]
+      [u.name, u.telegram_username, u.headline, u.bio, u.intentions, (u.interests_skills ?? []).join(" ")]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q)),
     );
   }, [directory, directoryQuery]);
+
 
   // 1. Telegram WebApp + auth (with preview/mock fallback)
   useEffect(() => {
@@ -1124,7 +1126,7 @@ export default function TelegramMini() {
       cancelled = true;
     };
   }, [authState, tgUserId]);
-  // Profiles directory (community members joined with users) — Vibey community
+  // Profiles directory (community members joined with users) — Vibey + Edge Esmerelda
   useEffect(() => {
     if (authState !== "ready") return;
     let cancelled = false;
@@ -1133,11 +1135,10 @@ export default function TelegramMini() {
       const { data, error } = await supabase
         .from("community_members")
         .select(
-          "user_id, users:users!community_members_user_id_fkey(id, auth_user_id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, instagram_handle, twitter_handle, source_url, headline, bio, intentions, interests_skills)",
+          "user_id, users:users!community_members_user_id_fkey(id, auth_user_id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, instagram_handle, twitter_handle, source_url, headline, bio, intentions, interests_skills, is_claimed)",
         )
-        .eq("community_id", VIBEY_COMMUNITY_ID)
-        .order("joined_at", { ascending: true })
-        .limit(1000);
+        .in("community_id", DIRECTORY_COMMUNITY_IDS)
+        .limit(2000);
       if (cancelled) return;
       if (error) {
         console.error("load directory failed", error.message);
@@ -1148,21 +1149,24 @@ export default function TelegramMini() {
           .filter((u): u is DirectoryEntry => !!u);
 
         // Dedupe by auth_user_id (when present) else by id. Prefer the row with the
-        // most complete profile (avatar, headline, telegram_username).
+        // most complete profile (avatar, bio, headline, telegram_username).
         const score = (u: DirectoryEntry) =>
-          (u.avatar_url || u.profile_picture_url || u.telegram_photo_url ? 4 : 0) +
+          (u.avatar_url || u.profile_picture_url || u.telegram_photo_url ? 8 : 0) +
+          (u.bio ? 4 : 0) +
           (u.telegram_username ? 2 : 0) +
-          (u.headline ? 1 : 0) +
-          (u.bio ? 1 : 0);
+          (u.headline ? 1 : 0);
         const byKey = new Map<string, DirectoryEntry>();
         for (const u of raw) {
           const key = u.auth_user_id ?? u.id;
           const existing = byKey.get(key);
           if (!existing || score(u) > score(existing)) byKey.set(key, u);
         }
-        const entries = Array.from(byKey.values()).sort((a, b) =>
-          (a.name ?? "~").localeCompare(b.name ?? "~"),
-        );
+        // Sort: people with the richest profiles first (avatar + bio), then alpha.
+        const entries = Array.from(byKey.values()).sort((a, b) => {
+          const diff = score(b) - score(a);
+          if (diff !== 0) return diff;
+          return (a.name ?? "~").localeCompare(b.name ?? "~");
+        });
         setDirectory(entries);
       }
       setDirectoryLoading(false);
@@ -1171,6 +1175,7 @@ export default function TelegramMini() {
       cancelled = true;
     };
   }, [authState]);
+
 
 
   // 4. Admin data — load all prefs + chat logs when admin mode is on
@@ -1701,11 +1706,16 @@ export default function TelegramMini() {
               <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
                 <UsersIcon className="w-3 h-3" />
                 community · {directoryQuery ? `${filteredDirectory.length} / ${directory.length}` : directory.length}
+                {directory.length > 0 && (
+                  <span className="text-muted-foreground/70">
+                    · {directory.filter((u) => !u.is_claimed).length} unclaimed
+                  </span>
+                )}
               </h2>
               <input
                 value={directoryQuery}
                 onChange={(e) => setDirectoryQuery(e.target.value)}
-                placeholder="search name, @handle, headline…"
+                placeholder="search name, @handle, bio…"
                 className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
               />
               {directoryLoading ? (
@@ -1717,7 +1727,7 @@ export default function TelegramMini() {
               ) : filteredDirectory.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-2">no matches.</p>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1.5">
                   {filteredDirectory.map((u) => {
                     const avatar =
                       u.avatar_url ??
@@ -1725,28 +1735,54 @@ export default function TelegramMini() {
                       u.telegram_photo_url ??
                       null;
                     const display = u.name ?? (u.telegram_username ? `@${u.telegram_username}` : "—");
+                    const preview = u.headline ?? u.bio ?? null;
+                    const tags = (u.interests_skills ?? []).slice(0, 3);
                     return (
                       <button
                         type="button"
                         key={u.id}
                         onClick={() => setSelectedProfile(u)}
-                        className="p-2.5 rounded-lg bg-card border border-border flex items-center gap-2 min-w-0 text-left hover:border-primary/40 hover:bg-muted/40 transition-colors"
+                        className="group p-3 rounded-lg bg-card border border-border flex items-start gap-3 min-w-0 text-left hover:border-primary/50 hover:bg-muted/30 transition-colors"
                       >
-                        <div className="w-9 h-9 rounded-full overflow-hidden bg-muted shrink-0 ring-1 ring-border">
+                        <div className="w-11 h-11 rounded-full overflow-hidden bg-muted shrink-0 ring-1 ring-border group-hover:ring-primary/40 transition">
                           {avatar ? (
                             <img src={avatar} alt={display} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-xs font-mono text-muted-foreground">
+                            <div className="w-full h-full flex items-center justify-center text-xs font-mono text-muted-foreground bg-gradient-to-br from-primary/10 to-muted">
                               {(display ?? "?").slice(0, 1).toUpperCase()}
                             </div>
                           )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold truncate">{display}</p>
-                          {u.headline && (
-                            <p className="text-[10px] text-muted-foreground truncate">
-                              {u.headline}
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                            <p className="text-sm font-semibold truncate max-w-full">{display}</p>
+                            {u.telegram_username && u.name && (
+                              <span className="text-[10px] font-mono text-muted-foreground truncate">
+                                @{u.telegram_username.replace(/^@/, "")}
+                              </span>
+                            )}
+                            {!u.is_claimed && (
+                              <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                                unclaimed
+                              </span>
+                            )}
+                          </div>
+                          {preview && (
+                            <p className="text-[11px] text-muted-foreground line-clamp-2 [overflow-wrap:anywhere]">
+                              {preview}
                             </p>
+                          )}
+                          {tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-0.5">
+                              {tags.map((t, i) => (
+                                <span
+                                  key={`${t}-${i}`}
+                                  className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary"
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
                           )}
                         </div>
                       </button>
@@ -1755,6 +1791,7 @@ export default function TelegramMini() {
                 </div>
               )}
             </section>
+
 
             {/* Admin: everyone's preferences + chat history */}
             {adminMode && isAdmin && (
