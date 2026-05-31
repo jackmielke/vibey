@@ -2309,14 +2309,18 @@ async function listEdgeEvents(args: Record<string, unknown>): Promise<string> {
     return ta - tb;
   });
   const nowIso = new Date().toISOString();
+  const todayWeekday = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "long" }).format(new Date());
+  const todayDate = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", year: "numeric", month: "long", day: "numeric" }).format(new Date());
+  const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "numeric" }).format(new Date());
   return JSON.stringify({
     ok: true,
     count: sorted.length,
     now: nowIso,
     now_local: formatLocalTime(nowIso, "America/Los_Angeles"),
+    today: `${todayWeekday}, ${todayDate} (${todayIso})`,
     events: sorted.map(compactEdgeEvent),
     hint: sorted.length
-      ? "Events are sorted by start_time ascending. Use local_start (already in event's timezone) when telling the user what day/time something is — do NOT re-convert start_time yourself. For recurring events, pass start_time as occurrence_start when RSVPing."
+      ? `TODAY is ${todayWeekday} ${todayIso} — use this weekday, do NOT recompute from the date. Events are sorted by start_time ascending. Use local_start (already in event's timezone) when telling the user what day/time something is — do NOT re-convert start_time yourself. For recurring events, pass start_time as occurrence_start when RSVPing.`
       : "No upcoming events matched.",
   });
 }
@@ -2362,17 +2366,16 @@ export function buildSystemPromptWithMemories(
   // Esmeralda, Vibe House, etc.) so PT is the right default. Telegram doesn't
   // expose the user's timezone, so we anchor to Pacific and let Vibey adapt
   // when someone explicitly says they're elsewhere.
+  const nowPT = new Date();
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "long" }).format(nowPT);
+  const dateStr = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", year: "numeric", month: "long", day: "numeric" }).format(nowPT);
+  const timeStr = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit", hour12: true }).format(nowPT);
+  const isoPT = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "numeric" }).format(nowPT);
   const timeBlock =
-    `Current time: ${new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Los_Angeles",
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date())} (Pacific Time)\n\n`;
+    `## CURRENT DATE & TIME (authoritative — do NOT compute weekday yourself, your training data is stale)\n` +
+    `Today is **${weekday}, ${dateStr}** (ISO ${isoPT}). It is currently **${timeStr} Pacific Time**.\n` +
+    `When you say "today" / "tomorrow" / "this weekend", anchor to ${weekday} ${isoPT}. ` +
+    `If you're tempted to name a different weekday for this date, you are wrong — trust this line.\n\n`;
 
   const memoryBlock =
     memories.length === 0
