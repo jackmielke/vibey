@@ -1493,8 +1493,10 @@ Deno.serve(async (req) => {
     const greeting = firstName ? `Hey ${firstName}! I'm Vibey 👋` : `Hey! I'm Vibey 👋`;
     const contextLine =
       `I'm here to help you understand Edge Esmeralda, from the people and events to whatever else you're curious about!`;
+    const privacyLine =
+      `A quick note on privacy: today, anything shared in group chats I'm part of is public memory, and the Vibe team can see DMs. We're working toward a fully private mode — until then, share like you would in a group chat.`;
     const actionLine = `Ping me anytime and I'll respond, or get started below.`;
-    const welcome = [greeting, contextLine, actionLine].join("\n\n");
+    const welcome = [greeting, contextLine, privacyLine, actionLine].join("\n\n");
 
     const quickActions = {
       keyboard: [
@@ -1518,12 +1520,19 @@ Deno.serve(async (req) => {
       text: contextLine,
     });
 
+    await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 800);
+    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+      chat_id: chatId,
+      text: privacyLine,
+    });
+
     await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 650);
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
       chat_id: chatId,
       text: actionLine,
       reply_markup: quickActions,
     });
+
 
     supabase.from("agent_chat_logs").insert({
       agent_id: VIBEY_AGENT_ID,
