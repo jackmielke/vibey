@@ -1761,6 +1761,104 @@ async function notifyJack(
   }
 }
 
+// ── Vibe Code Residency join tool ────────────────────────────────────────────
+//
+// Adds the current caller to the Vibe Code Residency community, auto-filling
+// any missing profile fields from their Telegram identity so the new member
+// shows up in the directory with a face + name immediately. Idempotent.
+
+async function joinVibeResidency(
+  supabase: SupabaseClient,
+  metadata: Record<string, unknown>,
+  callerVibeUserId: string | null,
+): Promise<string> {
+  if (!callerVibeUserId) {
+    return JSON.stringify({
+      ok: false,
+      error: "no_profile",
+      message:
+        "I couldn't find your Vibe profile yet — make sure you're messaging me from your own Telegram account, then try again.",
+    });
+  }
+
+  // Pull current profile so we only patch what's missing.
+  const { data: userRow, error: loadErr } = await supabase
+    .from("users")
+    .select("id, name, avatar_url, telegram_photo_url, profile_picture_url, telegram_user_id, telegram_username, is_claimed, headline, bio, intentions")
+    .eq("id", callerVibeUserId)
+    .maybeSingle();
+
+  if (loadErr || !userRow) {
+    return JSON.stringify({ ok: false, error: `couldn't load profile: ${loadErr?.message ?? "not found"}` });
+  }
+
+  const tgId = (metadata?.telegram_user_id as number | null | undefined) ?? null;
+  const tgUser =
+    (metadata?.telegram_username as string | null | undefined) ?? null;
+  const tgPhoto =
+    (metadata?.telegram_photo_url as string | null | undefined) ?? null;
+  const tgName = (metadata?.display_name as string | null | undefined) ?? null;
+
+  const patch: Record<string, unknown> = {};
+  if (!userRow.name && tgName) patch.name = tgName;
+  if (!userRow.telegram_user_id && tgId != null) patch.telegram_user_id = tgId;
+  if (!userRow.telegram_username && tgUser) patch.telegram_username = tgUser;
+  if (!userRow.telegram_photo_url && tgPhoto) patch.telegram_photo_url = tgPhoto;
+  if (!userRow.avatar_url && (tgPhoto || userRow.telegram_photo_url)) {
+    patch.avatar_url = tgPhoto ?? userRow.telegram_photo_url;
+  }
+  if (!userRow.is_claimed) patch.is_claimed = true;
+
+  if (Object.keys(patch).length > 0) {
+    const { error: updErr } = await supabase
+      .from("users")
+      .update(patch)
+      .eq("id", callerVibeUserId);
+    if (updErr) {
+      console.warn("joinVibeResidency: profile patch failed:", updErr.message);
+    }
+  }
+
+  // Check existing membership.
+  const { data: existing } = await supabase
+    .from("community_members")
+    .select("user_id, role, joined_at")
+    .eq("community_id", VIBE_CODE_RESIDENCY_COMMUNITY_ID)
+    .eq("user_id", callerVibeUserId)
+    .maybeSingle();
+
+  if (existing) {
+    return JSON.stringify({
+      ok: true,
+      already_member: true,
+      community_name: "Vibe Code Residency",
+      joined_at: existing.joined_at,
+      profile_complete: !!(userRow.bio || userRow.headline || userRow.intentions),
+      display_name: patch.name ?? userRow.name ?? null,
+    });
+  }
+
+  const { error: insErr } = await supabase
+    .from("community_members")
+    .insert({
+      community_id: VIBE_CODE_RESIDENCY_COMMUNITY_ID,
+      user_id: callerVibeUserId,
+      role: "member",
+    });
+
+  if (insErr) {
+    return JSON.stringify({ ok: false, error: `couldn't join: ${insErr.message}` });
+  }
+
+  return JSON.stringify({
+    ok: true,
+    already_member: false,
+    community_name: "Vibe Code Residency",
+    profile_complete: !!(userRow.bio || userRow.headline || userRow.intentions),
+    display_name: patch.name ?? userRow.name ?? null,
+  });
+}
+
 const ADMIN_TOOL_NAMES = new Set(ADMIN_TOOLS.map((t) => t.function.name));
 
 async function executeToolCall(
