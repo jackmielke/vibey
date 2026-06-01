@@ -3155,6 +3155,15 @@ export function describeToolDone(
       if (result?.ok === false) return { label: `🚫 RSVP failed`, details: result?.error };
       return { label: result?.action === "cancelled" ? `↩️ RSVP cancelled` : `✅ RSVP confirmed` };
     }
+    case "join_vibe_residency": {
+      if (result?.ok === false) {
+        return { label: `🚫 couldn't add you to the residency`, details: result?.message ?? result?.error };
+      }
+      if (result?.already_member) {
+        return { label: `🌱 already a Vibe Resident` };
+      }
+      return { label: `🌱 welcome to the Vibe Code Residency` };
+    }
     default:
       return { label: `✅ ${name} done` };
   }
