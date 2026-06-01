@@ -415,6 +415,18 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "join_vibe_residency",
+      description:
+        "Officially add the current caller to the Vibe Code Residency community. Call this whenever someone clearly expresses they want to join / become a Vibe Resident / be part of the residency (e.g. 'I want to join the Vibe Residency', 'sign me up for the residency', 'add me as a vibe resident'). Auto-fills missing profile fields (name, avatar, telegram handle) from their Telegram identity and marks the profile as claimed. Idempotent — safe to call if they're already a member. After success, give them a warm one-line welcome and gently nudge them to fill in their bio so other residents can find them.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
