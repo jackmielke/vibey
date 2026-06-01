@@ -399,11 +399,11 @@ function createStatusMessage(token: string, chatId: number, reply_to_message_id?
   };
 }
 
-// ── Voice transcription via OpenAI Whisper ────────────────────────────────────
+// ── Voice transcription via ElevenLabs Scribe v2 ─────────────────────────────
 
 async function transcribeVoice(
   botToken: string,
-  openaiKey: string,
+  elevenLabsKey: string,
   fileId: string
 ): Promise<string | null> {
   try {
@@ -429,24 +429,24 @@ async function transcribeVoice(
     const form = new FormData();
     const filename = filePath.split("/").pop() || "voice.oga";
     form.append("file", audioBlob, filename);
-    form.append("model", "whisper-1");
+    form.append("model_id", "scribe_v2");
 
-    const whisperResp = await fetch(
-      "https://api.openai.com/v1/audio/transcriptions",
+    const sttResp = await fetch(
+      "https://api.elevenlabs.io/v1/speech-to-text",
       {
         method: "POST",
-        headers: { Authorization: `Bearer ${openaiKey}` },
+        headers: { "xi-api-key": elevenLabsKey },
         body: form,
       }
     );
 
-    if (!whisperResp.ok) {
-      const errText = await whisperResp.text().catch(() => "");
-      console.error("whisper failed", whisperResp.status, errText);
+    if (!sttResp.ok) {
+      const errText = await sttResp.text().catch(() => "");
+      console.error("elevenlabs stt failed", sttResp.status, errText);
       return null;
     }
 
-    const json = await whisperResp.json();
+    const json = await sttResp.json();
     const text = (json?.text ?? "").trim();
     return text || null;
   } catch (e) {
@@ -1116,9 +1116,9 @@ Deno.serve(async (req) => {
       return new Response("ok", { status: 200 });
     }
 
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) {
-      console.error("Voice received but OPENAI_API_KEY not configured");
+    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+    if (!ELEVENLABS_API_KEY) {
+      console.error("Voice received but ELEVENLABS_API_KEY not configured");
       await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
         chat_id: chatId,
         text: "i can't transcribe voice notes yet — text me instead 🙏",
@@ -1132,7 +1132,7 @@ Deno.serve(async (req) => {
     });
 
     const fileId = (msg.voice ?? msg.audio)!.file_id;
-    const transcript = await transcribeVoice(TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, fileId);
+    const transcript = await transcribeVoice(TELEGRAM_BOT_TOKEN, ELEVENLABS_API_KEY, fileId);
 
     if (!transcript) {
       await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
