@@ -399,11 +399,11 @@ function createStatusMessage(token: string, chatId: number, reply_to_message_id?
   };
 }
 
-// ── Voice transcription via OpenAI Whisper ────────────────────────────────────
+// ── Voice transcription via ElevenLabs Scribe v2 ─────────────────────────────
 
 async function transcribeVoice(
   botToken: string,
-  openaiKey: string,
+  elevenLabsKey: string,
   fileId: string
 ): Promise<string | null> {
   try {
@@ -429,24 +429,24 @@ async function transcribeVoice(
     const form = new FormData();
     const filename = filePath.split("/").pop() || "voice.oga";
     form.append("file", audioBlob, filename);
-    form.append("model", "whisper-1");
+    form.append("model_id", "scribe_v2");
 
-    const whisperResp = await fetch(
-      "https://api.openai.com/v1/audio/transcriptions",
+    const sttResp = await fetch(
+      "https://api.elevenlabs.io/v1/speech-to-text",
       {
         method: "POST",
-        headers: { Authorization: `Bearer ${openaiKey}` },
+        headers: { "xi-api-key": elevenLabsKey },
         body: form,
       }
     );
 
-    if (!whisperResp.ok) {
-      const errText = await whisperResp.text().catch(() => "");
-      console.error("whisper failed", whisperResp.status, errText);
+    if (!sttResp.ok) {
+      const errText = await sttResp.text().catch(() => "");
+      console.error("elevenlabs stt failed", sttResp.status, errText);
       return null;
     }
 
-    const json = await whisperResp.json();
+    const json = await sttResp.json();
     const text = (json?.text ?? "").trim();
     return text || null;
   } catch (e) {
