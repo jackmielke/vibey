@@ -12,6 +12,7 @@ type SupabaseClient = any;
 
 export const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 export const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
+export const VIBE_CODE_RESIDENCY_COMMUNITY_ID = "4202857f-13fd-4407-8906-3f8ffe63e510";
 
 // Telegram user IDs that get full admin powers (edit Vibey's soul, memories,
 // skills, and tools via conversation). Standard users get read-only powers.
@@ -411,6 +412,18 @@ export const TOOLS = [
           cancel: { type: "boolean", description: "If true, cancels the RSVP instead of creating one." },
         },
         required: ["event_id"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "join_vibe_residency",
+      description:
+        "Officially add the current caller to the Vibe Code Residency community. Call this whenever someone clearly expresses they want to join / become a Vibe Resident / be part of the residency (e.g. 'I want to join the Vibe Residency', 'sign me up for the residency', 'add me as a vibe resident'). Auto-fills missing profile fields (name, avatar, telegram handle) from their Telegram identity and marks the profile as claimed. Idempotent — safe to call if they're already a member. After success, give them a warm one-line welcome and gently nudge them to fill in their bio so other residents can find them.",
+      parameters: {
+        type: "object",
+        properties: {},
       },
     },
   },
@@ -1748,6 +1761,104 @@ async function notifyJack(
   }
 }
 
+// ── Vibe Code Residency join tool ────────────────────────────────────────────
+//
+// Adds the current caller to the Vibe Code Residency community, auto-filling
+// any missing profile fields from their Telegram identity so the new member
+// shows up in the directory with a face + name immediately. Idempotent.
+
+async function joinVibeResidency(
+  supabase: SupabaseClient,
+  metadata: Record<string, unknown>,
+  callerVibeUserId: string | null,
+): Promise<string> {
+  if (!callerVibeUserId) {
+    return JSON.stringify({
+      ok: false,
+      error: "no_profile",
+      message:
+        "I couldn't find your Vibe profile yet — make sure you're messaging me from your own Telegram account, then try again.",
+    });
+  }
+
+  // Pull current profile so we only patch what's missing.
+  const { data: userRow, error: loadErr } = await supabase
+    .from("users")
+    .select("id, name, avatar_url, telegram_photo_url, profile_picture_url, telegram_user_id, telegram_username, is_claimed, headline, bio, intentions")
+    .eq("id", callerVibeUserId)
+    .maybeSingle();
+
+  if (loadErr || !userRow) {
+    return JSON.stringify({ ok: false, error: `couldn't load profile: ${loadErr?.message ?? "not found"}` });
+  }
+
+  const tgId = (metadata?.telegram_user_id as number | null | undefined) ?? null;
+  const tgUser =
+    (metadata?.telegram_username as string | null | undefined) ?? null;
+  const tgPhoto =
+    (metadata?.telegram_photo_url as string | null | undefined) ?? null;
+  const tgName = (metadata?.display_name as string | null | undefined) ?? null;
+
+  const patch: Record<string, unknown> = {};
+  if (!userRow.name && tgName) patch.name = tgName;
+  if (!userRow.telegram_user_id && tgId != null) patch.telegram_user_id = tgId;
+  if (!userRow.telegram_username && tgUser) patch.telegram_username = tgUser;
+  if (!userRow.telegram_photo_url && tgPhoto) patch.telegram_photo_url = tgPhoto;
+  if (!userRow.avatar_url && (tgPhoto || userRow.telegram_photo_url)) {
+    patch.avatar_url = tgPhoto ?? userRow.telegram_photo_url;
+  }
+  if (!userRow.is_claimed) patch.is_claimed = true;
+
+  if (Object.keys(patch).length > 0) {
+    const { error: updErr } = await supabase
+      .from("users")
+      .update(patch)
+      .eq("id", callerVibeUserId);
+    if (updErr) {
+      console.warn("joinVibeResidency: profile patch failed:", updErr.message);
+    }
+  }
+
+  // Check existing membership.
+  const { data: existing } = await supabase
+    .from("community_members")
+    .select("user_id, role, joined_at")
+    .eq("community_id", VIBE_CODE_RESIDENCY_COMMUNITY_ID)
+    .eq("user_id", callerVibeUserId)
+    .maybeSingle();
+
+  if (existing) {
+    return JSON.stringify({
+      ok: true,
+      already_member: true,
+      community_name: "Vibe Code Residency",
+      joined_at: existing.joined_at,
+      profile_complete: !!(userRow.bio || userRow.headline || userRow.intentions),
+      display_name: patch.name ?? userRow.name ?? null,
+    });
+  }
+
+  const { error: insErr } = await supabase
+    .from("community_members")
+    .insert({
+      community_id: VIBE_CODE_RESIDENCY_COMMUNITY_ID,
+      user_id: callerVibeUserId,
+      role: "member",
+    });
+
+  if (insErr) {
+    return JSON.stringify({ ok: false, error: `couldn't join: ${insErr.message}` });
+  }
+
+  return JSON.stringify({
+    ok: true,
+    already_member: false,
+    community_name: "Vibe Code Residency",
+    profile_complete: !!(userRow.bio || userRow.headline || userRow.intentions),
+    display_name: patch.name ?? userRow.name ?? null,
+  });
+}
+
 const ADMIN_TOOL_NAMES = new Set(ADMIN_TOOLS.map((t) => t.function.name));
 
 async function executeToolCall(
@@ -1863,6 +1974,8 @@ async function executeToolCall(
       return await getEdgeEvent(parsed as { event_id: string; occurrence_start?: string });
     case "rsvp_edge_event":
       return await rsvpEdgeEvent(parsed as { event_id: string; occurrence_start?: string; cancel?: boolean });
+    case "join_vibe_residency":
+      return await joinVibeResidency(supabase, metadata, callerVibeUserId);
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
@@ -2450,6 +2563,16 @@ You have access to these tools:
   the current user in your reply that you've pinged Jack — keep it casual, no
   drama. Don't promise Jack will respond instantly.
 
+- **join_vibe_residency()** — officially add the caller to the Vibe Code Residency.
+  Trigger whenever someone clearly says they want to join / be part of / sign up for
+  the Vibe Residency or Vibe Code Residency (e.g. "I want to join the Vibe Residency",
+  "make me a vibe resident", "sign me up for the residency"). Don't ask follow-up
+  questions first — just call it; their Telegram name + photo auto-fill the profile.
+  After it succeeds, give a warm one-line welcome (e.g. "you're in 🌱 welcome to the
+  Vibe Code Residency"), and if \`profile_complete\` is false, gently nudge them to
+  reply with a one-line bio + what they're building so other residents can find them.
+  If \`already_member\` is true, just confirm warmly without re-onboarding.
+
 
 You can call any tool zero, one, or multiple times before replying. After all tool
 calls finish, give the user your normal natural-language reply — don't mention tools
@@ -2931,6 +3054,8 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       return "🗓️ pulling that Edge event…";
     case "rsvp_edge_event":
       return args?.cancel ? "↩️ cancelling that RSVP…" : "✋ RSVPing on Edge…";
+    case "join_vibe_residency":
+      return "🌱 adding you to the Vibe Code Residency…";
     default:
       return `⚙️ running ${name}…`;
   }
@@ -3039,6 +3164,15 @@ export function describeToolDone(
     case "rsvp_edge_event": {
       if (result?.ok === false) return { label: `🚫 RSVP failed`, details: result?.error };
       return { label: result?.action === "cancelled" ? `↩️ RSVP cancelled` : `✅ RSVP confirmed` };
+    }
+    case "join_vibe_residency": {
+      if (result?.ok === false) {
+        return { label: `🚫 couldn't add you to the residency`, details: result?.message ?? result?.error };
+      }
+      if (result?.already_member) {
+        return { label: `🌱 already a Vibe Resident` };
+      }
+      return { label: `🌱 welcome to the Vibe Code Residency` };
     }
     default:
       return { label: `✅ ${name} done` };

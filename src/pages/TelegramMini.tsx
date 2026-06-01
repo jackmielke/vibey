@@ -831,19 +831,24 @@ export default function TelegramMini() {
   const [selectedProfile, setSelectedProfile] = useState<ProfileDetail | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<EventEditRow | null>(null);
   const [directoryQuery, setDirectoryQuery] = useState("");
+  const [showEmptyProfiles, setShowEmptyProfiles] = useState(false);
 
   // Current user mini-profile (for header avatar popover)
   const [myProfile, setMyProfile] = useState<MiniProfile | null>(null);
 
+  const hasProfileContent = (u: DirectoryEntry) =>
+    !!(u.bio || u.headline || u.intentions || (u.interests_skills?.length ?? 0) > 0);
+
   const filteredDirectory = useMemo(() => {
     const q = directoryQuery.trim().toLowerCase();
-    if (!q) return directory;
-    return directory.filter((u) =>
+    const base = showEmptyProfiles ? directory : directory.filter(hasProfileContent);
+    if (!q) return base;
+    return base.filter((u) =>
       [u.name, u.telegram_username, u.headline, u.bio, u.intentions, (u.interests_skills ?? []).join(" ")]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q)),
     );
-  }, [directory, directoryQuery]);
+  }, [directory, directoryQuery, showEmptyProfiles]);
 
 
   // 1. Telegram WebApp + auth (with preview/mock fallback)
@@ -1703,14 +1708,23 @@ export default function TelegramMini() {
           <>
             {/* Directory */}
             <section className="space-y-2">
-              <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+              <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5 flex-wrap">
                 <UsersIcon className="w-3 h-3" />
-                community · {directoryQuery ? `${filteredDirectory.length} / ${directory.length}` : directory.length}
-                {directory.length > 0 && (
-                  <span className="text-muted-foreground/70">
-                    · {directory.filter((u) => !u.is_claimed).length} unclaimed
-                  </span>
-                )}
+                community · {filteredDirectory.length}{directory.length !== filteredDirectory.length ? ` / ${directory.length}` : ""}
+                {directory.length > 0 && (() => {
+                  const emptyCount = directory.filter((u) => !hasProfileContent(u)).length;
+                  if (emptyCount === 0) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setShowEmptyProfiles((v) => !v)}
+                      className="text-[10px] font-mono normal-case tracking-normal text-muted-foreground/80 hover:text-primary transition-colors underline-offset-2 hover:underline"
+                      title={showEmptyProfiles ? "hide profiles with no bio" : "show profiles with no bio"}
+                    >
+                      · {showEmptyProfiles ? `hide ${emptyCount} empty` : `+${emptyCount} with no bio`}
+                    </button>
+                  );
+                })()}
               </h2>
               <input
                 value={directoryQuery}
@@ -1718,6 +1732,7 @@ export default function TelegramMini() {
                 placeholder="search name, @handle, bio…"
                 className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
               />
+
               {directoryLoading ? (
                 <div className="flex items-center py-6">
                   <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
