@@ -831,19 +831,24 @@ export default function TelegramMini() {
   const [selectedProfile, setSelectedProfile] = useState<ProfileDetail | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<EventEditRow | null>(null);
   const [directoryQuery, setDirectoryQuery] = useState("");
+  const [showEmptyProfiles, setShowEmptyProfiles] = useState(false);
 
   // Current user mini-profile (for header avatar popover)
   const [myProfile, setMyProfile] = useState<MiniProfile | null>(null);
 
+  const hasProfileContent = (u: DirectoryEntry) =>
+    !!(u.bio || u.headline || u.intentions || (u.interests_skills?.length ?? 0) > 0);
+
   const filteredDirectory = useMemo(() => {
     const q = directoryQuery.trim().toLowerCase();
-    if (!q) return directory;
-    return directory.filter((u) =>
+    const base = showEmptyProfiles ? directory : directory.filter(hasProfileContent);
+    if (!q) return base;
+    return base.filter((u) =>
       [u.name, u.telegram_username, u.headline, u.bio, u.intentions, (u.interests_skills ?? []).join(" ")]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q)),
     );
-  }, [directory, directoryQuery]);
+  }, [directory, directoryQuery, showEmptyProfiles]);
 
 
   // 1. Telegram WebApp + auth (with preview/mock fallback)
