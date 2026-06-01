@@ -3044,6 +3044,8 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       return "🗓️ pulling that Edge event…";
     case "rsvp_edge_event":
       return args?.cancel ? "↩️ cancelling that RSVP…" : "✋ RSVPing on Edge…";
+    case "join_vibe_residency":
+      return "🌱 adding you to the Vibe Code Residency…";
     default:
       return `⚙️ running ${name}…`;
   }
