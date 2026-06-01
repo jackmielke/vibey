@@ -1974,6 +1974,8 @@ async function executeToolCall(
       return await getEdgeEvent(parsed as { event_id: string; occurrence_start?: string });
     case "rsvp_edge_event":
       return await rsvpEdgeEvent(parsed as { event_id: string; occurrence_start?: string; cancel?: boolean });
+    case "join_vibe_residency":
+      return await joinVibeResidency(supabase, metadata, callerVibeUserId);
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
