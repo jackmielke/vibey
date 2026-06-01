@@ -1116,9 +1116,9 @@ Deno.serve(async (req) => {
       return new Response("ok", { status: 200 });
     }
 
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) {
-      console.error("Voice received but OPENAI_API_KEY not configured");
+    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+    if (!ELEVENLABS_API_KEY) {
+      console.error("Voice received but ELEVENLABS_API_KEY not configured");
       await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
         chat_id: chatId,
         text: "i can't transcribe voice notes yet — text me instead 🙏",
@@ -1132,7 +1132,7 @@ Deno.serve(async (req) => {
     });
 
     const fileId = (msg.voice ?? msg.audio)!.file_id;
-    const transcript = await transcribeVoice(TELEGRAM_BOT_TOKEN, OPENAI_API_KEY, fileId);
+    const transcript = await transcribeVoice(TELEGRAM_BOT_TOKEN, ELEVENLABS_API_KEY, fileId);
 
     if (!transcript) {
       await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
