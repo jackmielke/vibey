@@ -1708,14 +1708,23 @@ export default function TelegramMini() {
           <>
             {/* Directory */}
             <section className="space-y-2">
-              <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+              <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5 flex-wrap">
                 <UsersIcon className="w-3 h-3" />
-                community · {directoryQuery ? `${filteredDirectory.length} / ${directory.length}` : directory.length}
-                {directory.length > 0 && (
-                  <span className="text-muted-foreground/70">
-                    · {directory.filter((u) => !u.is_claimed).length} unclaimed
-                  </span>
-                )}
+                community · {filteredDirectory.length}{directory.length !== filteredDirectory.length ? ` / ${directory.length}` : ""}
+                {directory.length > 0 && (() => {
+                  const emptyCount = directory.filter((u) => !hasProfileContent(u)).length;
+                  if (emptyCount === 0) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setShowEmptyProfiles((v) => !v)}
+                      className="text-[10px] font-mono normal-case tracking-normal text-muted-foreground/80 hover:text-primary transition-colors underline-offset-2 hover:underline"
+                      title={showEmptyProfiles ? "hide profiles with no bio" : "show profiles with no bio"}
+                    >
+                      · {showEmptyProfiles ? `hide ${emptyCount} empty` : `+${emptyCount} with no bio`}
+                    </button>
+                  );
+                })()}
               </h2>
               <input
                 value={directoryQuery}
@@ -1723,6 +1732,7 @@ export default function TelegramMini() {
                 placeholder="search name, @handle, bio…"
                 className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
               />
+
               {directoryLoading ? (
                 <div className="flex items-center py-6">
                   <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
