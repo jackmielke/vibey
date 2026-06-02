@@ -731,6 +731,9 @@ export async function loadEnabledToolNames(
   if (!rows.some((r) => r.name === "save_to_gallery")) {
     enabled.add("save_to_gallery");
   }
+  if (!rows.some((r) => r.name === "search_people")) {
+    enabled.add("search_people");
+  }
 
 
   return enabled;
