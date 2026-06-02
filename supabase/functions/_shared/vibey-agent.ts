@@ -433,6 +433,7 @@ export const TOOLS = [
         properties: {},
       },
     },
+  },
   {
     type: "function" as const,
     function: {
