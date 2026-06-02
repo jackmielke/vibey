@@ -1894,6 +1894,111 @@ async function joinVibeResidency(
   });
 }
 
+// ── People search tool ──────────────────────────────────────────────────────
+//
+// Searches the community directory for members whose name / bio / headline /
+// intentions / interests_skills match the user's query. Scoped to the
+// communities the directory aggregates across so Vibey doesn't leak strangers.
+
+async function searchPeople(
+  supabase: SupabaseClient,
+  args: { query?: string; limit?: number; include_empty_bios?: boolean },
+): Promise<string> {
+  const limit = Math.min(Math.max(args.limit ?? 8, 1), 20);
+  const q = (args.query ?? "").trim();
+  const includeEmpty = args.include_empty_bios === true;
+
+  // Find user_ids that belong to the directory communities.
+  const { data: members, error: memErr } = await supabase
+    .from("community_members")
+    .select("user_id")
+    .in("community_id", DIRECTORY_COMMUNITY_IDS);
+
+  if (memErr) {
+    return JSON.stringify({ ok: false, error: `members lookup failed: ${memErr.message}` });
+  }
+  const userIds = Array.from(new Set((members ?? []).map((m: { user_id: string }) => m.user_id)));
+  if (userIds.length === 0) {
+    return JSON.stringify({ ok: true, count: 0, people: [] });
+  }
+
+  let builder = supabase
+    .from("users")
+    .select("id, name, telegram_username, avatar_url, telegram_photo_url, profile_picture_url, headline, bio, intentions, interests_skills, is_claimed")
+    .in("id", userIds);
+
+  if (q) {
+    const safe = q.replace(/[%,()]/g, " ");
+    builder = builder.or(
+      [
+        `name.ilike.%${safe}%`,
+        `bio.ilike.%${safe}%`,
+        `headline.ilike.%${safe}%`,
+        `intentions.ilike.%${safe}%`,
+        `telegram_username.ilike.%${safe}%`,
+        `interests_skills.cs.{${safe}}`,
+      ].join(","),
+    );
+  }
+
+  // Pull more than `limit` so we can post-filter empties + dedupe before slicing.
+  const { data, error } = await builder.limit(Math.max(limit * 4, 40));
+  if (error) {
+    return JSON.stringify({ ok: false, error: `people search failed: ${error.message}` });
+  }
+
+  type UserRow = {
+    id: string;
+    name: string | null;
+    telegram_username: string | null;
+    avatar_url: string | null;
+    telegram_photo_url: string | null;
+    profile_picture_url: string | null;
+    headline: string | null;
+    bio: string | null;
+    intentions: string | null;
+    interests_skills: string[] | null;
+    is_claimed: boolean | null;
+  };
+  const rows: UserRow[] = (data ?? []) as UserRow[];
+
+  const filtered = rows.filter((r) => {
+    if (includeEmpty) return true;
+    return !!(r.bio?.trim() || r.headline?.trim() || r.intentions?.trim() || (r.interests_skills?.length ?? 0) > 0);
+  });
+
+  // Score: claimed + has bio first, then by total profile richness.
+  filtered.sort((a, b) => {
+    const score = (r: UserRow) =>
+      (r.is_claimed ? 8 : 0) +
+      (r.bio ? 4 : 0) +
+      (r.headline ? 2 : 0) +
+      (r.intentions ? 2 : 0) +
+      ((r.interests_skills?.length ?? 0) > 0 ? 1 : 0);
+    return score(b) - score(a);
+  });
+
+  const people = filtered.slice(0, limit).map((r) => ({
+    id: r.id,
+    name: r.name,
+    telegram_username: r.telegram_username,
+    avatar_url: r.avatar_url ?? r.telegram_photo_url ?? r.profile_picture_url ?? null,
+    headline: r.headline,
+    bio: r.bio,
+    intentions: r.intentions,
+    interests_skills: r.interests_skills ?? [],
+    claimed: !!r.is_claimed,
+  }));
+
+  return JSON.stringify({
+    ok: true,
+    count: people.length,
+    total_candidates: rows.length,
+    query: q || null,
+    people,
+  });
+}
+
 const ADMIN_TOOL_NAMES = new Set(ADMIN_TOOLS.map((t) => t.function.name));
 
 async function executeToolCall(
