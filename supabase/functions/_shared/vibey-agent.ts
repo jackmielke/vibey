@@ -1911,43 +1911,24 @@ async function searchPeople(
   const q = (args.query ?? "").trim();
   const includeEmpty = args.include_empty_bios === true;
 
-  // Find user_ids that belong to the directory communities.
-  const { data: members, error: memErr } = await supabase
+  // Query from memberships and embed users in one request. Avoids building a huge
+  // `users.id=in.(...)` URL, which PostgREST rejects as "Bad Request" once the
+  // directory has hundreds of profiles.
+  const { data, error } = await supabase
     .from("community_members")
-    .select("user_id")
-    .in("community_id", DIRECTORY_COMMUNITY_IDS);
+    .select(
+      "user:users!community_members_user_id_fkey(id, name, telegram_username, avatar_url, telegram_photo_url, profile_picture_url, headline, bio, intentions, interests_skills, is_claimed)"
+    )
+    .in("community_id", DIRECTORY_COMMUNITY_IDS)
+    .limit(2000);
 
-  if (memErr) {
-    return JSON.stringify({ ok: false, error: `members lookup failed: ${memErr.message}` });
-  }
-  const userIds = Array.from(new Set((members ?? []).map((m: { user_id: string }) => m.user_id)));
-  if (userIds.length === 0) {
-    return JSON.stringify({ ok: true, count: 0, people: [] });
-  }
-
-  let builder = supabase
-    .from("users")
-    .select("id, name, telegram_username, avatar_url, telegram_photo_url, profile_picture_url, headline, bio, intentions, interests_skills, is_claimed")
-    .in("id", userIds);
-
-  if (q) {
-    const safe = q.replace(/[%,()]/g, " ");
-    builder = builder.or(
-      [
-        `name.ilike.%${safe}%`,
-        `bio.ilike.%${safe}%`,
-        `headline.ilike.%${safe}%`,
-        `intentions.ilike.%${safe}%`,
-        `telegram_username.ilike.%${safe}%`,
-        `interests_skills.cs.{${safe}}`,
-      ].join(","),
-    );
-  }
-
-  // Pull more than `limit` so we can post-filter empties + dedupe before slicing.
-  const { data, error } = await builder.limit(Math.max(limit * 4, 40));
   if (error) {
-    return JSON.stringify({ ok: false, error: `people search failed: ${error.message}` });
+    return JSON.stringify({
+      ok: false,
+      error: `people search failed: ${error.message}`,
+      details: error.details ?? null,
+      code: error.code ?? null,
+    });
   }
 
   type UserRow = {
@@ -1963,11 +1944,41 @@ async function searchPeople(
     interests_skills: string[] | null;
     is_claimed: boolean | null;
   };
-  const rows: UserRow[] = (data ?? []) as UserRow[];
+  const byId = new Map<string, UserRow>();
+  for (const membership of data ?? []) {
+    const embedded = (membership as { user?: UserRow | UserRow[] | null }).user;
+    const user = Array.isArray(embedded) ? embedded[0] : embedded;
+    if (user?.id && !byId.has(user.id)) byId.set(user.id, user);
+  }
+  const rows: UserRow[] = Array.from(byId.values());
+
+  const tokens = q
+    .toLowerCase()
+    .split(/[^a-z0-9@_+-]+/i)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 1);
+
+  const queryScore = (r: UserRow) => {
+    if (tokens.length === 0) return 1;
+    const haystack = [
+      r.name,
+      r.telegram_username,
+      r.headline,
+      r.bio,
+      r.intentions,
+      ...(r.interests_skills ?? []),
+    ]
+      .filter(Boolean)
+      .join(" \n ")
+      .toLowerCase();
+
+    return tokens.reduce((score, token) => score + (haystack.includes(token) ? 1 : 0), 0);
+  };
 
   const filtered = rows.filter((r) => {
     if (includeEmpty) return true;
-    return !!(r.bio?.trim() || r.headline?.trim() || r.intentions?.trim() || (r.interests_skills?.length ?? 0) > 0);
+    const hasProfileText = !!(r.bio?.trim() || r.headline?.trim() || r.intentions?.trim() || (r.interests_skills?.length ?? 0) > 0);
+    return hasProfileText && queryScore(r) > 0;
   });
 
   // Score: claimed + has bio first, then by total profile richness.
@@ -1978,7 +1989,8 @@ async function searchPeople(
       (r.headline ? 2 : 0) +
       (r.intentions ? 2 : 0) +
       ((r.interests_skills?.length ?? 0) > 0 ? 1 : 0);
-    return score(b) - score(a);
+    const byQuery = queryScore(b) - queryScore(a);
+    return byQuery || score(b) - score(a);
   });
 
   const people = filtered.slice(0, limit).map((r) => ({
