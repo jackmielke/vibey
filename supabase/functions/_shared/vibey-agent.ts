@@ -3323,6 +3323,20 @@ export function describeToolDone(
       }
       return { label: `🌱 welcome to the Vibe Code Residency` };
     }
+    case "search_people": {
+      if (result?.ok === false) return { label: `🚫 people search failed`, details: result?.error };
+      const n = Number(result?.count ?? 0);
+      const names = Array.isArray(result?.people)
+        ? (result.people as Array<{ name?: string | null; telegram_username?: string | null }>)
+            .slice(0, 4)
+            .map((p) => p.name || (p.telegram_username ? `@${p.telegram_username}` : "someone"))
+            .join(", ")
+        : "";
+      return {
+        label: n > 0 ? `👥 found ${n} ${n === 1 ? "person" : "people"}` : `🤷 nobody matched`,
+        details: names || undefined,
+      };
+    }
     default:
       return { label: `✅ ${name} done` };
   }
