@@ -3201,6 +3201,10 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       return args?.cancel ? "↩️ cancelling that RSVP…" : "✋ RSVPing on Edge…";
     case "join_vibe_residency":
       return "🌱 adding you to the Vibe Code Residency…";
+    case "search_people": {
+      const q = String(args?.query ?? "").trim();
+      return q ? `👥 scanning bios for "${q.slice(0, 60)}"…` : "👥 browsing the community directory…";
+    }
     default:
       return `⚙️ running ${name}…`;
   }
