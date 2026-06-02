@@ -2540,50 +2540,71 @@ function compactEdgeEvent(e: any) {
 }
 
 async function listEdgeEvents(args: Record<string, unknown>): Promise<string> {
-  const params = new URLSearchParams();
-  // Default to start-of-today in PT so events earlier today still show up.
-  const defaultStart = (() => {
-    const now = new Date();
-    const ptDate = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Los_Angeles",
-      year: "numeric", month: "2-digit", day: "numeric",
-    }).format(now); // YYYY-MM-DD
-    // 00:00 PT ≈ 07:00 or 08:00 UTC; use 12:00 UTC the day before to be safe across DST.
-    const prev = new Date(`${ptDate}T00:00:00-08:00`);
-    return prev.toISOString();
-  })();
-  const start_after = (args.start_after as string) || defaultStart;
-  params.set("start_after", start_after);
-  if (args.start_before) params.set("start_before", String(args.start_before));
-  if (args.search) params.set("search", String(args.search));
-  if (args.rsvped_only) params.set("rsvped_only", "true");
-  if (Array.isArray(args.tags)) for (const t of args.tags) params.append("tags", String(t));
-  const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 50);
-  params.set("limit", String(limit));
+  try {
+    const params = new URLSearchParams();
+    // Default to start-of-today in PT so events earlier today still show up.
+    const safeDefaultStart = (() => {
+      try {
+        const now = new Date();
+        const ptDate = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "America/Los_Angeles",
+          year: "numeric", month: "2-digit", day: "numeric",
+        }).format(now); // YYYY-MM-DD
+        const prev = new Date(`${ptDate}T00:00:00-08:00`);
+        if (Number.isNaN(prev.getTime())) return new Date().toISOString();
+        return prev.toISOString();
+      } catch {
+        return new Date().toISOString();
+      }
+    })();
 
-  const r = await edgeosFetch(`/events/portal/events?${params.toString()}`);
-  if (!r.ok) return JSON.stringify({ ok: false, error: r.error, status: r.status });
-  const results = Array.isArray(r.data?.results) ? r.data.results : [];
-  const sorted = [...results].sort((a, b) => {
-    const ta = a?.start_time ? Date.parse(a.start_time) : 0;
-    const tb = b?.start_time ? Date.parse(b.start_time) : 0;
-    return ta - tb;
-  });
-  const nowIso = new Date().toISOString();
-  const todayWeekday = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "long" }).format(new Date());
-  const todayDate = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", year: "numeric", month: "long", day: "numeric" }).format(new Date());
-  const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "numeric" }).format(new Date());
-  return JSON.stringify({
-    ok: true,
-    count: sorted.length,
-    now: nowIso,
-    now_local: formatLocalTime(nowIso, "America/Los_Angeles"),
-    today: `${todayWeekday}, ${todayDate} (${todayIso})`,
-    events: sorted.map(compactEdgeEvent),
-    hint: sorted.length
-      ? `TODAY is ${todayWeekday} ${todayIso} — use this weekday, do NOT recompute from the date. Events are sorted by start_time ascending. Use local_start (already in event's timezone) when telling the user what day/time something is — do NOT re-convert start_time yourself. For recurring events, pass start_time as occurrence_start when RSVPing.`
-      : "No upcoming events matched.",
-  });
+    // Validate any model-supplied start_after — if it's garbage, fall back.
+    const sanitizeIso = (v: unknown): string | null => {
+      if (typeof v !== "string" || !v.trim()) return null;
+      const t = Date.parse(v);
+      if (Number.isNaN(t)) return null;
+      try { return new Date(t).toISOString(); } catch { return null; }
+    };
+    const start_after = sanitizeIso(args.start_after) ?? safeDefaultStart;
+    params.set("start_after", start_after);
+    const startBefore = sanitizeIso(args.start_before);
+    if (startBefore) params.set("start_before", startBefore);
+    if (args.search) params.set("search", String(args.search));
+    if (args.rsvped_only) params.set("rsvped_only", "true");
+    if (Array.isArray(args.tags)) for (const t of args.tags) params.append("tags", String(t));
+    const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 50);
+    params.set("limit", String(limit));
+
+    const r = await edgeosFetch(`/events/portal/events?${params.toString()}`);
+    if (!r.ok) return JSON.stringify({ ok: false, error: r.error, status: r.status });
+    const results = Array.isArray(r.data?.results) ? r.data.results : [];
+    const sorted = [...results].sort((a, b) => {
+      const ta = a?.start_time ? Date.parse(a.start_time) : 0;
+      const tb = b?.start_time ? Date.parse(b.start_time) : 0;
+      return (Number.isNaN(ta) ? 0 : ta) - (Number.isNaN(tb) ? 0 : tb);
+    });
+    const nowIso = new Date().toISOString();
+    const todayWeekday = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "long" }).format(new Date());
+    const todayDate = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", year: "numeric", month: "long", day: "numeric" }).format(new Date());
+    const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "numeric" }).format(new Date());
+    return JSON.stringify({
+      ok: true,
+      count: sorted.length,
+      now: nowIso,
+      now_local: formatLocalTime(nowIso, "America/Los_Angeles"),
+      today: `${todayWeekday}, ${todayDate} (${todayIso})`,
+      events: sorted.map(compactEdgeEvent),
+      hint: sorted.length
+        ? `TODAY is ${todayWeekday} ${todayIso} — use this weekday, do NOT recompute from the date. Events are sorted by start_time ascending. Use local_start (already in event's timezone) when telling the user what day/time something is — do NOT re-convert start_time yourself. For recurring events, pass start_time as occurrence_start when RSVPing.`
+        : "No upcoming events matched.",
+    });
+  } catch (e) {
+    console.error("listEdgeEvents crashed:", e);
+    return JSON.stringify({
+      ok: false,
+      error: e instanceof Error ? e.message : "listEdgeEvents failed unexpectedly",
+    });
+  }
 }
 
 async function getEdgeEvent(args: { event_id: string; occurrence_start?: string }): Promise<string> {
