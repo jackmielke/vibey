@@ -433,6 +433,33 @@ export const TOOLS = [
         properties: {},
       },
     },
+  {
+    type: "function" as const,
+    function: {
+      name: "search_people",
+      description:
+        "Search the community member directory (Vibey community + Edge Esmeralda + Vibe Code Residency) by name, bio, headline, intentions, or interests/skills. Use this WHENEVER the user asks 'who should I meet', 'who in the community is into X', 'find me someone working on Y', 'is there anyone here doing Z', or wants intros / matchmaking. Returns up to `limit` people with name, telegram_username, headline, bio, intentions, interests_skills, avatar_url. Quietly skips profiles with no bio so you don't recommend ghosts. After getting results, pick the 2-4 best matches and briefly say WHY each one matches what the user asked for. Include their @telegram_username so the user can DM them.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "What the user is looking for — keywords, topic, skill, vibe (e.g. 'ai agents', 'solidity', 'meditation', 'someone to co-found with'). Leave empty to browse recent members with bios.",
+          },
+          limit: {
+            type: "integer",
+            description: "Max people to return (1-20). Default 8.",
+            minimum: 1,
+            maximum: 20,
+          },
+          include_empty_bios: {
+            type: "boolean",
+            description: "If true, also include profiles with no bio. Default false — only return people with at least a bio/headline/intentions.",
+          },
+        },
+      },
+    },
   },
 ];
 
