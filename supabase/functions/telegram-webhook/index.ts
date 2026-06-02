@@ -1495,23 +1495,15 @@ Deno.serve(async (req) => {
       `I'm here to help you understand Edge Esmeralda, from the people and events to whatever else you're curious about!`;
     const privacyLine =
       `A quick note on privacy: today, anything shared in group chats I'm part of is public memory, and the Vibe team can see DMs. We're working toward a fully private mode — until then, share like you would in a group chat.`;
-    const actionLine = `Ping me anytime and I'll respond, or get started below.`;
+    const actionLine = `Ping me anytime and I'll respond.`;
     const welcome = [greeting, contextLine, privacyLine, actionLine].join("\n\n");
-
-    const quickActions = {
-      keyboard: [
-        [{ text: "What's happening today?" }, { text: "Who should I meet?" }],
-        [{ text: "Tell me about yourself" }, { text: "What's the vibe right now?" }],
-      ],
-      resize_keyboard: true,
-      one_time_keyboard: true,
-      input_field_placeholder: "Message Vibey…",
-    };
 
     await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 700);
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
       chat_id: chatId,
       text: greeting,
+      // Clear any previously-shown reply keyboard from past /start sessions.
+      reply_markup: { remove_keyboard: true },
     });
 
     await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 900);
@@ -1530,7 +1522,6 @@ Deno.serve(async (req) => {
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
       chat_id: chatId,
       text: actionLine,
-      reply_markup: quickActions,
     });
 
 
