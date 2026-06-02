@@ -13,6 +13,13 @@ type SupabaseClient = any;
 export const VIBEY_COMMUNITY_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 export const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
 export const VIBE_CODE_RESIDENCY_COMMUNITY_ID = "4202857f-13fd-4407-8906-3f8ffe63e510";
+export const EDGE_ESMERELDA_COMMUNITY_ID = "bb93af8f-3d13-458e-a580-207d374bbe39";
+// Communities the people directory / search_people tool aggregates across.
+export const DIRECTORY_COMMUNITY_IDS = [
+  VIBEY_COMMUNITY_ID,
+  EDGE_ESMERELDA_COMMUNITY_ID,
+  VIBE_CODE_RESIDENCY_COMMUNITY_ID,
+];
 
 // Telegram user IDs that get full admin powers (edit Vibey's soul, memories,
 // skills, and tools via conversation). Standard users get read-only powers.
@@ -427,6 +434,34 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "search_people",
+      description:
+        "Search the community member directory (Vibey community + Edge Esmeralda + Vibe Code Residency) by name, bio, headline, intentions, or interests/skills. Use this WHENEVER the user asks 'who should I meet', 'who in the community is into X', 'find me someone working on Y', 'is there anyone here doing Z', or wants intros / matchmaking. Returns up to `limit` people with name, telegram_username, headline, bio, intentions, interests_skills, avatar_url. Quietly skips profiles with no bio so you don't recommend ghosts. After getting results, pick the 2-4 best matches and briefly say WHY each one matches what the user asked for. Include their @telegram_username so the user can DM them.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "What the user is looking for — keywords, topic, skill, vibe (e.g. 'ai agents', 'solidity', 'meditation', 'someone to co-found with'). Leave empty to browse recent members with bios.",
+          },
+          limit: {
+            type: "integer",
+            description: "Max people to return (1-20). Default 8.",
+            minimum: 1,
+            maximum: 20,
+          },
+          include_empty_bios: {
+            type: "boolean",
+            description: "If true, also include profiles with no bio. Default false — only return people with at least a bio/headline/intentions.",
+          },
+        },
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
@@ -695,6 +730,9 @@ export async function loadEnabledToolNames(
   }
   if (!rows.some((r) => r.name === "save_to_gallery")) {
     enabled.add("save_to_gallery");
+  }
+  if (!rows.some((r) => r.name === "search_people")) {
+    enabled.add("search_people");
   }
 
 
@@ -1859,6 +1897,111 @@ async function joinVibeResidency(
   });
 }
 
+// ── People search tool ──────────────────────────────────────────────────────
+//
+// Searches the community directory for members whose name / bio / headline /
+// intentions / interests_skills match the user's query. Scoped to the
+// communities the directory aggregates across so Vibey doesn't leak strangers.
+
+async function searchPeople(
+  supabase: SupabaseClient,
+  args: { query?: string; limit?: number; include_empty_bios?: boolean },
+): Promise<string> {
+  const limit = Math.min(Math.max(args.limit ?? 8, 1), 20);
+  const q = (args.query ?? "").trim();
+  const includeEmpty = args.include_empty_bios === true;
+
+  // Find user_ids that belong to the directory communities.
+  const { data: members, error: memErr } = await supabase
+    .from("community_members")
+    .select("user_id")
+    .in("community_id", DIRECTORY_COMMUNITY_IDS);
+
+  if (memErr) {
+    return JSON.stringify({ ok: false, error: `members lookup failed: ${memErr.message}` });
+  }
+  const userIds = Array.from(new Set((members ?? []).map((m: { user_id: string }) => m.user_id)));
+  if (userIds.length === 0) {
+    return JSON.stringify({ ok: true, count: 0, people: [] });
+  }
+
+  let builder = supabase
+    .from("users")
+    .select("id, name, telegram_username, avatar_url, telegram_photo_url, profile_picture_url, headline, bio, intentions, interests_skills, is_claimed")
+    .in("id", userIds);
+
+  if (q) {
+    const safe = q.replace(/[%,()]/g, " ");
+    builder = builder.or(
+      [
+        `name.ilike.%${safe}%`,
+        `bio.ilike.%${safe}%`,
+        `headline.ilike.%${safe}%`,
+        `intentions.ilike.%${safe}%`,
+        `telegram_username.ilike.%${safe}%`,
+        `interests_skills.cs.{${safe}}`,
+      ].join(","),
+    );
+  }
+
+  // Pull more than `limit` so we can post-filter empties + dedupe before slicing.
+  const { data, error } = await builder.limit(Math.max(limit * 4, 40));
+  if (error) {
+    return JSON.stringify({ ok: false, error: `people search failed: ${error.message}` });
+  }
+
+  type UserRow = {
+    id: string;
+    name: string | null;
+    telegram_username: string | null;
+    avatar_url: string | null;
+    telegram_photo_url: string | null;
+    profile_picture_url: string | null;
+    headline: string | null;
+    bio: string | null;
+    intentions: string | null;
+    interests_skills: string[] | null;
+    is_claimed: boolean | null;
+  };
+  const rows: UserRow[] = (data ?? []) as UserRow[];
+
+  const filtered = rows.filter((r) => {
+    if (includeEmpty) return true;
+    return !!(r.bio?.trim() || r.headline?.trim() || r.intentions?.trim() || (r.interests_skills?.length ?? 0) > 0);
+  });
+
+  // Score: claimed + has bio first, then by total profile richness.
+  filtered.sort((a, b) => {
+    const score = (r: UserRow) =>
+      (r.is_claimed ? 8 : 0) +
+      (r.bio ? 4 : 0) +
+      (r.headline ? 2 : 0) +
+      (r.intentions ? 2 : 0) +
+      ((r.interests_skills?.length ?? 0) > 0 ? 1 : 0);
+    return score(b) - score(a);
+  });
+
+  const people = filtered.slice(0, limit).map((r) => ({
+    id: r.id,
+    name: r.name,
+    telegram_username: r.telegram_username,
+    avatar_url: r.avatar_url ?? r.telegram_photo_url ?? r.profile_picture_url ?? null,
+    headline: r.headline,
+    bio: r.bio,
+    intentions: r.intentions,
+    interests_skills: r.interests_skills ?? [],
+    claimed: !!r.is_claimed,
+  }));
+
+  return JSON.stringify({
+    ok: true,
+    count: people.length,
+    total_candidates: rows.length,
+    query: q || null,
+    people,
+  });
+}
+
 const ADMIN_TOOL_NAMES = new Set(ADMIN_TOOLS.map((t) => t.function.name));
 
 async function executeToolCall(
@@ -1976,6 +2119,11 @@ async function executeToolCall(
       return await rsvpEdgeEvent(parsed as { event_id: string; occurrence_start?: string; cancel?: boolean });
     case "join_vibe_residency":
       return await joinVibeResidency(supabase, metadata, callerVibeUserId);
+    case "search_people":
+      return await searchPeople(
+        supabase,
+        parsed as { query?: string; limit?: number; include_empty_bios?: boolean },
+      );
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
@@ -3056,6 +3204,10 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       return args?.cancel ? "↩️ cancelling that RSVP…" : "✋ RSVPing on Edge…";
     case "join_vibe_residency":
       return "🌱 adding you to the Vibe Code Residency…";
+    case "search_people": {
+      const q = String(args?.query ?? "").trim();
+      return q ? `👥 scanning bios for "${q.slice(0, 60)}"…` : "👥 browsing the community directory…";
+    }
     default:
       return `⚙️ running ${name}…`;
   }
@@ -3173,6 +3325,20 @@ export function describeToolDone(
         return { label: `🌱 already a Vibe Resident` };
       }
       return { label: `🌱 welcome to the Vibe Code Residency` };
+    }
+    case "search_people": {
+      if (result?.ok === false) return { label: `🚫 people search failed`, details: result?.error };
+      const n = Number(result?.count ?? 0);
+      const names = Array.isArray(result?.people)
+        ? (result.people as Array<{ name?: string | null; telegram_username?: string | null }>)
+            .slice(0, 4)
+            .map((p) => p.name || (p.telegram_username ? `@${p.telegram_username}` : "someone"))
+            .join(", ")
+        : "";
+      return {
+        label: n > 0 ? `👥 found ${n} ${n === 1 ? "person" : "people"}` : `🤷 nobody matched`,
+        details: names || undefined,
+      };
     }
     default:
       return { label: `✅ ${name} done` };
