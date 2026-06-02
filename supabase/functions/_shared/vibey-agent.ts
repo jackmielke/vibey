@@ -439,7 +439,7 @@ export const TOOLS = [
     function: {
       name: "search_people",
       description:
-        "Search the community member directory (Vibey community + Edge Esmeralda + Vibe Code Residency) by name, bio, headline, intentions, or interests/skills. Use this WHENEVER the user asks 'who should I meet', 'who in the community is into X', 'find me someone working on Y', 'is there anyone here doing Z', or wants intros / matchmaking. Returns up to `limit` people with name, telegram_username, headline, bio, intentions, interests_skills, avatar_url. Quietly skips profiles with no bio so you don't recommend ghosts. After getting results, pick the 2-4 best matches and briefly say WHY each one matches what the user asked for. Include their @telegram_username so the user can DM them.",
+        "Search the community member directory (Vibey community + Edge Esmeralda + Vibe Code Residency) by name, bio, headline, intentions, or interests/skills. THIS is the right tool for any question about PEOPLE — 'who should I meet', 'who in the community is into X', 'find me someone working on Y', 'is there anyone here doing Z', matchmaking, intros, finding collaborators. Do NOT call list_edge_events for people questions — events are about what's happening, this tool is about WHO is here. Returns up to `limit` people with name, telegram_username, headline, bio, intentions, interests_skills, avatar_url. Quietly skips profiles with no bio so you don't recommend ghosts. After getting results, pick the 2-4 best matches and briefly say WHY each one matches what the user asked for. Include their @telegram_username so the user can DM them.",
       parameters: {
         type: "object",
         properties: {
