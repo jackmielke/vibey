@@ -2116,6 +2116,11 @@ async function executeToolCall(
       return await rsvpEdgeEvent(parsed as { event_id: string; occurrence_start?: string; cancel?: boolean });
     case "join_vibe_residency":
       return await joinVibeResidency(supabase, metadata, callerVibeUserId);
+    case "search_people":
+      return await searchPeople(
+        supabase,
+        parsed as { query?: string; limit?: number; include_empty_bios?: boolean },
+      );
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
