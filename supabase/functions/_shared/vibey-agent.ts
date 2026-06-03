@@ -1990,7 +1990,7 @@ async function searchPeople(
   supabase: SupabaseClient,
   args: { query?: string; limit?: number; include_empty_bios?: boolean },
 ): Promise<string> {
-  const limit = Math.min(Math.max(args.limit ?? 8, 1), 20);
+  const limit = Math.min(Math.max(args.limit ?? 1000, 1), 1000);
   const q = (args.query ?? "").trim();
   const includeEmpty = args.include_empty_bios === true;
 
