@@ -2155,6 +2155,11 @@ async function executeToolCall(
         supabase,
         parsed as { query?: string; limit?: number; include_empty_bios?: boolean },
       );
+    case "list_workshops":
+      return await listWorkshops(
+        supabase,
+        parsed as { week?: number; include_surveys?: boolean; attendee_limit?: number },
+      );
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
