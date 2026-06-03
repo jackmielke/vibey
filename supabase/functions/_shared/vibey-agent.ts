@@ -462,6 +462,22 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "list_workshops",
+      description:
+        "List the Local Business AI Series workshops with registrants and (optionally) intake survey responses. Use this for ANY question about the workshop series, workshop attendees, who's registered for which week, business owners signing up, or the intake surveys (e.g. 'who's coming to week 3?', 'how many people registered?', 'show me the surveys', 'is Gillian registered?'). Returns each workshop (week, title, date, capacity, registered_count, seats_left), the registrant list (name, email, business, workshop_weeks, status), and recent survey_responses (business_name, contact, payload).",
+      parameters: {
+        type: "object",
+        properties: {
+          week: { type: "integer", description: "Optional — only return this workshop week (1-5)." },
+          include_surveys: { type: "boolean", description: "Include intake survey_responses. Default true." },
+          attendee_limit: { type: "integer", description: "Max registrants per workshop (1-200). Default 100.", minimum: 1, maximum: 200 },
+        },
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
@@ -733,6 +749,9 @@ export async function loadEnabledToolNames(
   }
   if (!rows.some((r) => r.name === "search_people")) {
     enabled.add("search_people");
+  }
+  if (!rows.some((r) => r.name === "list_workshops")) {
+    enabled.add("list_workshops");
   }
 
 
@@ -2014,6 +2033,87 @@ async function searchPeople(
   });
 }
 
+async function listWorkshops(
+  supabase: SupabaseClient,
+  args: { week?: number; include_surveys?: boolean; attendee_limit?: number },
+): Promise<string> {
+  const includeSurveys = args.include_surveys !== false;
+  const attendeeLimit = Math.min(Math.max(args.attendee_limit ?? 100, 1), 200);
+
+  let wsQuery = supabase
+    .from("workshops")
+    .select("week, slug, title, subtitle, date_label, starts_at, tool, capacity, sort_order, is_published")
+    .eq("is_published", true)
+    .order("sort_order", { ascending: true });
+  if (typeof args.week === "number") wsQuery = wsQuery.eq("week", args.week);
+  const { data: workshops, error: wsErr } = await wsQuery;
+  if (wsErr) return JSON.stringify({ ok: false, error: `workshops query failed: ${wsErr.message}` });
+
+  // Pull all workshop inquiries (registrations come from the inquiries table, source='workshop').
+  let inqQuery = supabase
+    .from("inquiries")
+    .select("id, name, email, phone, business, workshop_weeks, status, sms_opt_in, message, created_at, notes")
+    .eq("source", "workshop")
+    .order("created_at", { ascending: false })
+    .limit(500);
+  const { data: inquiries, error: inqErr } = await inqQuery;
+  if (inqErr) return JSON.stringify({ ok: false, error: `inquiries query failed: ${inqErr.message}` });
+
+  const allInquiries = (inquiries ?? []) as Array<{
+    id: string; name: string; email: string; phone: string | null; business: string | null;
+    workshop_weeks: number[] | null; status: string; sms_opt_in: boolean | null;
+    message: string | null; created_at: string; notes: string | null;
+  }>;
+
+  const withWorkshops = (workshops ?? []).map((w: any) => {
+    const registrants = allInquiries.filter((i) =>
+      Array.isArray(i.workshop_weeks) && i.workshop_weeks.includes(w.week),
+    );
+    const registered = registrants.filter((r) => r.status === "registered");
+    return {
+      week: w.week,
+      slug: w.slug,
+      title: w.title,
+      subtitle: w.subtitle,
+      date_label: w.date_label,
+      starts_at: w.starts_at,
+      tool: w.tool,
+      capacity: w.capacity,
+      registered_count: registered.length,
+      seats_left: Math.max((w.capacity ?? 0) - registered.length, 0),
+      registrants: registrants.slice(0, attendeeLimit).map((r) => ({
+        name: r.name,
+        email: r.email,
+        business: r.business,
+        workshop_weeks: r.workshop_weeks,
+        status: r.status,
+        sms_opt_in: r.sms_opt_in,
+        signed_up_at: r.created_at,
+      })),
+    };
+  });
+
+  let surveys: any[] = [];
+  if (includeSurveys) {
+    const { data: surveyRows, error: sErr } = await supabase
+      .from("survey_responses")
+      .select("id, business_name, contact_name, contact_email, payload, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (!sErr) surveys = surveyRows ?? [];
+  }
+
+  return JSON.stringify({
+    ok: true,
+    workshops_count: withWorkshops.length,
+    total_registrants: allInquiries.length,
+    total_registered: allInquiries.filter((i) => i.status === "registered").length,
+    workshops: withWorkshops,
+    surveys_count: surveys.length,
+    surveys,
+  });
+}
+
 const ADMIN_TOOL_NAMES = new Set(ADMIN_TOOLS.map((t) => t.function.name));
 
 async function executeToolCall(
@@ -2135,6 +2235,11 @@ async function executeToolCall(
       return await searchPeople(
         supabase,
         parsed as { query?: string; limit?: number; include_empty_bios?: boolean },
+      );
+    case "list_workshops":
+      return await listWorkshops(
+        supabase,
+        parsed as { week?: number; include_surveys?: boolean; attendee_limit?: number },
       );
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
@@ -3241,6 +3346,10 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       const q = String(args?.query ?? "").trim();
       return q ? `👥 scanning bios for "${q.slice(0, 60)}"…` : "👥 browsing the community directory…";
     }
+    case "list_workshops": {
+      const w = args?.week;
+      return w ? `🛠️ checking workshop week ${w}…` : "🛠️ pulling the Local Business AI Series roster…";
+    }
     default:
       return `⚙️ running ${name}…`;
   }
@@ -3371,6 +3480,16 @@ export function describeToolDone(
       return {
         label: n > 0 ? `👥 found ${n} ${n === 1 ? "person" : "people"}` : `🤷 nobody matched`,
         details: names || undefined,
+      };
+    }
+    case "list_workshops": {
+      if (result?.ok === false) return { label: `🚫 workshops lookup failed`, details: result?.error };
+      const ws = Number(result?.workshops_count ?? 0);
+      const regs = Number(result?.total_registered ?? 0);
+      const surveys = Number(result?.surveys_count ?? 0);
+      return {
+        label: `🛠️ ${ws} workshop${ws === 1 ? "" : "s"} · ${regs} registered`,
+        details: surveys ? `${surveys} survey response${surveys === 1 ? "" : "s"}` : undefined,
       };
     }
     default:

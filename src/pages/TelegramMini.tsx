@@ -24,6 +24,7 @@ import {
   ImagePlus,
   Camera,
   MessagesSquare,
+  GraduationCap,
 } from "lucide-react";
 import { ConversationsSection } from "@/components/sections/ConversationsSection";
 import { EventEditModal, type EventEditRow } from "@/components/EventEditModal";
@@ -842,8 +843,19 @@ export default function TelegramMini() {
   const [adminLoading, setAdminLoading] = useState(false);
 
   // Tabs
-  type Tab = "memories" | "profiles" | "preferences" | "events" | "soul" | "chats";
+  type Tab = "memories" | "profiles" | "preferences" | "events" | "workshops" | "soul" | "chats";
   const [tab, setTab] = useState<Tab>("memories");
+
+  // Workshops (admin only — Local Business AI Series)
+  type WorkshopRow = { week: number; slug: string; title: string; subtitle: string | null; date_label: string | null; starts_at: string | null; tool: string | null; capacity: number; sort_order: number };
+  type WorkshopInquiry = { id: string; name: string; email: string; phone: string | null; business: string | null; workshop_weeks: number[] | null; status: string; sms_opt_in: boolean | null; message: string | null; created_at: string; notes: string | null };
+  type SurveyRow = { id: string; business_name: string | null; contact_name: string | null; contact_email: string | null; payload: Record<string, unknown> | null; created_at: string };
+  const [workshops, setWorkshops] = useState<WorkshopRow[]>([]);
+  const [workshopInquiries, setWorkshopInquiries] = useState<WorkshopInquiry[]>([]);
+  const [workshopSurveys, setWorkshopSurveys] = useState<SurveyRow[]>([]);
+  const [workshopsLoading, setWorkshopsLoading] = useState(false);
+  const [workshopsError, setWorkshopsError] = useState<string | null>(null);
+  const [workshopsLoaded, setWorkshopsLoaded] = useState(false);
 
   // Profiles directory
   type DirectoryEntry = {
@@ -1197,6 +1209,35 @@ export default function TelegramMini() {
     };
   }, [authState]);
 
+  // 2b. Workshops data (admin only, lazy-load when tab opens)
+  useEffect(() => {
+    if (tab !== "workshops" || !isAdmin || workshopsLoaded || workshopsLoading) return;
+    const tg = window.Telegram?.WebApp;
+    const initData = tg?.initData;
+    if (!initData) {
+      setWorkshopsError("Open this in Telegram to view workshop data.");
+      return;
+    }
+    setWorkshopsLoading(true);
+    setWorkshopsError(null);
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("workshops-data", { body: { initData } });
+        if (error) throw error;
+        if (data?.ok === false || data?.error) throw new Error(data?.error ?? "failed");
+        setWorkshops((data?.workshops ?? []) as WorkshopRow[]);
+        setWorkshopInquiries((data?.inquiries ?? []) as WorkshopInquiry[]);
+        setWorkshopSurveys((data?.surveys ?? []) as SurveyRow[]);
+        setWorkshopsLoaded(true);
+      } catch (e: any) {
+        setWorkshopsError(e?.message ?? "failed to load workshops");
+      } finally {
+        setWorkshopsLoading(false);
+      }
+    })();
+  }, [tab, isAdmin, workshopsLoaded, workshopsLoading]);
+
+
   // 3. Personal preferences
   useEffect(() => {
     if (authState !== "ready" || !tgUserId) {
@@ -1544,6 +1585,7 @@ export default function TelegramMini() {
     { id: "profiles", label: "people", icon: UsersIcon },
     { id: "preferences", label: "you", icon: Heart },
     { id: "events", label: "events", icon: Calendar },
+    ...(isAdmin ? [{ id: "workshops" as Tab, label: "workshops", icon: GraduationCap }] : []),
     ...(isAdmin ? [{ id: "chats" as Tab, label: "chats", icon: MessagesSquare }] : []),
     { id: "soul", label: "soul", icon: Sparkles },
   ];
@@ -2262,6 +2304,109 @@ export default function TelegramMini() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ===== WORKSHOPS TAB (admin only) — Local Business AI Series ===== */}
+        {tab === "workshops" && isAdmin && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
+                <GraduationCap className="w-3 h-3" />
+                Local Business AI Series · {workshops.length} workshops · {workshopInquiries.filter(i => i.status === "registered").length} registered
+              </h2>
+              {workshopsLoaded && (
+                <button
+                  onClick={() => { setWorkshopsLoaded(false); }}
+                  className="px-2 py-1 rounded font-mono text-[10px] uppercase tracking-widest border border-border text-muted-foreground hover:text-primary hover:border-primary/40"
+                >
+                  refresh
+                </button>
+              )}
+            </div>
+
+            {workshopsLoading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-4">
+                <Loader2 className="w-3 h-3 animate-spin" /> loading workshops…
+              </div>
+            )}
+            {workshopsError && (
+              <p className="text-xs text-destructive py-2">{workshopsError}</p>
+            )}
+
+            {!workshopsLoading && !workshopsError && workshops.map((w) => {
+              const regs = workshopInquiries.filter((i) =>
+                Array.isArray(i.workshop_weeks) && i.workshop_weeks.includes(w.week),
+              );
+              const registered = regs.filter((r) => r.status === "registered");
+              const seatsLeft = Math.max((w.capacity ?? 0) - registered.length, 0);
+              return (
+                <div key={w.week} className="p-3 rounded-lg bg-card border border-border space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                        week {w.week} {w.tool ? `· ${w.tool}` : ""}
+                      </p>
+                      <p className="text-sm font-semibold leading-tight">{w.title}</p>
+                      {w.date_label && (
+                        <p className="text-xs text-muted-foreground">{w.date_label}</p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-primary">
+                        {registered.length}/{w.capacity}
+                      </p>
+                      <p className="font-mono text-[10px] text-muted-foreground">{seatsLeft} seats left</p>
+                    </div>
+                  </div>
+                  {regs.length > 0 && (
+                    <ul className="space-y-1 pt-1 border-t border-border/60">
+                      {regs.map((r) => (
+                        <li key={r.id + "-" + w.week} className="text-xs flex items-center justify-between gap-2">
+                          <span className="truncate">
+                            <span className="font-medium">{r.name}</span>
+                            {r.business ? <span className="text-muted-foreground"> · {r.business}</span> : null}
+                          </span>
+                          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground shrink-0">
+                            {r.status}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+
+            {!workshopsLoading && !workshopsError && workshopSurveys.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <h3 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <MessageSquare className="w-3 h-3" /> intake surveys · {workshopSurveys.length}
+                </h3>
+                {workshopSurveys.map((s) => (
+                  <div key={s.id} className="p-3 rounded-lg bg-card border border-border space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold leading-tight truncate">
+                        {s.business_name || s.contact_name || "Survey response"}
+                      </p>
+                      <p className="font-mono text-[10px] text-muted-foreground shrink-0">
+                        {format(new Date(s.created_at), "MMM d")}
+                      </p>
+                    </div>
+                    {s.contact_name && (
+                      <p className="text-xs text-muted-foreground">
+                        {s.contact_name}{s.contact_email ? ` · ${s.contact_email}` : ""}
+                      </p>
+                    )}
+                    {s.payload && (
+                      <pre className="text-[10px] whitespace-pre-wrap font-mono text-foreground/80 mt-1 max-h-40 overflow-auto">
+                        {JSON.stringify(s.payload, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </section>
