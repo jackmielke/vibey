@@ -277,10 +277,9 @@ Deno.serve(async (req) => {
         })()
       : Promise.resolve([]);
 
-    // Augment system prompt with: image-handling note + recent community memories + per-user prefs + skills.
-    const [memories, events, userPrefs, skills] = await Promise.all([
-      loadRecentMemories(supabase),
-      loadUpcomingEvents(supabase),
+    // Lean hydration: soul + time + caller block + skills + tools. Memories
+    // are NOT preloaded — Vibey calls `search_memories` when a turn needs them.
+    const [userPrefs, skills] = await Promise.all([
       loadUserPreferences(supabase, {
         telegram_user_id: resolvedTgUserId,
         telegram_username: resolvedTgUsername,
@@ -289,12 +288,16 @@ Deno.serve(async (req) => {
     ]);
     const baseSystemPrompt =
       `${agent.system_prompt}\n\nNote: when the user asks to see photos/images, the app will attach matching gallery images below your reply automatically. Just speak naturally about them — do NOT paste image URLs or markdown image syntax.`;
+    const isAdmin = isAdminTelegramUser(resolvedTgUserId);
     const userContext = buildUserContextBlock(userPrefs, {
       display_name: resolvedDisplayName,
       telegram_username: resolvedTgUsername,
+      telegram_user_id: resolvedTgUserId,
+      surface: context?.surface ?? "web",
+      is_admin: isAdmin,
+      vibe_user_id: vibeUserId,
     });
-    const isAdmin = isAdminTelegramUser(resolvedTgUserId);
-    const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, memories, vibeUserId, isAdmin)}${buildEventsBlock(events)}\n\n${userContext}${buildSkillsBlock(skills)}`;
+    const systemPrompt = `${buildSystemPromptWithMemories(baseSystemPrompt, [], vibeUserId, isAdmin)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
     // Split incoming messages into prior history + the current user turn so the
     // agent loop can run tool iterations before streaming the final reply.

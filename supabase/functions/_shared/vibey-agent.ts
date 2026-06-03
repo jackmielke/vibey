@@ -214,6 +214,30 @@ export const TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "search_memories",
+      description:
+        "Search Vibey's long-term memory store for relevant community memories. Call this BEFORE answering any question about community norms, recurring events, people, projects, preferences, or 'do you remember…' — memories are no longer eagerly loaded into your context, so you must look them up yourself. Cheap keyword search over title/content/tags. Returns up to `limit` memories with id, owner, title, content, tags, created_at, and a `mine` flag (true if the current caller created it; you can only update those via update_memory).",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "Optional keyword(s) to match against memory title, content, or tags. Omit to get the most recent memories.",
+          },
+          limit: {
+            type: "integer",
+            description: "How many memories to return (1-25). Default 10.",
+            minimum: 1,
+            maximum: 25,
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "web_search",
       description:
         "Search the live web (via Firecrawl) for current information. Use when the user asks about recent events, news, prices, dates, or anything you can't answer from memory or the community context. Returns up to 10 result snippets with URLs. Follow up with fetch_url if you need full content from a specific page.",
@@ -930,6 +954,46 @@ async function updateMemory(
     before: { content: existing.content, tags: existing.tags },
     after: { content, tags },
   };
+}
+
+async function searchMemories(
+  supabase: SupabaseClient,
+  args: { query?: string; limit?: number },
+  callerVibeUserId: string | null
+): Promise<string> {
+  const q = (args?.query ?? "").trim();
+  const limit = Math.max(1, Math.min(25, Number(args?.limit) || 10));
+
+  let qb = supabase
+    .from("memories")
+    .select("id, title, content, tags, created_at, created_by")
+    .eq("community_id", VIBEY_COMMUNITY_ID)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (q) {
+    const safe = q.replace(/[%,()]/g, "");
+    qb = qb.or(
+      `title.ilike.%${safe}%,content.ilike.%${safe}%,tags.cs.{${safe.toLowerCase()}}`
+    );
+  }
+
+  const { data, error } = await qb;
+  if (error) {
+    console.error("search_memories failed:", error.message);
+    return JSON.stringify({ ok: false, error: error.message });
+  }
+
+  const memories = (data ?? []).map((m) => ({
+    id: m.id,
+    owner: m.created_by,
+    mine: callerVibeUserId ? m.created_by === callerVibeUserId : false,
+    title: m.title,
+    content: m.content,
+    tags: m.tags,
+    created_at: m.created_at,
+  }));
+  return JSON.stringify({ ok: true, count: memories.length, query: q || null, memories });
 }
 
 // ── Web tools ────────────────────────────────────────────────────────────────
@@ -2153,6 +2217,12 @@ async function executeToolCall(
       );
       return JSON.stringify(result);
     }
+    case "search_memories":
+      return await searchMemories(
+        supabase,
+        parsed as { query?: string; limit?: number },
+        callerVibeUserId
+      );
     case "web_search":
       return await webSearchFirecrawl(parsed as { query: string; count?: number });
     case "fetch_url":
@@ -2776,19 +2846,11 @@ export function buildSystemPromptWithMemories(
     `When you say "today" / "tomorrow" / "this weekend", anchor to ${weekday} ${isoPT}. ` +
     `If you're tempted to name a different weekday for this date, you are wrong — trust this line.\n\n`;
 
-  const memoryBlock =
-    memories.length === 0
-      ? "(none yet — feel free to call save_memory when something durable is worth remembering)"
-      : memories
-          .map((m, i) => {
-            const tags = m.tags && m.tags.length ? ` [${m.tags.join(", ")}]` : "";
-            const owner = m.created_by ?? "unknown";
-            const mine =
-              callerVibeUserId && m.created_by === callerVibeUserId ? " (yours)" : "";
-            const title = m.title ? `**${m.title}** — ` : "";
-            return `${i + 1}. id=${m.id} owner=${owner}${mine} — ${title}${m.content}${tags}`;
-          })
-          .join("\n");
+  // Memories are NOT eagerly loaded anymore. Vibey calls `search_memories`
+  // when a turn actually needs community memory. Keeps the system prompt
+  // small, fast, and focused.
+  const _memoriesEager = memories; // intentionally unused — kept for backwards compat
+  void _memoriesEager;
 
   const callerLine = callerVibeUserId
     ? `\nCurrent caller's vibe user id: ${callerVibeUserId}. You may update only memories where owner matches this id.`
@@ -2799,6 +2861,12 @@ export function buildSystemPromptWithMemories(
 
 You have access to these tools:
 
+- **search_memories(query?, limit?)** — look up community memories. Memories are NOT preloaded
+  into your prompt anymore — you MUST call this any time the user asks about community norms,
+  recurring events, people, projects, "do you remember…", or anything where past Vibey context
+  would help. Cheap keyword search; returns id, owner, content, tags, and a \`mine\` flag.
+  Call with no query to get the most recent memories.
+
 - **save_memory(content, tags?)** — store a durable fact about the community for future conversations.
   Call it ONLY when the user shares something genuinely worth remembering long-term:
   community norms, recurring events, important projects/people, stated preferences.
@@ -2806,9 +2874,9 @@ You have access to these tools:
   Tags should be 1-4 short lowercase keywords.
 
 - **update_memory(id, content, tags?)** — edit an existing memory.
-  Pass the memory's UUID (shown as id=… in the list below) and the FULL new content.
-  You can ONLY update memories where the owner matches the current caller's vibe user id
-  (marked "(yours)" in the list). For anyone else's memory, refuse politely instead of calling.
+  First call \`search_memories\` to find the memory's UUID, then pass the FULL new content.
+  You can ONLY update memories where \`mine\` is true (the current caller created it).
+  For anyone else's memory, refuse politely instead of calling.
 
 - **web_search(query, count?)** — search the live web (Firecrawl) for current info.
   Use for recent events, news, prices, dates, public facts you can't answer from memory.
@@ -2867,10 +2935,6 @@ links like [Edge Esmeralda](https://edgeesmeralda.com) — never bare domain nam
 ("according to nytimes.com") and never bare URLs. Every external source you mention
 should be a [label](url) link so the user can tap through.
 ${callerLine}
-
-## Recent community memories (top ${memories.length})
-
-${memoryBlock}
 `.trim();
 
   const adminBlock = isAdmin
@@ -3077,15 +3141,27 @@ export async function loadUserPreferences(
 
 export function buildUserContextBlock(
   prefs: UserPrefs | null,
-  fallback: { display_name?: string | null; telegram_username?: string | null }
+  fallback: {
+    display_name?: string | null;
+    telegram_username?: string | null;
+    telegram_user_id?: number | null;
+    surface?: string | null;
+    is_admin?: boolean;
+    vibe_user_id?: string | null;
+  }
 ): string {
   const name = prefs?.display_name || fallback.display_name || fallback.telegram_username || "this person";
   const handle = prefs?.telegram_username || fallback.telegram_username;
+  const tgId = prefs?.telegram_user_id ?? fallback.telegram_user_id ?? null;
   const notes = prefs?.relationship_notes?.trim();
 
   const lines: string[] = [];
   lines.push(`## Who you're talking to right now`);
   lines.push(`- Name: ${name}${handle ? ` (@${handle})` : ""}`);
+  if (tgId) lines.push(`- Telegram user id: ${tgId}`);
+  if (fallback.vibe_user_id) lines.push(`- Vibe user id: ${fallback.vibe_user_id}`);
+  if (fallback.surface) lines.push(`- Surface: ${fallback.surface} (adapt formatting accordingly — Telegram supports markdown; voice/robot should be plain spoken text)`);
+  if (fallback.is_admin) lines.push(`- Admin: yes (you may use admin_* tools)`);
   if (prefs?.interaction_count) {
     lines.push(`- Past interactions with you: ${prefs.interaction_count}`);
   }
@@ -3317,6 +3393,10 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       return "🧠 jotting this one down…";
     case "update_memory":
       return "✏️ rewriting that memory…";
+    case "search_memories": {
+      const q = String(args?.query ?? "").trim();
+      return q ? `🧠 searching memories for "${q.slice(0, 60)}"…` : "🧠 flipping through memories…";
+    }
     case "get_vibe_price": {
       const usd = args?.usd, vibe = args?.vibe;
       if (typeof usd === "number") return `🪙 checking VIBE for $${usd}…`;
@@ -3405,6 +3485,11 @@ export function describeToolDone(
         label: `📝 memory updated`,
         details: `before: ${before}\nafter:  ${after}`,
       };
+    }
+    case "search_memories": {
+      if (result?.ok === false) return { label: `🤷 memory search failed`, details: result?.error };
+      const n = Number(result?.count ?? 0);
+      return { label: n > 0 ? `🧠 found ${n} memor${n === 1 ? "y" : "ies"}` : `🪨 no matching memories` };
     }
     case "get_vibe_price": {
       if (result?.ok === false) return { label: `🥲 couldn't fetch VIBE price`, details: result?.error };
