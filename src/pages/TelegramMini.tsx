@@ -843,8 +843,19 @@ export default function TelegramMini() {
   const [adminLoading, setAdminLoading] = useState(false);
 
   // Tabs
-  type Tab = "memories" | "profiles" | "preferences" | "events" | "soul" | "chats";
+  type Tab = "memories" | "profiles" | "preferences" | "events" | "workshops" | "soul" | "chats";
   const [tab, setTab] = useState<Tab>("memories");
+
+  // Workshops (admin only — Local Business AI Series)
+  type WorkshopRow = { week: number; slug: string; title: string; subtitle: string | null; date_label: string | null; starts_at: string | null; tool: string | null; capacity: number; sort_order: number };
+  type WorkshopInquiry = { id: string; name: string; email: string; phone: string | null; business: string | null; workshop_weeks: number[] | null; status: string; sms_opt_in: boolean | null; message: string | null; created_at: string; notes: string | null };
+  type SurveyRow = { id: string; business_name: string | null; contact_name: string | null; contact_email: string | null; payload: Record<string, unknown> | null; created_at: string };
+  const [workshops, setWorkshops] = useState<WorkshopRow[]>([]);
+  const [workshopInquiries, setWorkshopInquiries] = useState<WorkshopInquiry[]>([]);
+  const [workshopSurveys, setWorkshopSurveys] = useState<SurveyRow[]>([]);
+  const [workshopsLoading, setWorkshopsLoading] = useState(false);
+  const [workshopsError, setWorkshopsError] = useState<string | null>(null);
+  const [workshopsLoaded, setWorkshopsLoaded] = useState(false);
 
   // Profiles directory
   type DirectoryEntry = {
