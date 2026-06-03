@@ -195,20 +195,36 @@ function renderWithLinks(text: string) {
   });
 }
 
+type MemoryAuthor = {
+  name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+};
+
+function authorInitials(a: MemoryAuthor | null): string {
+  const src = a?.name || a?.username || "";
+  if (!src) return "V";
+  const parts = src.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || src[0]!.toUpperCase();
+}
+
 function MemoryCard({
   m,
-  highlight,
-  adminMode,
+  author,
+  isMine,
+  canEdit,
   onEdit,
   onDelete,
 }: {
   m: MemoryRow;
-  highlight?: boolean;
-  adminMode?: boolean;
+  author?: MemoryAuthor | null;
+  isMine?: boolean;
+  canEdit?: boolean;
   onEdit?: (m: MemoryRow) => void;
   onDelete?: (m: MemoryRow) => void;
 }) {
   const source = memorySource(m.metadata);
+  const displayName = author?.name || (author?.username ? `@${author.username}` : "vibey");
   return (
     <motion.div
       layout
@@ -216,73 +232,93 @@ function MemoryCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
       className={
-        "p-3 rounded-lg bg-card border overflow-hidden " +
-        (highlight ? "border-primary/40" : "border-border")
+        "p-3 rounded-lg bg-card overflow-hidden " +
+        (isMine
+          ? "border-2 border-dashed border-primary/70 shadow-[0_0_0_3px_hsl(var(--primary)/0.08)]"
+          : "border border-border")
       }
     >
-      <div className="flex items-start justify-between gap-2 min-w-0">
+      <div className="flex items-start gap-3 min-w-0">
+        <Avatar className="w-9 h-9 shrink-0 ring-1 ring-border">
+          {author?.avatar_url ? (
+            <AvatarImage src={author.avatar_url} alt={displayName} />
+          ) : null}
+          <AvatarFallback className="text-[10px] font-mono bg-muted">
+            {authorInitials(author ?? null)}
+          </AvatarFallback>
+        </Avatar>
         <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
+              <span className="text-xs font-semibold truncate">{displayName}</span>
+              {isMine && (
+                <span className="text-[9px] font-mono uppercase tracking-widest text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/30">
+                  you
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {canEdit && onEdit && (
+                <button
+                  onClick={() => onEdit(m)}
+                  className="text-muted-foreground hover:text-primary p-1"
+                  aria-label="Edit memory"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
+              {canEdit && onDelete && (
+                <button
+                  onClick={() => onDelete(m)}
+                  className="text-muted-foreground hover:text-destructive p-1"
+                  aria-label="Delete memory"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <a
+                href={buildTelegramShareUrl(formatMemoryForTelegram(m))}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-primary p-1"
+                aria-label="Share to Telegram"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
           {m.title && (
-            <p className="text-sm font-semibold mb-1 break-words [overflow-wrap:anywhere]">
+            <p className="text-sm font-semibold mt-1 break-words [overflow-wrap:anywhere]">
               {m.title}
             </p>
           )}
-          <p className="text-sm whitespace-pre-wrap [overflow-wrap:anywhere] text-muted-foreground">
+          <p className="text-sm whitespace-pre-wrap [overflow-wrap:anywhere] mt-1 text-muted-foreground">
             {m.content ? renderWithLinks(m.content) : null}
           </p>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {adminMode && onEdit && (
-            <button
-              onClick={() => onEdit(m)}
-              className="text-muted-foreground hover:text-primary p-1"
-              aria-label="Edit memory"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {adminMode && onDelete && (
-            <button
-              onClick={() => onDelete(m)}
-              className="text-muted-foreground hover:text-destructive p-1"
-              aria-label="Delete memory"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-          <a
-            href={buildTelegramShareUrl(formatMemoryForTelegram(m))}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-primary p-1"
-            aria-label="Share to Telegram"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-          </a>
-        </div>
-      </div>
-      <div className="flex items-center gap-3 mt-2 flex-wrap">
-        <span className="text-[10px] text-muted-foreground font-mono">
-          {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
-        </span>
-        {source && (
-          <span className="text-[10px] text-muted-foreground font-mono">
-            via {source}
-          </span>
-        )}
-        {m.tags && m.tags.length > 0 && (
-          <div className="flex items-center gap-1 flex-wrap">
-            <Tag className="w-3 h-3 text-muted-foreground" />
-            {m.tags.map((t) => (
-              <span
-                key={t}
-                className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary"
-              >
-                {t}
+          <div className="flex items-center gap-3 mt-2 flex-wrap">
+            <span className="text-[10px] text-muted-foreground font-mono">
+              {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
+            </span>
+            {source && !author?.username && (
+              <span className="text-[10px] text-muted-foreground font-mono">
+                via {source}
               </span>
-            ))}
+            )}
+            {m.tags && m.tags.length > 0 && (
+              <div className="flex items-center gap-1 flex-wrap">
+                <Tag className="w-3 h-3 text-muted-foreground" />
+                {m.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </motion.div>
   );
@@ -770,6 +806,7 @@ export default function TelegramMini() {
   const [tgUserId, setTgUserId] = useState<number | null>(null);
 
   const [memories, setMemories] = useState<MemoryRow[]>([]);
+  const [memoryAuthors, setMemoryAuthors] = useState<Record<string, MemoryAuthor>>({});
   const [memLoading, setMemLoading] = useState(true);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -1080,6 +1117,57 @@ export default function TelegramMini() {
       supabase.removeChannel(channel);
     };
   }, [authState]);
+
+  // 2b. Resolve memory authors (by telegram_user_id / telegram_username)
+  useEffect(() => {
+    if (!memories.length) return;
+    const tgIds = new Set<number>();
+    const tgUsernames = new Set<string>();
+    for (const m of memories) {
+      const meta = (m.metadata ?? {}) as Record<string, unknown>;
+      const tid = meta.telegram_user_id;
+      const tuser = meta.telegram_username;
+      const tidKey = typeof tid === "number" ? `tgid:${tid}` : null;
+      const tuKey = typeof tuser === "string" && tuser ? `tguser:${tuser.toLowerCase()}` : null;
+      if (typeof tid === "number" && !memoryAuthors[tidKey!]) tgIds.add(tid);
+      if (typeof tuser === "string" && tuser && !memoryAuthors[tuKey!]) tgUsernames.add(tuser.toLowerCase());
+    }
+    if (!tgIds.size && !tgUsernames.size) return;
+    let cancelled = false;
+    (async () => {
+      const cols = "id, name, username, telegram_username, telegram_user_id, telegram_photo_url, avatar_url, profile_picture_url";
+      const next: Record<string, MemoryAuthor> = {};
+      const toInfo = (row: Record<string, unknown>): MemoryAuthor => ({
+        name: (row.name as string) ?? null,
+        username: (row.telegram_username as string) ?? (row.username as string) ?? null,
+        avatar_url:
+          (row.telegram_photo_url as string) ??
+          (row.profile_picture_url as string) ??
+          (row.avatar_url as string) ??
+          null,
+      });
+      if (tgIds.size) {
+        const { data } = await supabase.from("users").select(cols).in("telegram_user_id", Array.from(tgIds));
+        for (const row of (data ?? []) as Record<string, unknown>[]) {
+          next[`tgid:${row.telegram_user_id}`] = toInfo(row);
+        }
+      }
+      if (tgUsernames.size) {
+        const { data } = await supabase.from("users").select(cols).in("telegram_username", Array.from(tgUsernames));
+        for (const row of (data ?? []) as Record<string, unknown>[]) {
+          const tu = row.telegram_username as string | null;
+          if (tu) next[`tguser:${tu.toLowerCase()}`] = toInfo(row);
+        }
+      }
+      if (!cancelled && Object.keys(next).length) {
+        setMemoryAuthors((prev) => ({ ...prev, ...next }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memories]);
 
   // 3. Events
   useEffect(() => {
@@ -1399,6 +1487,17 @@ export default function TelegramMini() {
     tgUserId != null &&
     Number((m.metadata as Record<string, unknown> | null)?.telegram_user_id) === tgUserId;
 
+  const authorFor = (m: MemoryRow): MemoryAuthor | null => {
+    const meta = (m.metadata ?? {}) as Record<string, unknown>;
+    const tid = meta.telegram_user_id;
+    const tuser = meta.telegram_username;
+    if (typeof tid === "number" && memoryAuthors[`tgid:${tid}`]) return memoryAuthors[`tgid:${tid}`];
+    if (typeof tuser === "string" && memoryAuthors[`tguser:${tuser.toLowerCase()}`])
+      return memoryAuthors[`tguser:${tuser.toLowerCase()}`];
+    if (typeof tuser === "string" && tuser) return { name: null, username: tuser, avatar_url: null };
+    return null;
+  };
+
   const filteredMemories = useMemo(() => {
     if (memFilter === "mine") return memories.filter(isMine);
     if (memFilter === "others") return memories.filter((m) => !isMine(m));
@@ -1612,15 +1711,20 @@ export default function TelegramMini() {
               </div>
             ) : adminMode ? (
               <AnimatePresence initial={false}>
-                {memories.map((m) => (
-                  <MemoryCard
-                    key={m.id}
-                    m={m}
-                    adminMode
-                    onEdit={setEditingMemory}
-                    onDelete={deleteMemory}
-                  />
-                ))}
+                {memories.map((m) => {
+                  const mine = isMine(m);
+                  return (
+                    <MemoryCard
+                      key={m.id}
+                      m={m}
+                      author={authorFor(m)}
+                      isMine={mine}
+                      canEdit
+                      onEdit={setEditingMemory}
+                      onDelete={deleteMemory}
+                    />
+                  );
+                })}
               </AnimatePresence>
             ) : (
               <>
@@ -1656,9 +1760,20 @@ export default function TelegramMini() {
                   </p>
                 ) : (
                   <AnimatePresence initial={false}>
-                    {filteredMemories.map((m) => (
-                      <MemoryCard key={m.id} m={m} highlight={isMine(m)} />
-                    ))}
+                    {filteredMemories.map((m) => {
+                      const mine = isMine(m);
+                      return (
+                        <MemoryCard
+                          key={m.id}
+                          m={m}
+                          author={authorFor(m)}
+                          isMine={mine}
+                          canEdit={mine}
+                          onEdit={setEditingMemory}
+                          onDelete={deleteMemory}
+                        />
+                      );
+                    })}
                   </AnimatePresence>
                 )}
               </>
