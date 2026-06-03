@@ -2309,6 +2309,109 @@ export default function TelegramMini() {
           </section>
         )}
 
+        {/* ===== WORKSHOPS TAB (admin only) — Local Business AI Series ===== */}
+        {tab === "workshops" && isAdmin && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary flex items-center gap-1.5">
+                <GraduationCap className="w-3 h-3" />
+                Local Business AI Series · {workshops.length} workshops · {workshopInquiries.filter(i => i.status === "registered").length} registered
+              </h2>
+              {workshopsLoaded && (
+                <button
+                  onClick={() => { setWorkshopsLoaded(false); }}
+                  className="px-2 py-1 rounded font-mono text-[10px] uppercase tracking-widest border border-border text-muted-foreground hover:text-primary hover:border-primary/40"
+                >
+                  refresh
+                </button>
+              )}
+            </div>
+
+            {workshopsLoading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-4">
+                <Loader2 className="w-3 h-3 animate-spin" /> loading workshops…
+              </div>
+            )}
+            {workshopsError && (
+              <p className="text-xs text-destructive py-2">{workshopsError}</p>
+            )}
+
+            {!workshopsLoading && !workshopsError && workshops.map((w) => {
+              const regs = workshopInquiries.filter((i) =>
+                Array.isArray(i.workshop_weeks) && i.workshop_weeks.includes(w.week),
+              );
+              const registered = regs.filter((r) => r.status === "registered");
+              const seatsLeft = Math.max((w.capacity ?? 0) - registered.length, 0);
+              return (
+                <div key={w.week} className="p-3 rounded-lg bg-card border border-border space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                        week {w.week} {w.tool ? `· ${w.tool}` : ""}
+                      </p>
+                      <p className="text-sm font-semibold leading-tight">{w.title}</p>
+                      {w.date_label && (
+                        <p className="text-xs text-muted-foreground">{w.date_label}</p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-primary">
+                        {registered.length}/{w.capacity}
+                      </p>
+                      <p className="font-mono text-[10px] text-muted-foreground">{seatsLeft} seats left</p>
+                    </div>
+                  </div>
+                  {regs.length > 0 && (
+                    <ul className="space-y-1 pt-1 border-t border-border/60">
+                      {regs.map((r) => (
+                        <li key={r.id + "-" + w.week} className="text-xs flex items-center justify-between gap-2">
+                          <span className="truncate">
+                            <span className="font-medium">{r.name}</span>
+                            {r.business ? <span className="text-muted-foreground"> · {r.business}</span> : null}
+                          </span>
+                          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground shrink-0">
+                            {r.status}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+
+            {!workshopsLoading && !workshopsError && workshopSurveys.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <h3 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <MessageSquare className="w-3 h-3" /> intake surveys · {workshopSurveys.length}
+                </h3>
+                {workshopSurveys.map((s) => (
+                  <div key={s.id} className="p-3 rounded-lg bg-card border border-border space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold leading-tight truncate">
+                        {s.business_name || s.contact_name || "Survey response"}
+                      </p>
+                      <p className="font-mono text-[10px] text-muted-foreground shrink-0">
+                        {format(new Date(s.created_at), "MMM d")}
+                      </p>
+                    </div>
+                    {s.contact_name && (
+                      <p className="text-xs text-muted-foreground">
+                        {s.contact_name}{s.contact_email ? ` · ${s.contact_email}` : ""}
+                      </p>
+                    )}
+                    {s.payload && (
+                      <pre className="text-[10px] whitespace-pre-wrap font-mono text-foreground/80 mt-1 max-h-40 overflow-auto">
+                        {JSON.stringify(s.payload, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* ===== SOUL TAB ===== */}
         {tab === "soul" && (
           <section className="space-y-2">
