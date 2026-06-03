@@ -3346,6 +3346,10 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       const q = String(args?.query ?? "").trim();
       return q ? `👥 scanning bios for "${q.slice(0, 60)}"…` : "👥 browsing the community directory…";
     }
+    case "list_workshops": {
+      const w = args?.week;
+      return w ? `🛠️ checking workshop week ${w}…` : "🛠️ pulling the Local Business AI Series roster…";
+    }
     default:
       return `⚙️ running ${name}…`;
   }
