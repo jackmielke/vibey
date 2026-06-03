@@ -1700,15 +1700,20 @@ export default function TelegramMini() {
               </div>
             ) : adminMode ? (
               <AnimatePresence initial={false}>
-                {memories.map((m) => (
-                  <MemoryCard
-                    key={m.id}
-                    m={m}
-                    adminMode
-                    onEdit={setEditingMemory}
-                    onDelete={deleteMemory}
-                  />
-                ))}
+                {memories.map((m) => {
+                  const mine = isMine(m);
+                  return (
+                    <MemoryCard
+                      key={m.id}
+                      m={m}
+                      author={authorFor(m)}
+                      isMine={mine}
+                      canEdit
+                      onEdit={setEditingMemory}
+                      onDelete={deleteMemory}
+                    />
+                  );
+                })}
               </AnimatePresence>
             ) : (
               <>
@@ -1744,9 +1749,20 @@ export default function TelegramMini() {
                   </p>
                 ) : (
                   <AnimatePresence initial={false}>
-                    {filteredMemories.map((m) => (
-                      <MemoryCard key={m.id} m={m} highlight={isMine(m)} />
-                    ))}
+                    {filteredMemories.map((m) => {
+                      const mine = isMine(m);
+                      return (
+                        <MemoryCard
+                          key={m.id}
+                          m={m}
+                          author={authorFor(m)}
+                          isMine={mine}
+                          canEdit={mine}
+                          onEdit={setEditingMemory}
+                          onDelete={deleteMemory}
+                        />
+                      );
+                    })}
                   </AnimatePresence>
                 )}
               </>
