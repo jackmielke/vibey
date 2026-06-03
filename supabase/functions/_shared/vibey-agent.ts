@@ -2217,6 +2217,12 @@ async function executeToolCall(
       );
       return JSON.stringify(result);
     }
+    case "search_memories":
+      return await searchMemories(
+        supabase,
+        parsed as { query?: string; limit?: number },
+        callerVibeUserId
+      );
     case "web_search":
       return await webSearchFirecrawl(parsed as { query: string; count?: number });
     case "fetch_url":
