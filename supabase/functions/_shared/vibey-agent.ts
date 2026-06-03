@@ -2935,10 +2935,6 @@ links like [Edge Esmeralda](https://edgeesmeralda.com) — never bare domain nam
 ("according to nytimes.com") and never bare URLs. Every external source you mention
 should be a [label](url) link so the user can tap through.
 ${callerLine}
-
-## Recent community memories (top ${memories.length})
-
-${memoryBlock}
 `.trim();
 
   const adminBlock = isAdmin
