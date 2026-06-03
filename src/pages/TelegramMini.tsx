@@ -806,6 +806,7 @@ export default function TelegramMini() {
   const [tgUserId, setTgUserId] = useState<number | null>(null);
 
   const [memories, setMemories] = useState<MemoryRow[]>([]);
+  const [memoryAuthors, setMemoryAuthors] = useState<Record<string, MemoryAuthor>>({});
   const [memLoading, setMemLoading] = useState(true);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
