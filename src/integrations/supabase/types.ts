@@ -4049,6 +4049,17 @@ export type Database = {
       }
     }
     Functions: {
+      admin_list_survey_responses: {
+        Args: { _password: string }
+        Returns: {
+          business_name: string
+          contact_email: string
+          contact_name: string
+          created_at: string
+          id: string
+          payload: Json
+        }[]
+      }
       admin_list_workshop_inquiries: {
         Args: { _password: string }
         Returns: {
