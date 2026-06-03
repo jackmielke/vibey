@@ -216,20 +216,20 @@ export const TOOLS = [
     function: {
       name: "search_memories",
       description:
-        "Search Vibey's long-term memory store for relevant community memories. Call this BEFORE answering any question about community norms, recurring events, people, projects, preferences, or 'do you remember…' — memories are no longer eagerly loaded into your context, so you must look them up yourself. Cheap keyword search over title/content/tags. Returns up to `limit` memories with id, owner, title, content, tags, created_at, and a `mine` flag (true if the current caller created it; you can only update those via update_memory).",
+        "Search Vibey's long-term memory store for ALL relevant community memories. Call this BEFORE answering any question about community norms, recurring events, people, projects, preferences, or 'do you remember…'. Keyword search over title/content/tags; by default returns EVERY matching memory (not a sample). Each item: id, owner, title, content, tags, created_at, `mine` flag (true if the current caller created it; you can only update those via update_memory).",
       parameters: {
         type: "object",
         properties: {
           query: {
             type: "string",
             description:
-              "Optional keyword(s) to match against memory title, content, or tags. Omit to get the most recent memories.",
+              "Optional keyword(s) to match against memory title, content, or tags. Omit to get ALL memories (most recent first).",
           },
           limit: {
             type: "integer",
-            description: "How many memories to return (1-25). Default 10.",
+            description: "Optional cap. Default = no cap (returns all matches, up to 1000). Only set this when you explicitly want a smaller slice.",
             minimum: 1,
-            maximum: 25,
+            maximum: 1000,
           },
         },
       },
@@ -463,20 +463,20 @@ export const TOOLS = [
     function: {
       name: "search_people",
       description:
-        "Search the community member directory (Vibey community + Edge Esmeralda + Vibe Code Residency) by name, bio, headline, intentions, or interests/skills. THIS is the right tool for any question about PEOPLE — 'who should I meet', 'who in the community is into X', 'find me someone working on Y', 'is there anyone here doing Z', matchmaking, intros, finding collaborators. Do NOT call list_edge_events for people questions — events are about what's happening, this tool is about WHO is here. Returns up to `limit` people with name, telegram_username, headline, bio, intentions, interests_skills, avatar_url. Quietly skips profiles with no bio so you don't recommend ghosts. After getting results, pick the 2-4 best matches and briefly say WHY each one matches what the user asked for. Include their @telegram_username so the user can DM them.",
+        "Search the community member directory (Vibey community + Edge Esmeralda + Vibe Code Residency) by name, bio, headline, intentions, or interests/skills. THIS is the right tool for any question about PEOPLE — 'who should I meet', 'who in the community is into X', 'find me someone working on Y', matchmaking, intros, collaborators. Do NOT call list_edge_events for people questions. By default returns ALL matching members (not a sample) with name, telegram_username, headline, bio, intentions, interests_skills, avatar_url. Quietly skips profiles with no bio unless include_empty_bios=true. After getting results, pick the 2-4 best matches and briefly say WHY each matches. Include their @telegram_username so the user can DM them.",
       parameters: {
         type: "object",
         properties: {
           query: {
             type: "string",
             description:
-              "What the user is looking for — keywords, topic, skill, vibe (e.g. 'ai agents', 'solidity', 'meditation', 'someone to co-found with'). Leave empty to browse recent members with bios.",
+              "What the user is looking for — keywords, topic, skill, vibe (e.g. 'ai agents', 'solidity', 'meditation', 'someone to co-found with'). Leave empty to browse the full directory.",
           },
           limit: {
             type: "integer",
-            description: "Max people to return (1-20). Default 8.",
+            description: "Optional cap. Default = no cap (returns all matches, up to 1000). Only set when you want a smaller slice.",
             minimum: 1,
-            maximum: 20,
+            maximum: 1000,
           },
           include_empty_bios: {
             type: "boolean",
@@ -962,7 +962,7 @@ async function searchMemories(
   callerVibeUserId: string | null
 ): Promise<string> {
   const q = (args?.query ?? "").trim();
-  const limit = Math.max(1, Math.min(25, Number(args?.limit) || 10));
+  const limit = Math.max(1, Math.min(1000, Number(args?.limit) || 1000));
 
   let qb = supabase
     .from("memories")
@@ -1990,7 +1990,7 @@ async function searchPeople(
   supabase: SupabaseClient,
   args: { query?: string; limit?: number; include_empty_bios?: boolean },
 ): Promise<string> {
-  const limit = Math.min(Math.max(args.limit ?? 8, 1), 20);
+  const limit = Math.min(Math.max(args.limit ?? 1000, 1), 1000);
   const q = (args.query ?? "").trim();
   const includeEmpty = args.include_empty_bios === true;
 
@@ -2864,8 +2864,8 @@ You have access to these tools:
 - **search_memories(query?, limit?)** — look up community memories. Memories are NOT preloaded
   into your prompt anymore — you MUST call this any time the user asks about community norms,
   recurring events, people, projects, "do you remember…", or anything where past Vibey context
-  would help. Cheap keyword search; returns id, owner, content, tags, and a \`mine\` flag.
-  Call with no query to get the most recent memories.
+  would help. By default returns ALL matching memories (no artificial cap) — don't pass a limit
+  unless you specifically want a smaller slice. Call with no query to get every memory.
 
 - **save_memory(content, tags?)** — store a durable fact about the community for future conversations.
   Call it ONLY when the user shares something genuinely worth remembering long-term:
