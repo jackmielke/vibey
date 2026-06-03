@@ -3141,15 +3141,27 @@ export async function loadUserPreferences(
 
 export function buildUserContextBlock(
   prefs: UserPrefs | null,
-  fallback: { display_name?: string | null; telegram_username?: string | null }
+  fallback: {
+    display_name?: string | null;
+    telegram_username?: string | null;
+    telegram_user_id?: number | null;
+    surface?: string | null;
+    is_admin?: boolean;
+    vibe_user_id?: string | null;
+  }
 ): string {
   const name = prefs?.display_name || fallback.display_name || fallback.telegram_username || "this person";
   const handle = prefs?.telegram_username || fallback.telegram_username;
+  const tgId = prefs?.telegram_user_id ?? fallback.telegram_user_id ?? null;
   const notes = prefs?.relationship_notes?.trim();
 
   const lines: string[] = [];
   lines.push(`## Who you're talking to right now`);
   lines.push(`- Name: ${name}${handle ? ` (@${handle})` : ""}`);
+  if (tgId) lines.push(`- Telegram user id: ${tgId}`);
+  if (fallback.vibe_user_id) lines.push(`- Vibe user id: ${fallback.vibe_user_id}`);
+  if (fallback.surface) lines.push(`- Surface: ${fallback.surface} (adapt formatting accordingly — Telegram supports markdown; voice/robot should be plain spoken text)`);
+  if (fallback.is_admin) lines.push(`- Admin: yes (you may use admin_* tools)`);
   if (prefs?.interaction_count) {
     lines.push(`- Past interactions with you: ${prefs.interaction_count}`);
   }
