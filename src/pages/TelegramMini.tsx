@@ -1487,6 +1487,17 @@ export default function TelegramMini() {
     tgUserId != null &&
     Number((m.metadata as Record<string, unknown> | null)?.telegram_user_id) === tgUserId;
 
+  const authorFor = (m: MemoryRow): MemoryAuthor | null => {
+    const meta = (m.metadata ?? {}) as Record<string, unknown>;
+    const tid = meta.telegram_user_id;
+    const tuser = meta.telegram_username;
+    if (typeof tid === "number" && memoryAuthors[`tgid:${tid}`]) return memoryAuthors[`tgid:${tid}`];
+    if (typeof tuser === "string" && memoryAuthors[`tguser:${tuser.toLowerCase()}`])
+      return memoryAuthors[`tguser:${tuser.toLowerCase()}`];
+    if (typeof tuser === "string" && tuser) return { name: null, username: tuser, avatar_url: null };
+    return null;
+  };
+
   const filteredMemories = useMemo(() => {
     if (memFilter === "mine") return memories.filter(isMine);
     if (memFilter === "others") return memories.filter((m) => !isMine(m));
