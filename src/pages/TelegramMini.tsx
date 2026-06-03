@@ -1118,6 +1118,57 @@ export default function TelegramMini() {
     };
   }, [authState]);
 
+  // 2b. Resolve memory authors (by telegram_user_id / telegram_username)
+  useEffect(() => {
+    if (!memories.length) return;
+    const tgIds = new Set<number>();
+    const tgUsernames = new Set<string>();
+    for (const m of memories) {
+      const meta = (m.metadata ?? {}) as Record<string, unknown>;
+      const tid = meta.telegram_user_id;
+      const tuser = meta.telegram_username;
+      const tidKey = typeof tid === "number" ? `tgid:${tid}` : null;
+      const tuKey = typeof tuser === "string" && tuser ? `tguser:${tuser.toLowerCase()}` : null;
+      if (typeof tid === "number" && !memoryAuthors[tidKey!]) tgIds.add(tid);
+      if (typeof tuser === "string" && tuser && !memoryAuthors[tuKey!]) tgUsernames.add(tuser.toLowerCase());
+    }
+    if (!tgIds.size && !tgUsernames.size) return;
+    let cancelled = false;
+    (async () => {
+      const cols = "id, name, username, telegram_username, telegram_user_id, telegram_photo_url, avatar_url, profile_picture_url";
+      const next: Record<string, MemoryAuthor> = {};
+      const toInfo = (row: Record<string, unknown>): MemoryAuthor => ({
+        name: (row.name as string) ?? null,
+        username: (row.telegram_username as string) ?? (row.username as string) ?? null,
+        avatar_url:
+          (row.telegram_photo_url as string) ??
+          (row.profile_picture_url as string) ??
+          (row.avatar_url as string) ??
+          null,
+      });
+      if (tgIds.size) {
+        const { data } = await supabase.from("users").select(cols).in("telegram_user_id", Array.from(tgIds));
+        for (const row of (data ?? []) as Record<string, unknown>[]) {
+          next[`tgid:${row.telegram_user_id}`] = toInfo(row);
+        }
+      }
+      if (tgUsernames.size) {
+        const { data } = await supabase.from("users").select(cols).in("telegram_username", Array.from(tgUsernames));
+        for (const row of (data ?? []) as Record<string, unknown>[]) {
+          const tu = row.telegram_username as string | null;
+          if (tu) next[`tguser:${tu.toLowerCase()}`] = toInfo(row);
+        }
+      }
+      if (!cancelled && Object.keys(next).length) {
+        setMemoryAuthors((prev) => ({ ...prev, ...next }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memories]);
+
   // 3. Events
   useEffect(() => {
     if (authState !== "ready") return;
