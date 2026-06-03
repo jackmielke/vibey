@@ -1640,19 +1640,21 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200 });
   }
 
-  const [history, memories, events, userPrefs, skills] = await Promise.all([
+  const [history, userPrefs, skills] = await Promise.all([
     loadHistory(supabase, sessionKey),
-    loadRecentMemories(supabase),
-    loadUpcomingEvents(supabase),
     loadUserPreferences(supabase, { telegram_user_id: userId, telegram_username: msg.from?.username ?? null }),
     loadEnabledSkills(supabase),
   ]);
+  const isAdminDm = isAdminTelegramUser(userId);
   const userContext = buildUserContextBlock(userPrefs, {
     display_name: msg.from?.first_name ?? null,
     telegram_username: msg.from?.username ?? null,
+    telegram_user_id: userId,
+    surface: "telegram",
+    is_admin: isAdminDm,
+    vibe_user_id: vibeUserId,
   });
-  const isAdminDm = isAdminTelegramUser(userId);
-  const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, memories, vibeUserId, isAdminDm)}${buildEventsBlock(events)}\n\n${userContext}${buildSkillsBlock(skills)}`;
+  const systemPrompt = `${buildSystemPromptWithMemories(agent.system_prompt, [], vibeUserId, isAdminDm)}\n\n${userContext}${buildSkillsBlock(skills)}`;
 
   const dmStatus = createStatusMessage(TELEGRAM_BOT_TOKEN, chatId);
   let dmToolCount = 0;
