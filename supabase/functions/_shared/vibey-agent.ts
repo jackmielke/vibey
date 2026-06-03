@@ -216,20 +216,20 @@ export const TOOLS = [
     function: {
       name: "search_memories",
       description:
-        "Search Vibey's long-term memory store for relevant community memories. Call this BEFORE answering any question about community norms, recurring events, people, projects, preferences, or 'do you remember…' — memories are no longer eagerly loaded into your context, so you must look them up yourself. Cheap keyword search over title/content/tags. Returns up to `limit` memories with id, owner, title, content, tags, created_at, and a `mine` flag (true if the current caller created it; you can only update those via update_memory).",
+        "Search Vibey's long-term memory store for ALL relevant community memories. Call this BEFORE answering any question about community norms, recurring events, people, projects, preferences, or 'do you remember…'. Keyword search over title/content/tags; by default returns EVERY matching memory (not a sample). Each item: id, owner, title, content, tags, created_at, `mine` flag (true if the current caller created it; you can only update those via update_memory).",
       parameters: {
         type: "object",
         properties: {
           query: {
             type: "string",
             description:
-              "Optional keyword(s) to match against memory title, content, or tags. Omit to get the most recent memories.",
+              "Optional keyword(s) to match against memory title, content, or tags. Omit to get ALL memories (most recent first).",
           },
           limit: {
             type: "integer",
-            description: "How many memories to return (1-25). Default 10.",
+            description: "Optional cap. Default = no cap (returns all matches, up to 1000). Only set this when you explicitly want a smaller slice.",
             minimum: 1,
-            maximum: 25,
+            maximum: 1000,
           },
         },
       },
