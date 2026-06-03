@@ -750,6 +750,9 @@ export async function loadEnabledToolNames(
   if (!rows.some((r) => r.name === "search_people")) {
     enabled.add("search_people");
   }
+  if (!rows.some((r) => r.name === "list_workshops")) {
+    enabled.add("list_workshops");
+  }
 
 
   return enabled;
