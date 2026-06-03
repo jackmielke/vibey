@@ -2846,19 +2846,11 @@ export function buildSystemPromptWithMemories(
     `When you say "today" / "tomorrow" / "this weekend", anchor to ${weekday} ${isoPT}. ` +
     `If you're tempted to name a different weekday for this date, you are wrong — trust this line.\n\n`;
 
-  const memoryBlock =
-    memories.length === 0
-      ? "(none yet — feel free to call save_memory when something durable is worth remembering)"
-      : memories
-          .map((m, i) => {
-            const tags = m.tags && m.tags.length ? ` [${m.tags.join(", ")}]` : "";
-            const owner = m.created_by ?? "unknown";
-            const mine =
-              callerVibeUserId && m.created_by === callerVibeUserId ? " (yours)" : "";
-            const title = m.title ? `**${m.title}** — ` : "";
-            return `${i + 1}. id=${m.id} owner=${owner}${mine} — ${title}${m.content}${tags}`;
-          })
-          .join("\n");
+  // Memories are NOT eagerly loaded anymore. Vibey calls `search_memories`
+  // when a turn actually needs community memory. Keeps the system prompt
+  // small, fast, and focused.
+  const _memoriesEager = memories; // intentionally unused — kept for backwards compat
+  void _memoriesEager;
 
   const callerLine = callerVibeUserId
     ? `\nCurrent caller's vibe user id: ${callerVibeUserId}. You may update only memories where owner matches this id.`
