@@ -962,7 +962,7 @@ async function searchMemories(
   callerVibeUserId: string | null
 ): Promise<string> {
   const q = (args?.query ?? "").trim();
-  const limit = Math.max(1, Math.min(25, Number(args?.limit) || 10));
+  const limit = Math.max(1, Math.min(1000, Number(args?.limit) || 1000));
 
   let qb = supabase
     .from("memories")
