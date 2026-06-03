@@ -214,6 +214,30 @@ export const TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "search_memories",
+      description:
+        "Search Vibey's long-term memory store for relevant community memories. Call this BEFORE answering any question about community norms, recurring events, people, projects, preferences, or 'do you remember…' — memories are no longer eagerly loaded into your context, so you must look them up yourself. Cheap keyword search over title/content/tags. Returns up to `limit` memories with id, owner, title, content, tags, created_at, and a `mine` flag (true if the current caller created it; you can only update those via update_memory).",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "Optional keyword(s) to match against memory title, content, or tags. Omit to get the most recent memories.",
+          },
+          limit: {
+            type: "integer",
+            description: "How many memories to return (1-25). Default 10.",
+            minimum: 1,
+            maximum: 25,
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "web_search",
       description:
         "Search the live web (via Firecrawl) for current information. Use when the user asks about recent events, news, prices, dates, or anything you can't answer from memory or the community context. Returns up to 10 result snippets with URLs. Follow up with fetch_url if you need full content from a specific page.",
