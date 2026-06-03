@@ -462,6 +462,22 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "list_workshops",
+      description:
+        "List the Local Business AI Series workshops with registrants and (optionally) intake survey responses. Use this for ANY question about the workshop series, workshop attendees, who's registered for which week, business owners signing up, or the intake surveys (e.g. 'who's coming to week 3?', 'how many people registered?', 'show me the surveys', 'is Gillian registered?'). Returns each workshop (week, title, date, capacity, registered_count, seats_left), the registrant list (name, email, business, workshop_weeks, status), and recent survey_responses (business_name, contact, payload).",
+      parameters: {
+        type: "object",
+        properties: {
+          week: { type: "integer", description: "Optional — only return this workshop week (1-5)." },
+          include_surveys: { type: "boolean", description: "Include intake survey_responses. Default true." },
+          attendee_limit: { type: "integer", description: "Max registrants per workshop (1-200). Default 100.", minimum: 1, maximum: 200 },
+        },
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
