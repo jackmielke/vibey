@@ -1209,6 +1209,35 @@ export default function TelegramMini() {
     };
   }, [authState]);
 
+  // 2b. Workshops data (admin only, lazy-load when tab opens)
+  useEffect(() => {
+    if (tab !== "workshops" || !isAdmin || workshopsLoaded || workshopsLoading) return;
+    const tg = window.Telegram?.WebApp;
+    const initData = tg?.initData;
+    if (!initData) {
+      setWorkshopsError("Open this in Telegram to view workshop data.");
+      return;
+    }
+    setWorkshopsLoading(true);
+    setWorkshopsError(null);
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("workshops-data", { body: { initData } });
+        if (error) throw error;
+        if (data?.ok === false || data?.error) throw new Error(data?.error ?? "failed");
+        setWorkshops((data?.workshops ?? []) as WorkshopRow[]);
+        setWorkshopInquiries((data?.inquiries ?? []) as WorkshopInquiry[]);
+        setWorkshopSurveys((data?.surveys ?? []) as SurveyRow[]);
+        setWorkshopsLoaded(true);
+      } catch (e: any) {
+        setWorkshopsError(e?.message ?? "failed to load workshops");
+      } finally {
+        setWorkshopsLoading(false);
+      }
+    })();
+  }, [tab, isAdmin, workshopsLoaded, workshopsLoading]);
+
+
   // 3. Personal preferences
   useEffect(() => {
     if (authState !== "ready" || !tgUserId) {
