@@ -2861,6 +2861,12 @@ export function buildSystemPromptWithMemories(
 
 You have access to these tools:
 
+- **search_memories(query?, limit?)** — look up community memories. Memories are NOT preloaded
+  into your prompt anymore — you MUST call this any time the user asks about community norms,
+  recurring events, people, projects, "do you remember…", or anything where past Vibey context
+  would help. Cheap keyword search; returns id, owner, content, tags, and a `mine` flag.
+  Call with no query to get the most recent memories.
+
 - **save_memory(content, tags?)** — store a durable fact about the community for future conversations.
   Call it ONLY when the user shares something genuinely worth remembering long-term:
   community norms, recurring events, important projects/people, stated preferences.
@@ -2868,9 +2874,9 @@ You have access to these tools:
   Tags should be 1-4 short lowercase keywords.
 
 - **update_memory(id, content, tags?)** — edit an existing memory.
-  Pass the memory's UUID (shown as id=… in the list below) and the FULL new content.
-  You can ONLY update memories where the owner matches the current caller's vibe user id
-  (marked "(yours)" in the list). For anyone else's memory, refuse politely instead of calling.
+  First call \`search_memories\` to find the memory's UUID, then pass the FULL new content.
+  You can ONLY update memories where \`mine\` is true (the current caller created it).
+  For anyone else's memory, refuse politely instead of calling.
 
 - **web_search(query, count?)** — search the live web (Firecrawl) for current info.
   Use for recent events, news, prices, dates, public facts you can't answer from memory.
