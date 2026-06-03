@@ -956,6 +956,46 @@ async function updateMemory(
   };
 }
 
+async function searchMemories(
+  supabase: SupabaseClient,
+  args: { query?: string; limit?: number },
+  callerVibeUserId: string | null
+): Promise<string> {
+  const q = (args?.query ?? "").trim();
+  const limit = Math.max(1, Math.min(25, Number(args?.limit) || 10));
+
+  let qb = supabase
+    .from("memories")
+    .select("id, title, content, tags, created_at, created_by")
+    .eq("community_id", VIBEY_COMMUNITY_ID)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (q) {
+    const safe = q.replace(/[%,()]/g, "");
+    qb = qb.or(
+      `title.ilike.%${safe}%,content.ilike.%${safe}%,tags.cs.{${safe.toLowerCase()}}`
+    );
+  }
+
+  const { data, error } = await qb;
+  if (error) {
+    console.error("search_memories failed:", error.message);
+    return JSON.stringify({ ok: false, error: error.message });
+  }
+
+  const memories = (data ?? []).map((m) => ({
+    id: m.id,
+    owner: m.created_by,
+    mine: callerVibeUserId ? m.created_by === callerVibeUserId : false,
+    title: m.title,
+    content: m.content,
+    tags: m.tags,
+    created_at: m.created_at,
+  }));
+  return JSON.stringify({ ok: true, count: memories.length, query: q || null, memories });
+}
+
 // ── Web tools ────────────────────────────────────────────────────────────────
 
 // SHELVED 2026-05-18: Brave Search was the previous web_search backend.
