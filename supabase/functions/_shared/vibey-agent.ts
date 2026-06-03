@@ -3482,6 +3482,16 @@ export function describeToolDone(
         details: names || undefined,
       };
     }
+    case "list_workshops": {
+      if (result?.ok === false) return { label: `🚫 workshops lookup failed`, details: result?.error };
+      const ws = Number(result?.workshops_count ?? 0);
+      const regs = Number(result?.total_registered ?? 0);
+      const surveys = Number(result?.surveys_count ?? 0);
+      return {
+        label: `🛠️ ${ws} workshop${ws === 1 ? "" : "s"} · ${regs} registered`,
+        details: surveys ? `${surveys} survey response${surveys === 1 ? "" : "s"}` : undefined,
+      };
+    }
     default:
       return { label: `✅ ${name} done` };
   }
