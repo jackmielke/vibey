@@ -3480,6 +3480,11 @@ export function describeToolDone(
         details: `before: ${before}\nafter:  ${after}`,
       };
     }
+    case "search_memories": {
+      if (result?.ok === false) return { label: `🤷 memory search failed`, details: result?.error };
+      const n = Number(result?.count ?? 0);
+      return { label: n > 0 ? `🧠 found ${n} memor${n === 1 ? "y" : "ies"}` : `🪨 no matching memories` };
+    }
     case "get_vibe_price": {
       if (result?.ok === false) return { label: `🥲 couldn't fetch VIBE price`, details: result?.error };
       const p = Number(result?.price_usd);
