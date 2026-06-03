@@ -3387,6 +3387,10 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       return "🧠 jotting this one down…";
     case "update_memory":
       return "✏️ rewriting that memory…";
+    case "search_memories": {
+      const q = String(args?.query ?? "").trim();
+      return q ? `🧠 searching memories for "${q.slice(0, 60)}"…` : "🧠 flipping through memories…";
+    }
     case "get_vibe_price": {
       const usd = args?.usd, vibe = args?.vibe;
       if (typeof usd === "number") return `🪙 checking VIBE for $${usd}…`;
