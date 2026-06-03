@@ -2864,8 +2864,8 @@ You have access to these tools:
 - **search_memories(query?, limit?)** — look up community memories. Memories are NOT preloaded
   into your prompt anymore — you MUST call this any time the user asks about community norms,
   recurring events, people, projects, "do you remember…", or anything where past Vibey context
-  would help. Cheap keyword search; returns id, owner, content, tags, and a \`mine\` flag.
-  Call with no query to get the most recent memories.
+  would help. By default returns ALL matching memories (no artificial cap) — don't pass a limit
+  unless you specifically want a smaller slice. Call with no query to get every memory.
 
 - **save_memory(content, tags?)** — store a durable fact about the community for future conversations.
   Call it ONLY when the user shares something genuinely worth remembering long-term:
