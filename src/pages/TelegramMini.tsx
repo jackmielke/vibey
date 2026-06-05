@@ -132,6 +132,23 @@ type EventRow = {
 const EVENT_SELECT =
   "id, title, description, event_start_time, event_end_time, event_location, event_type, event_image_url, hosted_by, is_featured, tags, created_by, created_at, updated_at, current_attendees, max_attendees, is_public, registration_required";
 
+type ProjectRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  url: string;
+  image_url: string | null;
+  tags: string[] | null;
+  is_featured: boolean | null;
+  community_id: string;
+  created_by: string | null;
+  created_at: string;
+  author?: { id: string; name: string | null; telegram_username: string | null; avatar_url: string | null } | null;
+};
+
+const PROJECT_SELECT =
+  "id, title, description, url, image_url, tags, is_featured, community_id, created_by, created_at, author:users!projects_created_by_fkey(id, name, telegram_username, avatar_url)";
+
 type ChatLogRow = {
   id: string;
   user_message: string;
