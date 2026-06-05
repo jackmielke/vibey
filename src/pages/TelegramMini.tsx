@@ -1935,7 +1935,11 @@ export default function TelegramMini() {
                                 @{u.telegram_username.replace(/^@/, "")}
                               </span>
                             )}
-                            {!u.is_claimed && (
+                            {u.is_claimed ? (
+                              <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/30">
+                                resident
+                              </span>
+                            ) : (
                               <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
                                 unclaimed
                               </span>
