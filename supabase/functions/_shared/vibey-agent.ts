@@ -2380,7 +2380,111 @@ async function executeToolCall(
   }
 }
 
+// ── Projects portfolio tools ────────────────────────────────────────────────
+
+async function searchProjects(
+  supabase: SupabaseClient,
+  args: { query?: string; limit?: number },
+  callerVibeUserId: string | null,
+): Promise<string> {
+  const limit = Math.min(Math.max(args.limit ?? 500, 1), 500);
+  const q = (args.query ?? "").trim();
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select(
+      "id, title, description, url, image_url, tags, is_featured, status, created_at, created_by, community_id, author:users!projects_created_by_fkey(id, name, telegram_username)"
+    )
+    .in("community_id", DIRECTORY_COMMUNITY_IDS)
+    .eq("status", "active")
+    .order("is_featured", { ascending: false })
+    .order("display_order", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+
+  type Row = {
+    id: string; title: string; description: string | null; url: string;
+    image_url: string | null; tags: string[] | null; is_featured: boolean | null;
+    created_at: string; created_by: string | null; community_id: string;
+    author?: { id: string; name: string | null; telegram_username: string | null } | { id: string; name: string | null; telegram_username: string | null }[] | null;
+  };
+
+  const tokens = q.toLowerCase().split(/[^a-z0-9@_+-]+/i).filter((t) => t.length > 1);
+  const score = (r: Row) => {
+    if (tokens.length === 0) return 1;
+    const hay = [r.title, r.description, ...(r.tags ?? [])].filter(Boolean).join(" \n ").toLowerCase();
+    return tokens.reduce((s, t) => s + (hay.includes(t) ? 1 : 0), 0);
+  };
+
+  const filtered = ((data ?? []) as Row[]).filter((r) => tokens.length === 0 || score(r) > 0);
+  const projects = filtered.slice(0, limit).map((r) => {
+    const author = Array.isArray(r.author) ? r.author[0] : r.author;
+    return {
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      url: r.url,
+      image_url: r.image_url,
+      tags: r.tags ?? [],
+      is_featured: !!r.is_featured,
+      created_at: r.created_at,
+      author: author
+        ? { name: author.name, telegram_username: author.telegram_username }
+        : null,
+      mine: !!(callerVibeUserId && r.created_by === callerVibeUserId),
+    };
+  });
+
+  return JSON.stringify({ ok: true, count: projects.length, projects });
+}
+
+async function submitProject(
+  supabase: SupabaseClient,
+  args: { title: string; url: string; description?: string; tags?: string[]; image_url?: string },
+  callerVibeUserId: string | null,
+): Promise<string> {
+  if (!callerVibeUserId) {
+    return JSON.stringify({
+      ok: false,
+      error: "no_profile",
+      message: "I couldn't find your Vibe profile yet — make sure you're messaging me from your own Telegram account, then try again.",
+    });
+  }
+  const title = (args.title ?? "").trim();
+  const url = (args.url ?? "").trim();
+  if (!title || !url) {
+    return JSON.stringify({ ok: false, error: "Title and url are required." });
+  }
+  try { new URL(url); } catch {
+    return JSON.stringify({ ok: false, error: "url must be a valid http(s) link." });
+  }
+  const tags = Array.isArray(args.tags)
+    ? args.tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 6)
+    : [];
+
+  const { data, error } = await supabase
+    .from("projects")
+    .insert({
+      community_id: VIBE_CODE_RESIDENCY_COMMUNITY_ID,
+      created_by: callerVibeUserId,
+      title: title.slice(0, 120),
+      url,
+      description: (args.description ?? "").trim() || null,
+      image_url: (args.image_url ?? "").trim() || null,
+      tags: tags.length ? tags : null,
+      status: "active",
+    })
+    .select("id, title, url")
+    .single();
+
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  return JSON.stringify({ ok: true, project: data });
+}
+
 // ── Gallery tools ────────────────────────────────────────────────────────────
+
 
 async function searchGallery(
   supabase: SupabaseClient,
