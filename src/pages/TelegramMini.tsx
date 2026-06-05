@@ -1295,8 +1295,10 @@ export default function TelegramMini() {
           const existing = byKey.get(key);
           if (!existing || score(u) > score(existing)) byKey.set(key, u);
         }
-        // Sort: people with the richest profiles first (avatar + bio), then alpha.
+        // Sort: claimed profiles (Vibe Residents) first, then by profile richness, then alpha.
         const entries = Array.from(byKey.values()).sort((a, b) => {
+          const claimDiff = (b.is_claimed ? 1 : 0) - (a.is_claimed ? 1 : 0);
+          if (claimDiff !== 0) return claimDiff;
           const diff = score(b) - score(a);
           if (diff !== 0) return diff;
           return (a.name ?? "~").localeCompare(b.name ?? "~");
@@ -1933,7 +1935,11 @@ export default function TelegramMini() {
                                 @{u.telegram_username.replace(/^@/, "")}
                               </span>
                             )}
-                            {!u.is_claimed && (
+                            {u.is_claimed ? (
+                              <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/30">
+                                resident
+                              </span>
+                            ) : (
                               <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
                                 unclaimed
                               </span>
