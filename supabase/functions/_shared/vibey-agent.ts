@@ -2363,6 +2363,18 @@ async function executeToolCall(
         supabase,
         parsed as { week?: number; include_surveys?: boolean; attendee_limit?: number },
       );
+    case "search_projects":
+      return await searchProjects(
+        supabase,
+        parsed as { query?: string; limit?: number },
+        callerVibeUserId
+      );
+    case "submit_project":
+      return await submitProject(
+        supabase,
+        parsed as { title: string; url: string; description?: string; tags?: string[]; image_url?: string },
+        callerVibeUserId
+      );
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
