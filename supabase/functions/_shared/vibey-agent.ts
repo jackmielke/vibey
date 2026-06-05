@@ -502,6 +502,52 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "search_projects",
+      description:
+        "Search the community projects portfolio (Vibey community + Vibe Code Residency) — the public showcase of things residents have built. Use for ANY question about projects, builds, demos, what people have shipped, portfolio, 'what's been made', or finding projects by topic/tag. Keyword match over title/description/tags. By default returns ALL matching projects (not a sample). Each item: id, title, description, url, image_url, tags, author (name + @telegram_username if any), is_featured, created_at, `mine` flag (true if the current caller submitted it).",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Optional keyword(s) to match against title/description/tags. Omit to browse the whole portfolio.",
+          },
+          limit: {
+            type: "integer",
+            description: "Optional cap. Default = no cap (returns all matches, up to 500). Only set when you want a smaller slice.",
+            minimum: 1,
+            maximum: 500,
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "submit_project",
+      description:
+        "Submit a new project to the Vibe Code Residency portfolio on behalf of the current caller. Trigger whenever someone clearly wants to share/submit/add a project they built (e.g. 'add my project', 'submit this build', 'put X in the portfolio'). Requires a title and a url; description and tags are optional but encouraged. The caller is recorded as the project author. After it succeeds, confirm warmly and include the project title so they know it landed.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Short project name (max ~80 chars)." },
+          url: { type: "string", description: "Public link to the project (live demo, GitHub repo, post, video, etc.)." },
+          description: { type: "string", description: "Optional 1-3 sentence description of what it is and why it's cool." },
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional 1-6 short lowercase keyword tags (e.g. ['ai','agents','telegram']).",
+          },
+          image_url: { type: "string", description: "Optional cover image URL." },
+        },
+        required: ["title", "url"],
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
@@ -776,6 +822,12 @@ export async function loadEnabledToolNames(
   }
   if (!rows.some((r) => r.name === "list_workshops")) {
     enabled.add("list_workshops");
+  }
+  if (!rows.some((r) => r.name === "search_projects")) {
+    enabled.add("search_projects");
+  }
+  if (!rows.some((r) => r.name === "submit_project")) {
+    enabled.add("submit_project");
   }
 
 
@@ -2311,12 +2363,128 @@ async function executeToolCall(
         supabase,
         parsed as { week?: number; include_surveys?: boolean; attendee_limit?: number },
       );
+    case "search_projects":
+      return await searchProjects(
+        supabase,
+        parsed as { query?: string; limit?: number },
+        callerVibeUserId
+      );
+    case "submit_project":
+      return await submitProject(
+        supabase,
+        parsed as { title: string; url: string; description?: string; tags?: string[]; image_url?: string },
+        callerVibeUserId
+      );
     default:
       return JSON.stringify({ ok: false, error: `unknown tool: ${call.function.name}` });
   }
 }
 
+// ── Projects portfolio tools ────────────────────────────────────────────────
+
+async function searchProjects(
+  supabase: SupabaseClient,
+  args: { query?: string; limit?: number },
+  callerVibeUserId: string | null,
+): Promise<string> {
+  const limit = Math.min(Math.max(args.limit ?? 500, 1), 500);
+  const q = (args.query ?? "").trim();
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select(
+      "id, title, description, url, image_url, tags, is_featured, status, created_at, created_by, community_id, author:users!projects_created_by_fkey(id, name, telegram_username)"
+    )
+    .in("community_id", DIRECTORY_COMMUNITY_IDS)
+    .eq("status", "active")
+    .order("is_featured", { ascending: false })
+    .order("display_order", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+
+  type Row = {
+    id: string; title: string; description: string | null; url: string;
+    image_url: string | null; tags: string[] | null; is_featured: boolean | null;
+    created_at: string; created_by: string | null; community_id: string;
+    author?: { id: string; name: string | null; telegram_username: string | null } | { id: string; name: string | null; telegram_username: string | null }[] | null;
+  };
+
+  const tokens = q.toLowerCase().split(/[^a-z0-9@_+-]+/i).filter((t) => t.length > 1);
+  const score = (r: Row) => {
+    if (tokens.length === 0) return 1;
+    const hay = [r.title, r.description, ...(r.tags ?? [])].filter(Boolean).join(" \n ").toLowerCase();
+    return tokens.reduce((s, t) => s + (hay.includes(t) ? 1 : 0), 0);
+  };
+
+  const filtered = ((data ?? []) as Row[]).filter((r) => tokens.length === 0 || score(r) > 0);
+  const projects = filtered.slice(0, limit).map((r) => {
+    const author = Array.isArray(r.author) ? r.author[0] : r.author;
+    return {
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      url: r.url,
+      image_url: r.image_url,
+      tags: r.tags ?? [],
+      is_featured: !!r.is_featured,
+      created_at: r.created_at,
+      author: author
+        ? { name: author.name, telegram_username: author.telegram_username }
+        : null,
+      mine: !!(callerVibeUserId && r.created_by === callerVibeUserId),
+    };
+  });
+
+  return JSON.stringify({ ok: true, count: projects.length, projects });
+}
+
+async function submitProject(
+  supabase: SupabaseClient,
+  args: { title: string; url: string; description?: string; tags?: string[]; image_url?: string },
+  callerVibeUserId: string | null,
+): Promise<string> {
+  if (!callerVibeUserId) {
+    return JSON.stringify({
+      ok: false,
+      error: "no_profile",
+      message: "I couldn't find your Vibe profile yet — make sure you're messaging me from your own Telegram account, then try again.",
+    });
+  }
+  const title = (args.title ?? "").trim();
+  const url = (args.url ?? "").trim();
+  if (!title || !url) {
+    return JSON.stringify({ ok: false, error: "Title and url are required." });
+  }
+  try { new URL(url); } catch {
+    return JSON.stringify({ ok: false, error: "url must be a valid http(s) link." });
+  }
+  const tags = Array.isArray(args.tags)
+    ? args.tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 6)
+    : [];
+
+  const { data, error } = await supabase
+    .from("projects")
+    .insert({
+      community_id: VIBE_CODE_RESIDENCY_COMMUNITY_ID,
+      created_by: callerVibeUserId,
+      title: title.slice(0, 120),
+      url,
+      description: (args.description ?? "").trim() || null,
+      image_url: (args.image_url ?? "").trim() || null,
+      tags: tags.length ? tags : null,
+      status: "active",
+    })
+    .select("id, title, url")
+    .single();
+
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+  return JSON.stringify({ ok: true, project: data });
+}
+
 // ── Gallery tools ────────────────────────────────────────────────────────────
+
 
 async function searchGallery(
   supabase: SupabaseClient,
@@ -2927,6 +3095,21 @@ You have access to these tools:
   reply with a one-line bio + what they're building so other residents can find them.
   If \`already_member\` is true, just confirm warmly without re-onboarding.
 
+- **search_projects(query?, limit?)** — search the community projects portfolio (Vibey
+  community + Vibe Code Residency). Call this for ANY question about projects, builds,
+  demos, what people have shipped, or finding projects by topic. By default returns ALL
+  matching projects (no cap). When showing results, prefer 2-4 of the most relevant with
+  their url as a markdown link and a one-line "why it matches".
+
+- **submit_project({ title, url, description?, tags?, image_url? })** — add a new project
+  to the Vibe Code Residency portfolio on behalf of the caller. Trigger when someone
+  clearly wants to submit/share a project ("add my project", "submit this build"). If
+  they only give one of title/url, ask for the missing piece before calling. Tags should
+  be 1-6 short lowercase keywords. After it succeeds, confirm with the project title.
+
+
+
+
 
 You can call any tool zero, one, or multiple times before replying. After all tool
 calls finish, give the user your normal natural-language reply — don't mention tools
@@ -3430,6 +3613,14 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       const w = args?.week;
       return w ? `🛠️ checking workshop week ${w}…` : "🛠️ pulling the Local Business AI Series roster…";
     }
+    case "search_projects": {
+      const q = String(args?.query ?? "").trim();
+      return q ? `🚀 searching projects for "${q.slice(0, 60)}"…` : "🚀 flipping through the portfolio…";
+    }
+    case "submit_project": {
+      const t = String(args?.title ?? "").trim();
+      return t ? `🚀 submitting "${t.slice(0, 60)}"…` : "🚀 adding that project to the portfolio…";
+    }
     default:
       return `⚙️ running ${name}…`;
   }
@@ -3576,6 +3767,22 @@ export function describeToolDone(
         label: `🛠️ ${ws} workshop${ws === 1 ? "" : "s"} · ${regs} registered`,
         details: surveys ? `${surveys} survey response${surveys === 1 ? "" : "s"}` : undefined,
       };
+    }
+    case "search_projects": {
+      if (result?.ok === false) return { label: `🚫 project search failed`, details: result?.error };
+      const n = Number(result?.count ?? 0);
+      const titles = Array.isArray(result?.projects)
+        ? (result.projects as Array<{ title?: string }>).slice(0, 4).map((p) => p.title).filter(Boolean).join(", ")
+        : "";
+      return {
+        label: n > 0 ? `🚀 found ${n} project${n === 1 ? "" : "s"}` : `🪨 no projects matched`,
+        details: titles || undefined,
+      };
+    }
+    case "submit_project": {
+      if (result?.ok === false) return { label: `🚫 couldn't submit project`, details: result?.error ?? result?.message };
+      const t = result?.project?.title;
+      return { label: `🚀 project submitted${t ? `: ${String(t).slice(0, 60)}` : ""}` };
     }
     default:
       return { label: `✅ ${name} done` };
