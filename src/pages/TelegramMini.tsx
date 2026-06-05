@@ -25,6 +25,8 @@ import {
   Camera,
   MessagesSquare,
   GraduationCap,
+  Rocket,
+  ExternalLink,
 } from "lucide-react";
 import { ConversationsSection } from "@/components/sections/ConversationsSection";
 import { EventEditModal, type EventEditRow } from "@/components/EventEditModal";
