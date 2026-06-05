@@ -2427,7 +2427,157 @@ export default function TelegramMini() {
           </section>
         )}
 
+        {/* ===== PROJECTS TAB ===== */}
+        {tab === "projects" && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <Rocket className="w-3 h-3" />
+                community projects · {projects.length}
+              </h2>
+              {isMember && (
+                <button
+                  type="button"
+                  onClick={() => setProjectComposerOpen((o) => !o)}
+                  className="h-8 px-2.5 rounded-md bg-primary/10 border border-primary/30 text-primary font-mono text-[10px] uppercase tracking-widest flex items-center gap-1.5"
+                >
+                  {projectComposerOpen ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                  {projectComposerOpen ? "close" : "submit"}
+                </button>
+              )}
+            </div>
+
+            {projectComposerOpen && isMember && (
+              <div className="p-3 rounded-lg bg-card border border-primary/25 space-y-2">
+                <input
+                  value={newProjectTitle}
+                  onChange={(e) => setNewProjectTitle(e.target.value)}
+                  placeholder="project title"
+                  maxLength={120}
+                  className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
+                />
+                <input
+                  value={newProjectUrl}
+                  onChange={(e) => setNewProjectUrl(e.target.value)}
+                  placeholder="https://your-project-link.com"
+                  inputMode="url"
+                  className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60"
+                />
+                <textarea
+                  value={newProjectDescription}
+                  onChange={(e) => setNewProjectDescription(e.target.value)}
+                  placeholder="what is it? (optional)"
+                  rows={3}
+                  maxLength={1000}
+                  className="w-full bg-background border border-border rounded-md p-2 text-sm focus:outline-none focus:border-primary/60 resize-none"
+                />
+                <input
+                  value={newProjectTags}
+                  onChange={(e) => setNewProjectTags(e.target.value)}
+                  placeholder="tags (comma separated, e.g. ai, agents, telegram)"
+                  className="w-full bg-background border border-border rounded-md p-2 text-xs focus:outline-none focus:border-primary/60"
+                />
+                <input
+                  value={newProjectImageUrl}
+                  onChange={(e) => setNewProjectImageUrl(e.target.value)}
+                  placeholder="cover image url (optional)"
+                  className="w-full bg-background border border-border rounded-md p-2 text-xs focus:outline-none focus:border-primary/60"
+                />
+                <button
+                  type="button"
+                  onClick={addProject}
+                  disabled={savingProject || !newProjectTitle.trim() || !newProjectUrl.trim()}
+                  className="w-full h-9 rounded-md bg-primary text-primary-foreground font-mono text-[10px] uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {savingProject ? <Loader2 className="w-3 h-3 animate-spin" /> : <Rocket className="w-3 h-3" />}
+                  submit project
+                </button>
+              </div>
+            )}
+
+            {projectsLoading ? (
+              <div className="flex items-center py-6">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : projects.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                  <Rocket className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">no projects yet</p>
+                <p className="text-[11px] text-muted-foreground max-w-xs">
+                  builds, demos, and experiments from the residency will show up here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {projects.map((p) => {
+                  const author = Array.isArray(p.author) ? p.author[0] : p.author;
+                  return (
+                    <a
+                      key={p.id}
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-lg bg-card border border-border overflow-hidden hover:border-primary/40 transition-colors"
+                    >
+                      {p.image_url && (
+                        <div className="aspect-[16/9] bg-muted overflow-hidden">
+                          <img
+                            src={p.image_url}
+                            alt={p.title}
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget.parentElement as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div className="p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold leading-snug truncate">{p.title}</p>
+                            {author?.name && (
+                              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mt-1 truncate">
+                                by {author.name}{author.telegram_username ? ` · @${author.telegram_username}` : ""}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {p.is_featured && (
+                              <span className="rounded bg-primary/10 border border-primary/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary">
+                                featured
+                              </span>
+                            )}
+                            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+                          </div>
+                        </div>
+                        {p.description && (
+                          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+                            {p.description}
+                          </p>
+                        )}
+                        {p.tags && p.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {p.tags.slice(0, 6).map((t) => (
+                              <span key={t} className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground border border-border rounded px-1.5 py-0.5">
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* ===== WORKSHOPS TAB (admin only) — Local Business AI Series ===== */}
+
         {tab === "workshops" && isAdmin && (
           <section className="space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
