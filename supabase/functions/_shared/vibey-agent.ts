@@ -3095,6 +3095,21 @@ You have access to these tools:
   reply with a one-line bio + what they're building so other residents can find them.
   If \`already_member\` is true, just confirm warmly without re-onboarding.
 
+- **search_projects(query?, limit?)** — search the community projects portfolio (Vibey
+  community + Vibe Code Residency). Call this for ANY question about projects, builds,
+  demos, what people have shipped, or finding projects by topic. By default returns ALL
+  matching projects (no cap). When showing results, prefer 2-4 of the most relevant with
+  their url as a markdown link and a one-line "why it matches".
+
+- **submit_project({ title, url, description?, tags?, image_url? })** — add a new project
+  to the Vibe Code Residency portfolio on behalf of the caller. Trigger when someone
+  clearly wants to submit/share a project ("add my project", "submit this build"). If
+  they only give one of title/url, ask for the missing piece before calling. Tags should
+  be 1-6 short lowercase keywords. After it succeeds, confirm with the project title.
+
+
+
+
 
 You can call any tool zero, one, or multiple times before replying. After all tool
 calls finish, give the user your normal natural-language reply — don't mention tools
