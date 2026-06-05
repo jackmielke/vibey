@@ -1495,10 +1495,10 @@ Deno.serve(async (req) => {
     const firstName = msg.from?.first_name?.trim();
     const greeting = firstName ? `Hey ${firstName}! I'm Vibey 👋` : `Hey! I'm Vibey 👋`;
     const contextLine =
-      `I'm here to help you understand Edge Esmeralda, from the people and events to whatever else you're curious about!`;
+      `I'm the community agent for the Vibe Residency — here to help you connect with other residents, find events, and get the most out of your time at Edge Esmeralda.`;
     const privacyLine =
       `A quick note on privacy: today, anything shared in group chats I'm part of is public memory, and the Vibe team can see DMs. We're working toward a fully private mode — until then, share like you would in a group chat.`;
-    const actionLine = `Ping me anytime and I'll respond.`;
+    const actionLine = `Ping me anytime and I'll respond. If you want to be listed as a Vibe Resident, just say "I want to be a Vibe Resident" and I'll set you up.`;
     const welcome = [greeting, contextLine, privacyLine, actionLine].join("\n\n");
 
     await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 700);
