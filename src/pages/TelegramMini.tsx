@@ -1556,6 +1556,59 @@ export default function TelegramMini() {
     toast.success("event added");
   }
 
+  async function addProject() {
+    const title = newProjectTitle.trim();
+    const url = newProjectUrl.trim();
+    if (!title || !url) {
+      toast.error("Title and link required");
+      return;
+    }
+    try { new URL(url); } catch {
+      toast.error("That doesn't look like a valid URL");
+      return;
+    }
+    if (!myProfile?.id) {
+      toast.error("Couldn't submit project", { description: "Your profile is still loading." });
+      return;
+    }
+    const tags = newProjectTags
+      .split(",")
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean)
+      .slice(0, 6);
+
+    setSavingProject(true);
+    const { data, error } = await supabase
+      .from("projects")
+      .insert({
+        community_id: VIBE_CODE_RESIDENCY_COMMUNITY_ID,
+        created_by: myProfile.id,
+        title: title.slice(0, 120),
+        url,
+        description: newProjectDescription.trim() || null,
+        image_url: newProjectImageUrl.trim() || null,
+        tags: tags.length ? tags : null,
+        status: "active",
+      })
+      .select(PROJECT_SELECT)
+      .single();
+    setSavingProject(false);
+    if (error) {
+      toast.error("Couldn't submit project", { description: error.message });
+      return;
+    }
+    setProjects((prev) => [data as ProjectRow, ...prev]);
+    setNewProjectTitle("");
+    setNewProjectUrl("");
+    setNewProjectDescription("");
+    setNewProjectTags("");
+    setNewProjectImageUrl("");
+    setProjectComposerOpen(false);
+    toast.success("project submitted 🚀");
+  }
+
+
+
   const isMine = (m: MemoryRow) =>
     tgUserId != null &&
     Number((m.metadata as Record<string, unknown> | null)?.telegram_user_id) === tgUserId;
