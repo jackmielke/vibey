@@ -502,6 +502,52 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "search_projects",
+      description:
+        "Search the community projects portfolio (Vibey community + Vibe Code Residency) — the public showcase of things residents have built. Use for ANY question about projects, builds, demos, what people have shipped, portfolio, 'what's been made', or finding projects by topic/tag. Keyword match over title/description/tags. By default returns ALL matching projects (not a sample). Each item: id, title, description, url, image_url, tags, author (name + @telegram_username if any), is_featured, created_at, `mine` flag (true if the current caller submitted it).",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Optional keyword(s) to match against title/description/tags. Omit to browse the whole portfolio.",
+          },
+          limit: {
+            type: "integer",
+            description: "Optional cap. Default = no cap (returns all matches, up to 500). Only set when you want a smaller slice.",
+            minimum: 1,
+            maximum: 500,
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "submit_project",
+      description:
+        "Submit a new project to the Vibe Code Residency portfolio on behalf of the current caller. Trigger whenever someone clearly wants to share/submit/add a project they built (e.g. 'add my project', 'submit this build', 'put X in the portfolio'). Requires a title and a url; description and tags are optional but encouraged. The caller is recorded as the project author. After it succeeds, confirm warmly and include the project title so they know it landed.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Short project name (max ~80 chars)." },
+          url: { type: "string", description: "Public link to the project (live demo, GitHub repo, post, video, etc.)." },
+          description: { type: "string", description: "Optional 1-3 sentence description of what it is and why it's cool." },
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional 1-6 short lowercase keyword tags (e.g. ['ai','agents','telegram']).",
+          },
+          image_url: { type: "string", description: "Optional cover image URL." },
+        },
+        required: ["title", "url"],
+      },
+    },
+  },
 ];
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
