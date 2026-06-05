@@ -823,6 +823,12 @@ export async function loadEnabledToolNames(
   if (!rows.some((r) => r.name === "list_workshops")) {
     enabled.add("list_workshops");
   }
+  if (!rows.some((r) => r.name === "search_projects")) {
+    enabled.add("search_projects");
+  }
+  if (!rows.some((r) => r.name === "submit_project")) {
+    enabled.add("submit_project");
+  }
 
 
   return enabled;
