@@ -862,8 +862,19 @@ export default function TelegramMini() {
   const [adminLoading, setAdminLoading] = useState(false);
 
   // Tabs
-  type Tab = "memories" | "profiles" | "preferences" | "events" | "workshops" | "soul" | "chats";
+  type Tab = "memories" | "profiles" | "preferences" | "events" | "projects" | "workshops" | "soul" | "chats";
   const [tab, setTab] = useState<Tab>("memories");
+
+  // Projects portfolio
+  const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectComposerOpen, setProjectComposerOpen] = useState(false);
+  const [newProjectTitle, setNewProjectTitle] = useState("");
+  const [newProjectUrl, setNewProjectUrl] = useState("");
+  const [newProjectDescription, setNewProjectDescription] = useState("");
+  const [newProjectTags, setNewProjectTags] = useState("");
+  const [newProjectImageUrl, setNewProjectImageUrl] = useState("");
+  const [savingProject, setSavingProject] = useState(false);
 
   // Workshops (admin only — Local Business AI Series)
   type WorkshopRow = { week: number; slug: string; title: string; subtitle: string | null; date_label: string | null; starts_at: string | null; tool: string | null; capacity: number; sort_order: number };
