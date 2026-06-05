@@ -3598,6 +3598,14 @@ export function describeToolStart(name: string, args: Record<string, unknown>): 
       const w = args?.week;
       return w ? `🛠️ checking workshop week ${w}…` : "🛠️ pulling the Local Business AI Series roster…";
     }
+    case "search_projects": {
+      const q = String(args?.query ?? "").trim();
+      return q ? `🚀 searching projects for "${q.slice(0, 60)}"…` : "🚀 flipping through the portfolio…";
+    }
+    case "submit_project": {
+      const t = String(args?.title ?? "").trim();
+      return t ? `🚀 submitting "${t.slice(0, 60)}"…` : "🚀 adding that project to the portfolio…";
+    }
     default:
       return `⚙️ running ${name}…`;
   }
