@@ -3753,6 +3753,22 @@ export function describeToolDone(
         details: surveys ? `${surveys} survey response${surveys === 1 ? "" : "s"}` : undefined,
       };
     }
+    case "search_projects": {
+      if (result?.ok === false) return { label: `🚫 project search failed`, details: result?.error };
+      const n = Number(result?.count ?? 0);
+      const titles = Array.isArray(result?.projects)
+        ? (result.projects as Array<{ title?: string }>).slice(0, 4).map((p) => p.title).filter(Boolean).join(", ")
+        : "";
+      return {
+        label: n > 0 ? `🚀 found ${n} project${n === 1 ? "" : "s"}` : `🪨 no projects matched`,
+        details: titles || undefined,
+      };
+    }
+    case "submit_project": {
+      if (result?.ok === false) return { label: `🚫 couldn't submit project`, details: result?.error ?? result?.message };
+      const t = result?.project?.title;
+      return { label: `🚀 project submitted${t ? `: ${String(t).slice(0, 60)}` : ""}` };
+    }
     default:
       return { label: `✅ ${name} done` };
   }
