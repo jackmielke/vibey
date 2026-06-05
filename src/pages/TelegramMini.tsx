@@ -1239,6 +1239,34 @@ export default function TelegramMini() {
     };
   }, [authState]);
 
+  // 3b. Projects portfolio
+  useEffect(() => {
+    if (authState !== "ready") return;
+    let cancelled = false;
+    (async () => {
+      setProjectsLoading(true);
+      const { data, error } = await supabase
+        .from("projects")
+        .select(PROJECT_SELECT)
+        .in("community_id", [VIBEY_COMMUNITY_ID, VIBE_CODE_RESIDENCY_COMMUNITY_ID])
+        .eq("status", "active")
+        .order("is_featured", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (cancelled) return;
+      if (error) {
+        console.error("load projects failed", error.message);
+        setProjects([]);
+      } else {
+        setProjects((data ?? []) as ProjectRow[]);
+      }
+      setProjectsLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [authState]);
+
+
+
   // 2b. Workshops data (admin only, lazy-load when tab opens)
   useEffect(() => {
     if (tab !== "workshops" || !isAdmin || workshopsLoaded || workshopsLoading) return;
