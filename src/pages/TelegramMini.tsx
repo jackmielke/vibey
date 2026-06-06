@@ -251,15 +251,10 @@ function MemoryCard({
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
-      className={
-        "p-3 rounded-lg bg-card overflow-hidden " +
-        (isMine
-          ? "border-2 border-dashed border-primary/70 shadow-[0_0_0_3px_hsl(var(--primary)/0.08)]"
-          : "border border-border")
-      }
+      className="p-3 rounded-lg bg-card border border-border overflow-hidden"
     >
       <div className="flex items-start gap-3 min-w-0">
-        <Avatar className="w-9 h-9 shrink-0 ring-1 ring-border">
+        <Avatar className={"w-9 h-9 shrink-0 " + (isMine ? "ring-2 ring-primary" : "ring-1 ring-border")}>
           {author?.avatar_url ? (
             <AvatarImage src={author.avatar_url} alt={displayName} />
           ) : null}
@@ -272,7 +267,7 @@ function MemoryCard({
             <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
               <span className="text-xs font-semibold truncate">{displayName}</span>
               {isMine && (
-                <span className="text-[9px] font-mono uppercase tracking-widest text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/30">
+                <span className="text-[9px] font-mono uppercase tracking-widest text-primary px-1.5 py-0.5 rounded-sm bg-primary/10 border border-primary/30">
                   you
                 </span>
               )}
