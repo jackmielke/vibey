@@ -523,13 +523,48 @@ export function ConversationsSection() {
               );
             })()}
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium truncate">{headerLabel}</p>
-              <p className="text-[11px] text-muted-foreground font-mono flex items-center gap-1.5 min-w-0">
-                <TelegramIcon className="w-3 h-3 text-[#229ED9] shrink-0" />
-                <span className="truncate">
-                  {selected.kind === "group" ? selected.chatId : selected.telegramUserId} · {threadMessages.length} msgs
-                </span>
-              </p>
+              {selected.kind === "dm" ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setProfileLookup({
+                      telegramUserId: selectedDm?.telegramUserId ?? null,
+                      telegramUsername: selectedDm?.username ?? null,
+                    })
+                  }
+                  className="text-left -mx-1 -my-0.5 px-1 py-0.5 rounded hover:bg-muted/50 transition-colors min-w-0 max-w-full block"
+                  title="View profile"
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <p className="text-sm font-medium truncate">{headerLabel}</p>
+                    {selectedDm?.user?.is_vibe_resident && (
+                      <Sparkles className="w-3 h-3 text-primary shrink-0" aria-label="Vibe resident" />
+                    )}
+                    {selectedDm?.user?.world_id_verified && (
+                      <ShieldCheck className="w-3 h-3 text-primary/80 shrink-0" aria-label="World ID verified" />
+                    )}
+                    {selectedDm?.user?.phone_verified && (
+                      <Phone className="w-3 h-3 text-muted-foreground shrink-0" aria-label="Phone verified" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-mono flex items-center gap-1.5 min-w-0">
+                    <TelegramIcon className="w-3 h-3 text-[#229ED9] shrink-0" />
+                    <span className="truncate">
+                      {selectedDm?.username ? `@${selectedDm.username} · ` : ""}{selected.telegramUserId} · {threadMessages.length} msgs
+                    </span>
+                  </p>
+                </button>
+              ) : (
+                <>
+                  <p className="text-sm font-medium truncate">{headerLabel}</p>
+                  <p className="text-[11px] text-muted-foreground font-mono flex items-center gap-1.5 min-w-0">
+                    <TelegramIcon className="w-3 h-3 text-[#229ED9] shrink-0" />
+                    <span className="truncate">
+                      {selected.chatId} · {threadMessages.length} msgs
+                    </span>
+                  </p>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {updating && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
