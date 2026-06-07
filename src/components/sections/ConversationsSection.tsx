@@ -538,7 +538,7 @@ export function ConversationsSection() {
                 >
                   <div className="flex items-center gap-1.5 min-w-0">
                     <p className="text-sm font-medium truncate">{headerLabel}</p>
-                    {selectedDm?.user?.is_vibe_resident && (
+                    {(selectedDm?.user?.is_vibe_resident || selectedDm?.user?.is_claimed) && (
                       <Sparkles className="w-3 h-3 text-primary shrink-0" aria-label="Vibe resident" />
                     )}
                     {selectedDm?.user?.world_id_verified && (
