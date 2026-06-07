@@ -708,7 +708,7 @@ export function ConversationsSection() {
             const next = new Map(prev);
             if (updated.telegram_user_id) {
               const cur = next.get(Number(updated.telegram_user_id));
-              if (cur) next.set(Number(updated.telegram_user_id), { ...cur, is_vibe_resident: updated.is_vibe_resident, world_id_verified: updated.world_id_verified, phone_verified: updated.phone_verified });
+              if (cur) next.set(Number(updated.telegram_user_id), { ...cur, is_vibe_resident: updated.is_vibe_resident, is_claimed: updated.is_claimed ?? cur.is_claimed, world_id_verified: updated.world_id_verified, phone_verified: updated.phone_verified });
             }
             return next;
           });
@@ -717,7 +717,7 @@ export function ConversationsSection() {
             if (updated.telegram_username) {
               const key = updated.telegram_username.toLowerCase();
               const cur = next.get(key);
-              if (cur) next.set(key, { ...cur, is_vibe_resident: updated.is_vibe_resident, world_id_verified: updated.world_id_verified, phone_verified: updated.phone_verified });
+              if (cur) next.set(key, { ...cur, is_vibe_resident: updated.is_vibe_resident, is_claimed: updated.is_claimed ?? cur.is_claimed, world_id_verified: updated.world_id_verified, phone_verified: updated.phone_verified });
             }
             return next;
           });
