@@ -112,6 +112,9 @@ export function ConversationsSection() {
     | { kind: "dm"; telegramUserId: number }
     | null
   >(null);
+  const [profileLookup, setProfileLookup] = useState<
+    { telegramUserId?: number | null; telegramUsername?: string | null } | null
+  >(null);
   const threadEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
