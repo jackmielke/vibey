@@ -152,7 +152,7 @@ export function UserProfileDialog({
                     <DialogDescription className="font-mono text-xs">@{handle}</DialogDescription>
                   )}
                   <div className="flex flex-wrap gap-1 mt-1.5">
-                    {profile.is_vibe_resident && (
+                    {(profile.is_vibe_resident || profile.is_claimed) && (
                       <Badge className="text-[10px] gap-1 bg-primary/15 text-primary border-primary/30 hover:bg-primary/20">
                         <Sparkles className="w-2.5 h-2.5" /> Vibe resident
                       </Badge>

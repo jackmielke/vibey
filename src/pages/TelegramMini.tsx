@@ -899,6 +899,7 @@ export default function TelegramMini() {
     intentions: string | null;
     interests_skills: string[] | null;
     is_claimed: boolean | null;
+    is_vibe_resident: boolean | null;
   };
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
   const [directoryLoading, setDirectoryLoading] = useState(true);
@@ -1322,7 +1323,7 @@ export default function TelegramMini() {
       const { data, error } = await supabase
         .from("community_members")
         .select(
-          "user_id, users:users!community_members_user_id_fkey(id, auth_user_id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, instagram_handle, twitter_handle, source_url, headline, bio, intentions, interests_skills, is_claimed)",
+          "user_id, users:users!community_members_user_id_fkey(id, auth_user_id, name, avatar_url, profile_picture_url, telegram_photo_url, telegram_username, instagram_handle, twitter_handle, source_url, headline, bio, intentions, interests_skills, is_claimed, is_vibe_resident)",
         )
         .in("community_id", DIRECTORY_COMMUNITY_IDS)
         .limit(2000);
@@ -1348,10 +1349,11 @@ export default function TelegramMini() {
           const existing = byKey.get(key);
           if (!existing || score(u) > score(existing)) byKey.set(key, u);
         }
-        // Sort: claimed profiles (Vibe Residents) first, then by profile richness, then alpha.
+        // Sort: Vibe Residents (claimed OR explicitly marked) first, then by profile richness, then alpha.
+        const isResident = (u: DirectoryEntry) => !!(u.is_claimed || u.is_vibe_resident);
         const entries = Array.from(byKey.values()).sort((a, b) => {
-          const claimDiff = (b.is_claimed ? 1 : 0) - (a.is_claimed ? 1 : 0);
-          if (claimDiff !== 0) return claimDiff;
+          const residentDiff = (isResident(b) ? 1 : 0) - (isResident(a) ? 1 : 0);
+          if (residentDiff !== 0) return residentDiff;
           const diff = score(b) - score(a);
           if (diff !== 0) return diff;
           return (a.name ?? "~").localeCompare(b.name ?? "~");
@@ -2042,7 +2044,7 @@ export default function TelegramMini() {
                                 @{u.telegram_username.replace(/^@/, "")}
                               </span>
                             )}
-                            {u.is_claimed ? (
+                            {(u.is_claimed || u.is_vibe_resident) ? (
                               <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/30">
                                 resident
                               </span>

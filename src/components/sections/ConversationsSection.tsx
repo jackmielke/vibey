@@ -23,6 +23,7 @@ type UserLite = {
   telegram_photo_url: string | null;
   avatar_url: string | null;
   is_vibe_resident: boolean | null;
+  is_claimed: boolean | null;
   world_id_verified: boolean | null;
   phone_verified: boolean | null;
 };
@@ -133,7 +134,7 @@ export function ConversationsSection() {
           supabase.from("telegram_dm_settings")
             .select("telegram_user_id, telegram_username, display_name, enabled, mode"),
           supabase.from("users")
-            .select("id, name, telegram_username, telegram_user_id, telegram_photo_url, avatar_url, is_vibe_resident, world_id_verified, phone_verified")
+            .select("id, name, telegram_username, telegram_user_id, telegram_photo_url, avatar_url, is_vibe_resident, is_claimed, world_id_verified, phone_verified")
             .or("telegram_username.not.is.null,telegram_user_id.not.is.null"),
         ]);
 
@@ -537,7 +538,7 @@ export function ConversationsSection() {
                 >
                   <div className="flex items-center gap-1.5 min-w-0">
                     <p className="text-sm font-medium truncate">{headerLabel}</p>
-                    {selectedDm?.user?.is_vibe_resident && (
+                    {(selectedDm?.user?.is_vibe_resident || selectedDm?.user?.is_claimed) && (
                       <Sparkles className="w-3 h-3 text-primary shrink-0" aria-label="Vibe resident" />
                     )}
                     {selectedDm?.user?.world_id_verified && (
@@ -707,7 +708,7 @@ export function ConversationsSection() {
             const next = new Map(prev);
             if (updated.telegram_user_id) {
               const cur = next.get(Number(updated.telegram_user_id));
-              if (cur) next.set(Number(updated.telegram_user_id), { ...cur, is_vibe_resident: updated.is_vibe_resident, world_id_verified: updated.world_id_verified, phone_verified: updated.phone_verified });
+              if (cur) next.set(Number(updated.telegram_user_id), { ...cur, is_vibe_resident: updated.is_vibe_resident, is_claimed: updated.is_claimed ?? cur.is_claimed, world_id_verified: updated.world_id_verified, phone_verified: updated.phone_verified });
             }
             return next;
           });
@@ -716,7 +717,7 @@ export function ConversationsSection() {
             if (updated.telegram_username) {
               const key = updated.telegram_username.toLowerCase();
               const cur = next.get(key);
-              if (cur) next.set(key, { ...cur, is_vibe_resident: updated.is_vibe_resident, world_id_verified: updated.world_id_verified, phone_verified: updated.phone_verified });
+              if (cur) next.set(key, { ...cur, is_vibe_resident: updated.is_vibe_resident, is_claimed: updated.is_claimed ?? cur.is_claimed, world_id_verified: updated.world_id_verified, phone_verified: updated.phone_verified });
             }
             return next;
           });
