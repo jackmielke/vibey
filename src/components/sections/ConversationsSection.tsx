@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowLeft, Coins, Loader2, MessagesSquare, UsersRound, Zap } from "lucide-react";
+import { ArrowLeft, Coins, Loader2, MessagesSquare, Phone, ShieldCheck, Sparkles, UsersRound, Zap } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { TelegramIcon } from "@/components/icons/TelegramIcon";
+import { UserProfileDialog } from "@/components/UserProfileDialog";
 import { formatCredits, formatTokens } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
