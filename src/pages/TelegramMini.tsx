@@ -29,6 +29,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { ConversationsSection } from "@/components/sections/ConversationsSection";
+import { BracketSection } from "@/components/sections/BracketSection";
+import { Trophy } from "lucide-react";
 import { EventEditModal, type EventEditRow } from "@/components/EventEditModal";
 import { VibeyPortal } from "@/components/VibeyPortal";
 import { HeartbeatToggles } from "@/components/HeartbeatToggles";
@@ -857,7 +859,7 @@ export default function TelegramMini() {
   const [adminLoading, setAdminLoading] = useState(false);
 
   // Tabs
-  type Tab = "memories" | "profiles" | "preferences" | "events" | "projects" | "workshops" | "soul" | "chats";
+  type Tab = "memories" | "profiles" | "preferences" | "events" | "projects" | "workshops" | "soul" | "chats" | "bracket";
   const [tab, setTab] = useState<Tab>("memories");
 
   // Projects portfolio
@@ -1699,6 +1701,7 @@ export default function TelegramMini() {
     ...(isAdmin ? [{ id: "workshops" as Tab, label: "workshops", icon: GraduationCap }] : []),
     ...(isAdmin ? [{ id: "chats" as Tab, label: "chats", icon: MessagesSquare }] : []),
     { id: "soul", label: "soul", icon: Sparkles },
+    { id: "bracket", label: "bracket", icon: Trophy },
   ];
 
   return (
@@ -2716,6 +2719,9 @@ export default function TelegramMini() {
             <ConversationsSection />
           </section>
         )}
+
+        {/* ===== BRACKET TAB ===== */}
+        {tab === "bracket" && <BracketSection />}
       </div>
 
       {editingMemory && (
