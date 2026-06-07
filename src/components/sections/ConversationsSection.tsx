@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { TelegramIcon } from "@/components/icons/TelegramIcon";
 import { UserProfileDialog } from "@/components/UserProfileDialog";
+import { pickBestProfile } from "@/lib/profiles";
 import { formatCredits, formatTokens } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
