@@ -3386,6 +3386,7 @@ export type Database = {
           intentions: string | null
           interests_skills: string[] | null
           is_claimed: boolean | null
+          is_vibe_resident: boolean
           name: string | null
           original_item_id: number | null
           phone_number: string | null
@@ -3399,6 +3400,7 @@ export type Database = {
           universal_id: string
           updated_at: string
           username: string | null
+          vibe_resident_at: string | null
           vibecoin_balance: number
           wallet_address: string | null
           wallet_connected_at: string | null
@@ -3419,6 +3421,7 @@ export type Database = {
           intentions?: string | null
           interests_skills?: string[] | null
           is_claimed?: boolean | null
+          is_vibe_resident?: boolean
           name?: string | null
           original_item_id?: number | null
           phone_number?: string | null
@@ -3432,6 +3435,7 @@ export type Database = {
           universal_id: string
           updated_at?: string
           username?: string | null
+          vibe_resident_at?: string | null
           vibecoin_balance?: number
           wallet_address?: string | null
           wallet_connected_at?: string | null
@@ -3452,6 +3456,7 @@ export type Database = {
           intentions?: string | null
           interests_skills?: string[] | null
           is_claimed?: boolean | null
+          is_vibe_resident?: boolean
           name?: string | null
           original_item_id?: number | null
           phone_number?: string | null
@@ -3465,6 +3470,7 @@ export type Database = {
           universal_id?: string
           updated_at?: string
           username?: string | null
+          vibe_resident_at?: string | null
           vibecoin_balance?: number
           wallet_address?: string | null
           wallet_connected_at?: string | null

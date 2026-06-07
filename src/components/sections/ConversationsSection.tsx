@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowLeft, Coins, Loader2, MessagesSquare, UsersRound, Zap } from "lucide-react";
+import { ArrowLeft, Coins, Loader2, MessagesSquare, Phone, ShieldCheck, Sparkles, UsersRound, Zap } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { TelegramIcon } from "@/components/icons/TelegramIcon";
+import { UserProfileDialog } from "@/components/UserProfileDialog";
 import { formatCredits, formatTokens } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -21,6 +22,9 @@ type UserLite = {
   telegram_user_id: number | null;
   telegram_photo_url: string | null;
   avatar_url: string | null;
+  is_vibe_resident: boolean | null;
+  world_id_verified: boolean | null;
+  phone_verified: boolean | null;
 };
 
 type ChatLog = {
@@ -108,6 +112,9 @@ export function ConversationsSection() {
     | { kind: "dm"; telegramUserId: number }
     | null
   >(null);
+  const [profileLookup, setProfileLookup] = useState<
+    { telegramUserId?: number | null; telegramUsername?: string | null } | null
+  >(null);
   const threadEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -126,7 +133,7 @@ export function ConversationsSection() {
           supabase.from("telegram_dm_settings")
             .select("telegram_user_id, telegram_username, display_name, enabled, mode"),
           supabase.from("users")
-            .select("id, name, telegram_username, telegram_user_id, telegram_photo_url, avatar_url")
+            .select("id, name, telegram_username, telegram_user_id, telegram_photo_url, avatar_url, is_vibe_resident, world_id_verified, phone_verified")
             .or("telegram_username.not.is.null,telegram_user_id.not.is.null"),
         ]);
 
@@ -516,13 +523,48 @@ export function ConversationsSection() {
               );
             })()}
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium truncate">{headerLabel}</p>
-              <p className="text-[11px] text-muted-foreground font-mono flex items-center gap-1.5 min-w-0">
-                <TelegramIcon className="w-3 h-3 text-[#229ED9] shrink-0" />
-                <span className="truncate">
-                  {selected.kind === "group" ? selected.chatId : selected.telegramUserId} · {threadMessages.length} msgs
-                </span>
-              </p>
+              {selected.kind === "dm" ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setProfileLookup({
+                      telegramUserId: selectedDm?.telegramUserId ?? null,
+                      telegramUsername: selectedDm?.username ?? null,
+                    })
+                  }
+                  className="text-left -mx-1 -my-0.5 px-1 py-0.5 rounded hover:bg-muted/50 transition-colors min-w-0 max-w-full block"
+                  title="View profile"
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <p className="text-sm font-medium truncate">{headerLabel}</p>
+                    {selectedDm?.user?.is_vibe_resident && (
+                      <Sparkles className="w-3 h-3 text-primary shrink-0" aria-label="Vibe resident" />
+                    )}
+                    {selectedDm?.user?.world_id_verified && (
+                      <ShieldCheck className="w-3 h-3 text-primary/80 shrink-0" aria-label="World ID verified" />
+                    )}
+                    {selectedDm?.user?.phone_verified && (
+                      <Phone className="w-3 h-3 text-muted-foreground shrink-0" aria-label="Phone verified" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground font-mono flex items-center gap-1.5 min-w-0">
+                    <TelegramIcon className="w-3 h-3 text-[#229ED9] shrink-0" />
+                    <span className="truncate">
+                      {selectedDm?.username ? `@${selectedDm.username} · ` : ""}{selected.telegramUserId} · {threadMessages.length} msgs
+                    </span>
+                  </p>
+                </button>
+              ) : (
+                <>
+                  <p className="text-sm font-medium truncate">{headerLabel}</p>
+                  <p className="text-[11px] text-muted-foreground font-mono flex items-center gap-1.5 min-w-0">
+                    <TelegramIcon className="w-3 h-3 text-[#229ED9] shrink-0" />
+                    <span className="truncate">
+                      {selected.chatId} · {threadMessages.length} msgs
+                    </span>
+                  </p>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {updating && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
@@ -654,6 +696,32 @@ export function ConversationsSection() {
           {renderDetail()}
         </div>
       </div>
+
+      <UserProfileDialog
+        open={!!profileLookup}
+        onOpenChange={(o) => { if (!o) setProfileLookup(null); }}
+        lookup={profileLookup}
+        onChanged={(updated) => {
+          // Reflect new is_vibe_resident/verification flags into the in-memory user maps
+          setUsersByTgId((prev) => {
+            const next = new Map(prev);
+            if (updated.telegram_user_id) {
+              const cur = next.get(Number(updated.telegram_user_id));
+              if (cur) next.set(Number(updated.telegram_user_id), { ...cur, is_vibe_resident: updated.is_vibe_resident, world_id_verified: updated.world_id_verified, phone_verified: updated.phone_verified });
+            }
+            return next;
+          });
+          setUsersByTgUsername((prev) => {
+            const next = new Map(prev);
+            if (updated.telegram_username) {
+              const key = updated.telegram_username.toLowerCase();
+              const cur = next.get(key);
+              if (cur) next.set(key, { ...cur, is_vibe_resident: updated.is_vibe_resident, world_id_verified: updated.world_id_verified, phone_verified: updated.phone_verified });
+            }
+            return next;
+          });
+        }}
+      />
     </div>
   );
 }
