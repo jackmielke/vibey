@@ -64,6 +64,7 @@ const App = () => (
           <Route path="/mini" element={<TelegramMini />} />
           <Route path="/chat" element={<PublicChat />} />
           <Route path="/docs" element={<PublicDocs />} />
+          <Route path="/golden-goal" element={<GoldenGoalLanding />} />
           <Route element={<RequireAdmin><AdminLayout /></RequireAdmin>}>
             <Route index element={<Chat />} />
             <Route path="lovable-chat" element={<LovableChat />} />
