@@ -4055,6 +4055,14 @@ export type Database = {
       }
     }
     Functions: {
+      admin_auto_merge_telegram_username_duplicates: {
+        Args: { dry_run?: boolean }
+        Returns: {
+          merged_count: number
+          primary_id: string
+          tg_username: string
+        }[]
+      }
       admin_list_survey_responses: {
         Args: { _password: string }
         Returns: {
@@ -4079,6 +4087,18 @@ export type Database = {
           sms_opt_in: boolean
           status: string
           workshop_weeks: number[]
+        }[]
+      }
+      admin_merge_user_pair: {
+        Args: { loser_id: string; primary_id: string }
+        Returns: undefined
+      }
+      admin_preview_telegram_username_duplicate_groups: {
+        Args: never
+        Returns: {
+          n: number
+          rows: Json
+          tg_username: string
         }[]
       }
       admin_set_inquiry_status: {
