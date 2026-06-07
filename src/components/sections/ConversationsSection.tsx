@@ -22,6 +22,9 @@ type UserLite = {
   telegram_user_id: number | null;
   telegram_photo_url: string | null;
   avatar_url: string | null;
+  is_vibe_resident: boolean | null;
+  world_id_verified: boolean | null;
+  phone_verified: boolean | null;
 };
 
 type ChatLog = {
