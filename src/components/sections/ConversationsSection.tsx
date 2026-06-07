@@ -6,12 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TelegramIcon } from "@/components/icons/TelegramIcon";
 import { formatCredits, formatTokens } from "@/lib/usage";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type Mode = "read_only" | "reply";
+type Filter = "all" | "groups" | "dms";
 
 type UserLite = {
   id: string;
@@ -69,6 +70,16 @@ type DmConversation = {
   user: UserLite | null;
 };
 
+type GroupConversation = GroupRow & {
+  lastMessageAt: string;
+  lastPreview: string;
+  messageCount: number;
+};
+
+type ConvItem =
+  | { kind: "group"; key: string; lastMessageAt: string; group: GroupConversation }
+  | { kind: "dm"; key: string; lastMessageAt: string; dm: DmConversation };
+
 const PAGE_SIZE = 500;
 
 function initialsOf(label: string) {
@@ -77,8 +88,9 @@ function initialsOf(label: string) {
 
 export function ConversationsSection() {
   const [params, setParams] = useSearchParams();
-  const tab = (params.get("tab") as "groups" | "dms") || "groups";
-  const setTab = (next: string) => {
+  const rawTab = params.get("tab");
+  const filter: Filter = rawTab === "groups" ? "groups" : rawTab === "dms" ? "dms" : "all";
+  const setFilter = (next: Filter) => {
     const p = new URLSearchParams(params);
     p.set("tab", next);
     setParams(p, { replace: true });
@@ -137,7 +149,6 @@ export function ConversationsSection() {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Group permission persist ──
   const persistGroup = async (chatId: number, patch: Partial<GroupRow>) => {
     const key = `g:${chatId}`;
     setUpdatingKey(key);
@@ -158,7 +169,6 @@ export function ConversationsSection() {
     setGroups((prev) => prev.map((g) => (g.chat_id === chatId ? (data as GroupRow) : g)));
   };
 
-  // ── DM permission persist (upsert) ──
   const persistDm = async (
     telegramUserId: number,
     username: string | null,
@@ -210,7 +220,33 @@ export function ConversationsSection() {
     });
   };
 
-  // ── Derive DM conversations from logs + settings ──
+  // ── Build group conversations w/ last activity ──
+  const groupConversations = useMemo<GroupConversation[]>(() => {
+    const stats = new Map<number, { lastMessageAt: string; lastPreview: string; count: number }>();
+    for (const log of logs) {
+      if (log.telegram_chat_id === null || log.telegram_chat_id >= 0) continue;
+      const cur = stats.get(log.telegram_chat_id);
+      if (!cur) {
+        stats.set(log.telegram_chat_id, {
+          lastMessageAt: log.created_at,
+          lastPreview: log.user_message,
+          count: 1,
+        });
+      } else {
+        cur.count += 1;
+      }
+    }
+    return groups.map((g) => {
+      const s = stats.get(g.chat_id);
+      return {
+        ...g,
+        lastMessageAt: s?.lastMessageAt ?? g.added_at,
+        lastPreview: s?.lastPreview ?? "",
+        messageCount: s?.count ?? 0,
+      };
+    });
+  }, [groups, logs]);
+
   const dmConversations = useMemo<DmConversation[]>(() => {
     const settingsById = new Map(dmSettings.map((d) => [d.telegram_user_id, d]));
     const map = new Map<number, DmConversation>();
@@ -243,7 +279,6 @@ export function ConversationsSection() {
         user,
       });
     }
-    // Also include DMs that have an explicit setting but no logs yet
     for (const s of dmSettings) {
       if (map.has(s.telegram_user_id)) continue;
       const user = usersByTgId.get(s.telegram_user_id)
@@ -265,7 +300,31 @@ export function ConversationsSection() {
     return Array.from(map.values()).sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
   }, [logs, dmSettings, usersByTgId, usersByTgUsername]);
 
-  // ── Thread messages for selected ──
+  // ── Unified, sorted list of all conversations ──
+  const allItems = useMemo<ConvItem[]>(() => {
+    const items: ConvItem[] = [
+      ...groupConversations.map<ConvItem>((g) => ({
+        kind: "group",
+        key: `g:${g.chat_id}`,
+        lastMessageAt: g.lastMessageAt,
+        group: g,
+      })),
+      ...dmConversations.map<ConvItem>((d) => ({
+        kind: "dm",
+        key: `d:${d.telegramUserId}`,
+        lastMessageAt: d.lastMessageAt,
+        dm: d,
+      })),
+    ];
+    return items.sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
+  }, [groupConversations, dmConversations]);
+
+  const filteredItems = useMemo(() => {
+    if (filter === "groups") return allItems.filter((i) => i.kind === "group");
+    if (filter === "dms") return allItems.filter((i) => i.kind === "dm");
+    return allItems;
+  }, [allItems, filter]);
+
   const threadMessages = useMemo(() => {
     if (!selected) return [];
     return logs
@@ -292,28 +351,165 @@ export function ConversationsSection() {
     );
   }
 
-  // ── Thread detail view ──
-  if (selected) {
-    const headerLabel = selected.kind === "group"
-      ? groups.find((g) => g.chat_id === selected.chatId)?.chat_title ?? `Group ${selected.chatId}`
-      : dmConversations.find((d) => d.telegramUserId === selected.telegramUserId)?.label ?? `User ${selected.telegramUserId}`;
+  const counts = {
+    all: allItems.length,
+    groups: groupConversations.length,
+    dms: dmConversations.length,
+  };
+
+  // ── List item renderers ──
+  const renderRow = (item: ConvItem) => {
+    const isSelected =
+      selected?.kind === item.kind &&
+      ((selected.kind === "group" && item.kind === "group" && selected.chatId === item.group.chat_id) ||
+        (selected.kind === "dm" && item.kind === "dm" && selected.telegramUserId === item.dm.telegramUserId));
+
+    if (item.kind === "group") {
+      const g = item.group;
+      return (
+        <button
+          key={item.key}
+          type="button"
+          onClick={() => setSelected({ kind: "group", chatId: g.chat_id })}
+          className={cn(
+            "w-full text-left px-3 py-2.5 rounded-lg border transition-colors flex items-start gap-3 min-w-0",
+            isSelected
+              ? "bg-primary/10 border-primary/40"
+              : "bg-card border-border hover:bg-muted/40",
+          )}
+        >
+          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <UsersRound className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium truncate">{g.chat_title ?? `Chat ${g.chat_id}`}</p>
+              <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+                {g.lastMessageAt !== g.added_at || g.messageCount > 0
+                  ? formatDistanceToNow(new Date(g.lastMessageAt), { addSuffix: false })
+                  : "—"}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              {g.lastPreview || <span className="italic">group · {g.messageCount} msgs</span>}
+            </p>
+            <p className="text-[10px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1.5">
+              <span className={cn("inline-block w-1.5 h-1.5 rounded-full", g.enabled ? "bg-primary" : "bg-muted-foreground/30")} />
+              {g.enabled ? (g.mode === "reply" ? "reply" : "read-only") : "off"}
+            </p>
+          </div>
+        </button>
+      );
+    }
+
+    const c = item.dm;
+    const enabled = c.setting?.enabled ?? true;
+    const mode: Mode = c.setting?.mode ?? (c.hasReplies ? "reply" : "read_only");
+    const isExplicit = !!c.setting;
+    const photoUrl = c.user?.telegram_photo_url || c.user?.avatar_url || undefined;
+    return (
+      <button
+        key={item.key}
+        type="button"
+        onClick={() => setSelected({ kind: "dm", telegramUserId: c.telegramUserId })}
+        className={cn(
+          "w-full text-left px-3 py-2.5 rounded-lg border transition-colors flex items-start gap-3 min-w-0",
+          isSelected
+            ? "bg-primary/10 border-primary/40"
+            : "bg-card border-border hover:bg-muted/40",
+        )}
+      >
+        <Avatar className="h-10 w-10 rounded-lg ring-1 ring-border shrink-0">
+          {photoUrl && <AvatarImage src={photoUrl} alt={c.label} />}
+          <AvatarFallback className="rounded-lg text-[11px] font-mono">{initialsOf(c.label)}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium truncate">{c.label}</p>
+            <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+              {c.messageCount > 0 ? formatDistanceToNow(new Date(c.lastMessageAt), { addSuffix: false }) : "—"}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">{c.lastPreview || (c.username ? `@${c.username}` : "—")}</p>
+          <p className="text-[10px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1.5">
+            <span className={cn("inline-block w-1.5 h-1.5 rounded-full", enabled ? "bg-primary" : "bg-muted-foreground/30")} />
+            {enabled ? (mode === "reply" ? "reply" : "read-only") : "off"}
+            {!isExplicit && <span className="italic opacity-70">· inferred</span>}
+          </p>
+        </div>
+      </button>
+    );
+  };
+
+  const FilterBar = (
+    <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/40 border border-border w-fit">
+      {(["all", "groups", "dms"] as Filter[]).map((f) => (
+        <button
+          key={f}
+          type="button"
+          onClick={() => setFilter(f)}
+          className={cn(
+            "px-3 py-1 text-xs font-mono uppercase tracking-wider rounded-md transition-colors",
+            filter === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {f === "dms" ? "DMs" : f} <span className="opacity-60">({counts[f]})</span>
+        </button>
+      ))}
+    </div>
+  );
+
+  // ── Thread / detail pane ──
+  const renderDetail = () => {
+    if (!selected) {
+      return (
+        <div className="hidden md:flex flex-col items-center justify-center text-center py-16 text-muted-foreground">
+          <MessagesSquare className="w-8 h-8 mb-3 opacity-40" />
+          <p className="text-sm">Select a conversation</p>
+        </div>
+      );
+    }
+
+    const selectedGroup = selected.kind === "group"
+      ? groupConversations.find((g) => g.chat_id === selected.chatId) ?? null
+      : null;
+    const selectedDm = selected.kind === "dm"
+      ? dmConversations.find((d) => d.telegramUserId === selected.telegramUserId) ?? null
+      : null;
+    const headerLabel = selectedGroup?.chat_title ?? selectedDm?.label
+      ?? (selected.kind === "group" ? `Group ${selected.chatId}` : `User ${selected.telegramUserId}`);
+
+    const updating = selected.kind === "group"
+      ? updatingKey === `g:${selected.chatId}`
+      : updatingKey === `d:${selected.telegramUserId}`;
+
+    const enabled = selectedGroup?.enabled
+      ?? selectedDm?.setting?.enabled
+      ?? true;
+    const mode: Mode = selectedGroup?.mode
+      ?? selectedDm?.setting?.mode
+      ?? (selectedDm?.hasReplies ? "reply" : "read_only");
 
     return (
-      <div className="space-y-4 max-w-3xl w-full min-w-0">
-        <div className="sticky -top-5 -mx-5 px-5 pt-5 pb-3 z-10 bg-background/95 backdrop-blur-sm border-b border-border space-y-3">
-          <Button variant="ghost" size="sm" className="gap-1.5 -ml-2" onClick={() => setSelected(null)}>
-            <ArrowLeft className="w-4 h-4" /> Back
-          </Button>
+      <div className="flex flex-col h-full min-w-0">
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3 space-y-3">
           <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="md:hidden gap-1.5 -ml-2"
+              onClick={() => setSelected(null)}
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
             {selected.kind === "group" ? (
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+              <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                 <UsersRound className="w-4 h-4 text-muted-foreground" />
               </div>
             ) : (() => {
-              const dm = dmConversations.find((d) => d.telegramUserId === selected.telegramUserId);
-              const url = dm?.user?.telegram_photo_url || dm?.user?.avatar_url || undefined;
+              const url = selectedDm?.user?.telegram_photo_url || selectedDm?.user?.avatar_url || undefined;
               return (
-                <Avatar className="h-10 w-10 rounded-lg ring-1 ring-border">
+                <Avatar className="h-9 w-9 rounded-lg ring-1 ring-border">
                   {url && <AvatarImage src={url} alt={headerLabel} />}
                   <AvatarFallback className="rounded-lg text-[11px] font-mono">{initialsOf(headerLabel)}</AvatarFallback>
                 </Avatar>
@@ -321,22 +517,69 @@ export function ConversationsSection() {
             })()}
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium truncate">{headerLabel}</p>
-              <p className="text-xs text-muted-foreground font-mono flex items-center gap-1.5 min-w-0">
+              <p className="text-[11px] text-muted-foreground font-mono flex items-center gap-1.5 min-w-0">
                 <TelegramIcon className="w-3 h-3 text-[#229ED9] shrink-0" />
                 <span className="truncate">
-                  {selected.kind === "group" ? selected.chatId : selected.telegramUserId} · {threadMessages.length} messages
+                  {selected.kind === "group" ? selected.chatId : selected.telegramUserId} · {threadMessages.length} msgs
                 </span>
               </p>
             </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {updating && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                  {enabled ? "on" : "off"}
+                </span>
+                <Switch
+                  checked={enabled}
+                  onCheckedChange={(checked) => {
+                    if (selected.kind === "group") {
+                      persistGroup(selected.chatId, checked
+                        ? { enabled: true, enabled_at: new Date().toISOString() }
+                        : { enabled: false });
+                    } else if (selectedDm) {
+                      persistDm(selectedDm.telegramUserId, selectedDm.username, selectedDm.user?.name ?? null, { enabled: checked });
+                    }
+                  }}
+                  disabled={updating}
+                />
+              </div>
+            </div>
           </div>
+          {enabled && (
+            <div className="flex items-center justify-between gap-4 pt-2 border-t border-border/50">
+              <div className="min-w-0">
+                <p className="text-xs font-medium">
+                  {mode === "reply" ? "Reply mode" : "Read-only mode"}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {selected.kind === "group"
+                    ? (mode === "reply" ? "Replies when @mentioned or replied to." : "Listens silently — no replies.")
+                    : (mode === "reply" ? "Vibey replies to this person." : "Vibey reads but doesn't reply.")}
+                </p>
+              </div>
+              <Switch
+                checked={mode === "reply"}
+                onCheckedChange={(checked) => {
+                  if (selected.kind === "group") {
+                    persistGroup(selected.chatId, { mode: checked ? "reply" : "read_only" });
+                  } else if (selectedDm) {
+                    persistDm(selectedDm.telegramUserId, selectedDm.username, selectedDm.user?.name ?? null, {
+                      mode: checked ? "reply" : "read_only",
+                      enabled: true,
+                    });
+                  }
+                }}
+                disabled={updating}
+              />
+            </div>
+          )}
         </div>
 
-
-        {threadMessages.length === 0 && (
-          <p className="text-sm text-muted-foreground py-8 text-center">No messages yet.</p>
-        )}
-
-        <div className="space-y-3">
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+          {threadMessages.length === 0 && (
+            <p className="text-sm text-muted-foreground py-8 text-center">No messages yet.</p>
+          )}
           {threadMessages.map((m) => (
             <div key={m.id} className="space-y-2">
               <div className="flex flex-col items-end">
@@ -376,193 +619,41 @@ export function ConversationsSection() {
         </div>
       </div>
     );
-  }
+  };
 
-  // ── List view with tabs ──
+  // ── Layout ──
   return (
-    <div className="space-y-4 max-w-2xl w-full min-w-0">
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid w-full grid-cols-2 max-w-xs">
-          <TabsTrigger value="groups">
-            Groups <span className="ml-1.5 text-muted-foreground">({groups.length})</span>
-          </TabsTrigger>
-          <TabsTrigger value="dms">
-            DMs <span className="ml-1.5 text-muted-foreground">({dmConversations.length})</span>
-          </TabsTrigger>
-        </TabsList>
+    <div className="space-y-3 w-full min-w-0">
+      {/* On mobile, hide list when a thread is selected (Telegram-mobile style) */}
+      <div className={cn("space-y-3", selected && "hidden md:block")}>{FilterBar}</div>
 
-        {/* GROUPS */}
-        <TabsContent value="groups" className="space-y-3 mt-4">
-          {groups.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
-                <UsersRound className="w-6 h-6 text-muted-foreground" />
-              </div>
-              <p className="text-sm text-muted-foreground">No group chats yet</p>
-              <p className="text-xs text-muted-foreground max-w-sm">
-                Add <span className="font-mono">@vibey_ai_bot</span> to a Telegram group, send any message, and it'll appear here.
-              </p>
-            </div>
+      <div className="md:grid md:grid-cols-[minmax(280px,340px)_1fr] md:gap-4 md:border md:border-border md:rounded-lg md:overflow-hidden md:h-[calc(100vh-220px)] md:min-h-[480px]">
+        {/* LIST */}
+        <div
+          className={cn(
+            "space-y-1.5 md:overflow-y-auto md:p-2 md:border-r md:border-border md:bg-card/30",
+            selected && "hidden md:block",
           )}
-          {groups.map((g) => {
-            const updating = updatingKey === `g:${g.chat_id}`;
-            return (
-              <div key={g.chat_id} className="p-4 rounded-lg bg-card border border-border space-y-3">
-                <div className="flex items-start justify-between gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setSelected({ kind: "group", chatId: g.chat_id })}
-                    className="min-w-0 text-left flex-1 hover:opacity-80 transition-opacity"
-                  >
-                    <p className="text-sm font-medium truncate">{g.chat_title ?? `Chat ${g.chat_id}`}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{g.chat_id}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Added {formatDistanceToNow(new Date(g.added_at), { addSuffix: true })}
-                      {g.enabled && g.enabled_at && (
-                        <> · enabled {formatDistanceToNow(new Date(g.enabled_at), { addSuffix: true })}</>
-                      )}
-                    </p>
-                  </button>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {updating && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
-                    <div className="flex flex-col items-end gap-0.5">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                        {g.enabled ? "on" : "off"}
-                      </span>
-                      <Switch
-                        checked={g.enabled}
-                        onCheckedChange={(checked) =>
-                          persistGroup(g.chat_id, checked
-                            ? { enabled: true, enabled_at: new Date().toISOString() }
-                            : { enabled: false })
-                        }
-                        disabled={updating}
-                      />
-                    </div>
-                  </div>
-                </div>
-                {g.enabled && (
-                  <div className="flex items-center justify-between gap-4 pt-3 border-t border-border/50">
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium">
-                        {g.mode === "reply" ? "Reply mode" : "Read-only mode"}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {g.mode === "reply"
-                          ? "Replies when @mentioned or replied to."
-                          : "Listens silently — no replies, ever."}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={g.mode === "reply"}
-                      onCheckedChange={(checked) => persistGroup(g.chat_id, { mode: checked ? "reply" : "read_only" })}
-                      disabled={updating}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          <p className="text-xs text-muted-foreground pt-2">
-            Off = ignored. On + read-only = listens but never replies. On + reply = answers when @mentioned or replied to.
-            You can also send <span className="font-mono">/vibey on</span> or <span className="font-mono">/vibey off</span> in the group.
-          </p>
-        </TabsContent>
-
-        {/* DMs */}
-        <TabsContent value="dms" className="space-y-3 mt-4">
-          {dmConversations.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
+        >
+          {filteredItems.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
                 <MessagesSquare className="w-6 h-6 text-muted-foreground" />
               </div>
-              <p className="text-sm text-muted-foreground">No DMs yet</p>
+              <p className="text-sm text-muted-foreground">No conversations</p>
             </div>
           )}
-          {dmConversations.map((c) => {
-            const updating = updatingKey === `d:${c.telegramUserId}`;
-            // Effective state: explicit setting wins; otherwise inferred "reply" if they've gotten replies, else muted.
-            const enabled = c.setting?.enabled ?? true;
-            const mode: Mode = c.setting?.mode ?? (c.hasReplies ? "reply" : "read_only");
-            const isExplicit = !!c.setting;
-            const photoUrl = c.user?.telegram_photo_url || c.user?.avatar_url || undefined;
-            return (
-              <div key={c.telegramUserId} className="p-4 rounded-lg bg-card border border-border space-y-3">
-                <div className="flex items-start justify-between gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setSelected({ kind: "dm", telegramUserId: c.telegramUserId })}
-                    className="min-w-0 text-left flex-1 flex items-start gap-3 hover:opacity-80 transition-opacity"
-                  >
-                    <Avatar className="h-10 w-10 rounded-lg ring-1 ring-border shrink-0">
-                      {photoUrl && <AvatarImage src={photoUrl} alt={c.label} />}
-                      <AvatarFallback className="rounded-lg text-[11px] font-mono">{initialsOf(c.label)}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{c.label}</p>
-                      {c.username && (
-                        <p className="text-xs text-muted-foreground font-mono truncate">@{c.username}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">{c.lastPreview || "—"}</p>
-                      <p className="text-[10px] text-muted-foreground font-mono mt-0.5 flex items-center gap-1">
-                        <TelegramIcon className="w-2.5 h-2.5 text-[#229ED9]" />
-                        <span>
-                          {c.messageCount} msg{c.messageCount === 1 ? "" : "s"}
-                          {c.totalTokens > 0 ? ` · ${formatTokens(c.totalTokens)} tok` : ""}
-                          {!isExplicit && <> · <span className="italic">{c.hasReplies ? "auto-replying" : "muted (no shared group)"}</span></>}
-                        </span>
-                      </p>
-                    </div>
-                  </button>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {updating && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
-                    <div className="flex flex-col items-end gap-0.5">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-                        {enabled ? "on" : "off"}
-                      </span>
-                      <Switch
-                        checked={enabled}
-                        onCheckedChange={(checked) =>
-                          persistDm(c.telegramUserId, c.username, c.user?.name ?? null, { enabled: checked })
-                        }
-                        disabled={updating}
-                      />
-                    </div>
-                  </div>
-                </div>
-                {enabled && (
-                  <div className="flex items-center justify-between gap-4 pt-3 border-t border-border/50">
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium">
-                        {mode === "reply" ? "Reply mode" : "Read-only mode"}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {mode === "reply" ? "Vibey replies to this person." : "Vibey reads but doesn't reply."}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={mode === "reply"}
-                      onCheckedChange={(checked) =>
-                        persistDm(c.telegramUserId, c.username, c.user?.name ?? null, {
-                          mode: checked ? "reply" : "read_only",
-                          enabled: true,
-                        })
-                      }
-                      disabled={updating}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          <p className="text-xs text-muted-foreground pt-2">
-            Default: Vibey replies to people who share an enabled group. Toggle here to override per person.
-          </p>
-        </TabsContent>
-      </Tabs>
-      {logs.length === PAGE_SIZE && (
-        <p className="text-xs text-muted-foreground pt-2">Showing the most recent {PAGE_SIZE} messages.</p>
-      )}
+          {filteredItems.map(renderRow)}
+          {logs.length === PAGE_SIZE && (
+            <p className="text-[11px] text-muted-foreground pt-2 px-1">Showing the most recent {PAGE_SIZE} messages.</p>
+          )}
+        </div>
+
+        {/* DETAIL */}
+        <div className={cn("md:overflow-hidden", !selected && "hidden md:block")}>
+          {renderDetail()}
+        </div>
+      </div>
     </div>
   );
 }
