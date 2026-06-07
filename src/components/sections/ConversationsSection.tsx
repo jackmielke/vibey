@@ -134,7 +134,7 @@ export function ConversationsSection() {
           supabase.from("telegram_dm_settings")
             .select("telegram_user_id, telegram_username, display_name, enabled, mode"),
           supabase.from("users")
-            .select("id, name, telegram_username, telegram_user_id, telegram_photo_url, avatar_url, is_vibe_resident, world_id_verified, phone_verified")
+            .select("id, name, telegram_username, telegram_user_id, telegram_photo_url, avatar_url, is_vibe_resident, is_claimed, world_id_verified, phone_verified")
             .or("telegram_username.not.is.null,telegram_user_id.not.is.null"),
         ]);
 
