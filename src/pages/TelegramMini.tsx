@@ -1349,10 +1349,11 @@ export default function TelegramMini() {
           const existing = byKey.get(key);
           if (!existing || score(u) > score(existing)) byKey.set(key, u);
         }
-        // Sort: claimed profiles (Vibe Residents) first, then by profile richness, then alpha.
+        // Sort: Vibe Residents (claimed OR explicitly marked) first, then by profile richness, then alpha.
+        const isResident = (u: DirectoryEntry) => !!(u.is_claimed || u.is_vibe_resident);
         const entries = Array.from(byKey.values()).sort((a, b) => {
-          const claimDiff = (b.is_claimed ? 1 : 0) - (a.is_claimed ? 1 : 0);
-          if (claimDiff !== 0) return claimDiff;
+          const residentDiff = (isResident(b) ? 1 : 0) - (isResident(a) ? 1 : 0);
+          if (residentDiff !== 0) return residentDiff;
           const diff = score(b) - score(a);
           if (diff !== 0) return diff;
           return (a.name ?? "~").localeCompare(b.name ?? "~");
