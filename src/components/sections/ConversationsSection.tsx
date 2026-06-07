@@ -23,6 +23,7 @@ type UserLite = {
   telegram_photo_url: string | null;
   avatar_url: string | null;
   is_vibe_resident: boolean | null;
+  is_claimed: boolean | null;
   world_id_verified: boolean | null;
   phone_verified: boolean | null;
 };
