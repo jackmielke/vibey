@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { TelegramIcon } from "@/components/icons/TelegramIcon";
 import { UserProfileDialog } from "@/components/UserProfileDialog";
+import { pickBestProfile } from "@/lib/profiles";
 import { formatCredits, formatTokens } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -141,11 +142,33 @@ export function ConversationsSection() {
       if (cancelled) return;
       if (logsErr) toast.error("Couldn't load conversations", { description: logsErr.message });
 
+      // Group rows by tg id / username, then pick the best row from each group
+      // so the chat list shows the same profile the popup will show.
+      const byIdGroups = new Map<number, UserLite[]>();
+      const byUsernameGroups = new Map<string, UserLite[]>();
+      for (const u of (usersData ?? []) as UserLite[]) {
+        if (u.telegram_user_id) {
+          const k = Number(u.telegram_user_id);
+          const arr = byIdGroups.get(k) ?? [];
+          arr.push(u);
+          byIdGroups.set(k, arr);
+        }
+        if (u.telegram_username) {
+          const k = u.telegram_username.toLowerCase();
+          const arr = byUsernameGroups.get(k) ?? [];
+          arr.push(u);
+          byUsernameGroups.set(k, arr);
+        }
+      }
       const byId = new Map<number, UserLite>();
       const byUsername = new Map<string, UserLite>();
-      for (const u of (usersData ?? []) as UserLite[]) {
-        if (u.telegram_user_id) byId.set(Number(u.telegram_user_id), u);
-        if (u.telegram_username) byUsername.set(u.telegram_username.toLowerCase(), u);
+      for (const [k, arr] of byIdGroups) {
+        const best = pickBestProfile(arr);
+        if (best) byId.set(k, best);
+      }
+      for (const [k, arr] of byUsernameGroups) {
+        const best = pickBestProfile(arr);
+        if (best) byUsername.set(k, best);
       }
       setUsersByTgId(byId);
       setUsersByTgUsername(byUsername);
