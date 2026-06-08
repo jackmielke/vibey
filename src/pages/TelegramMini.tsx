@@ -2724,6 +2724,16 @@ export default function TelegramMini() {
         )}
 
         {/* ===== BRACKET TAB ===== */}
+        {/* ===== GALLERY TAB ===== */}
+        {tab === "gallery" && (
+          <GalleryTab
+            communityId={VIBEY_COMMUNITY_ID}
+            currentUserId={myProfile?.id ?? null}
+            isAdmin={isAdmin}
+          />
+        )}
+
+        {/* ===== BRACKET TAB ===== */}
         {tab === "bracket" && <BracketSection />}
       </div>
 
