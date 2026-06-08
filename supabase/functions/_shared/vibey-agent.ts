@@ -785,11 +785,13 @@ export async function loadEnabledToolNames(
   const enabled = new Set(rows.map((r) => r.name));
 
   // EdgeOS event tools auto-enable when the token secret is configured.
-  if (Deno.env.get("EDGEOS_API_TOKEN")) {
-    for (const name of ["list_edge_events", "get_edge_event", "rsvp_edge_event"]) {
-      if (!rows.some((r) => r.name === name)) enabled.add(name);
-    }
-  }
+  // TEMPORARILY DISABLED — calendar/events checking is not working reliably.
+  // if (Deno.env.get("EDGEOS_API_TOKEN")) {
+  //   for (const name of ["list_edge_events", "get_edge_event", "rsvp_edge_event"]) {
+  //     if (!rows.some((r) => r.name === name)) enabled.add(name);
+  //   }
+  // }
+
 
 
   // The remote migration history for this project can lag behind the deployed
