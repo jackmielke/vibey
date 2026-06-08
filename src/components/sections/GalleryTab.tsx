@@ -31,6 +31,8 @@ export function GalleryTab({ communityId, communityIds, currentUserId, isAdmin }
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [lightbox, setLightbox] = useState<Photo | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const readIds = communityIds && communityIds.length > 0 ? communityIds : [communityId];
@@ -128,8 +130,50 @@ export function GalleryTab({ communityId, communityIds, currentUserId, isAdmin }
     toast.success("Photo removed");
   };
 
+  const canUpload = Boolean(currentUserId);
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!canUpload) return;
+    if (!Array.from(e.dataTransfer.types || []).includes("Files")) return;
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    setIsDragging(true);
+  };
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!canUpload) return;
+    if (!Array.from(e.dataTransfer.types || []).includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!canUpload) return;
+    e.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) setIsDragging(false);
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    if (!canUpload) return;
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const dt = new DataTransfer();
+      Array.from(files)
+        .filter((f) => f.type.startsWith("image/"))
+        .forEach((f) => dt.items.add(f));
+      handleFiles(dt.files);
+    }
+  };
+
   return (
-    <section className="space-y-3">
+    <section
+      className="space-y-3 relative"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
           <ImageIcon className="w-3 h-3" />
@@ -166,6 +210,11 @@ export function GalleryTab({ communityId, communityIds, currentUserId, isAdmin }
             <ImageIcon className="w-6 h-6 text-muted-foreground" />
           </div>
           <p className="text-sm text-muted-foreground">No photos yet. Be the first!</p>
+          {canUpload && (
+            <p className="hidden md:block font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
+              drag &amp; drop images anywhere here
+            </p>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-1.5">
@@ -246,6 +295,24 @@ export function GalleryTab({ communityId, communityIds, currentUserId, isAdmin }
                 )}
               </div>
             )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isDragging && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="pointer-events-none fixed inset-0 z-40 bg-primary/10 backdrop-blur-sm flex items-center justify-center"
+          >
+            <div className="border-2 border-dashed border-primary rounded-xl px-8 py-10 bg-background/80 flex flex-col items-center gap-3">
+              <Plus className="w-8 h-8 text-primary" />
+              <p className="font-mono text-xs uppercase tracking-widest text-primary">
+                drop to upload
+              </p>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
