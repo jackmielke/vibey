@@ -38,8 +38,8 @@ const CHAT_URL = `${supabaseUrl}/functions/v1/chat-with-vibey`;
 
 
 function buildIntro(name: string | null): string {
-  const hi = name ? `hey ${name.toLowerCase()}` : "hey";
-  return `${hi} — i'm vibey, the community's resident ai. i can fill you in on what's happening, point you to people worth meeting, and remember anything you want me to. what's on your mind?`;
+  const hi = name ? `Hey ${name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()}!` : "Hey!";
+  return `${hi} I'm Vibey. I'm the community assistant for the Vibe Residency, here to connect you with the right people, teach, learn, boost vibes, and help you get the most out of your time here. Ping me anytime and I'll respond. If you want to be listed as a Vibe Resident, just say so and I'll set you up!`;
 }
 
 function firstName(session: ReturnType<typeof useAuth>["session"]): string | null {
