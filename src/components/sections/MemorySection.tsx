@@ -154,7 +154,7 @@ export function MemorySection() {
     if (typeof tuser === "string" && authors[`tguser:${tuser.toLowerCase()}`]) {
       return authors[`tguser:${tuser.toLowerCase()}`];
     }
-    if (typeof tuser === "string") return { name: null, username: tuser, avatar_url: null };
+    if (typeof tuser === "string") return { name: null, username: tuser, avatar_url: null, telegram_user_id: null };
     return null;
   }
 
