@@ -29,6 +29,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { ConversationsSection } from "@/components/sections/ConversationsSection";
+import { GalleryTab } from "@/components/sections/GalleryTab";
+import { Image as ImageIcon } from "lucide-react";
 import { BracketSection } from "@/components/sections/BracketSection";
 import { Trophy } from "lucide-react";
 import { EventEditModal, type EventEditRow } from "@/components/EventEditModal";
@@ -859,7 +861,7 @@ export default function TelegramMini() {
   const [adminLoading, setAdminLoading] = useState(false);
 
   // Tabs
-  type Tab = "memories" | "profiles" | "preferences" | "events" | "projects" | "workshops" | "soul" | "chats" | "bracket";
+  type Tab = "memories" | "profiles" | "preferences" | "events" | "projects" | "gallery" | "workshops" | "soul" | "chats" | "bracket";
   const [tab, setTab] = useState<Tab>("memories");
 
   // Projects portfolio
@@ -1698,6 +1700,7 @@ export default function TelegramMini() {
     { id: "preferences", label: "you", icon: Heart },
     { id: "events", label: "events", icon: Calendar },
     { id: "projects", label: "projects", icon: Rocket },
+    { id: "gallery", label: "gallery", icon: ImageIcon },
     ...(isAdmin ? [{ id: "workshops" as Tab, label: "workshops", icon: GraduationCap }] : []),
     ...(isAdmin ? [{ id: "chats" as Tab, label: "chats", icon: MessagesSquare }] : []),
     { id: "soul", label: "soul", icon: Sparkles },
@@ -2718,6 +2721,16 @@ export default function TelegramMini() {
             </h2>
             <ConversationsSection />
           </section>
+        )}
+
+        {/* ===== BRACKET TAB ===== */}
+        {/* ===== GALLERY TAB ===== */}
+        {tab === "gallery" && (
+          <GalleryTab
+            communityId={VIBEY_COMMUNITY_ID}
+            currentUserId={myProfile?.id ?? null}
+            isAdmin={isAdmin}
+          />
         )}
 
         {/* ===== BRACKET TAB ===== */}
