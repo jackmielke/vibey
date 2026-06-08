@@ -499,6 +499,12 @@ export function MemorySection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <UserProfileDialog
+        open={!!profileLookup}
+        onOpenChange={(o) => { if (!o) setProfileLookup(null); }}
+        lookup={profileLookup}
+      />
     </div>
   );
 }
