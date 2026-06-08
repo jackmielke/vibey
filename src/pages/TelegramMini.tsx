@@ -29,6 +29,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { ConversationsSection } from "@/components/sections/ConversationsSection";
+import { GalleryTab } from "@/components/sections/GalleryTab";
+import { Image as ImageIcon } from "lucide-react";
 import { BracketSection } from "@/components/sections/BracketSection";
 import { Trophy } from "lucide-react";
 import { EventEditModal, type EventEditRow } from "@/components/EventEditModal";
