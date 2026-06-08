@@ -16,6 +16,7 @@ type Photo = {
 
 interface Props {
   communityId: string;
+  communityIds?: string[]; // optional: read across multiple communities
   currentUserId: string | null; // public users.id
   isAdmin: boolean;
 }
@@ -25,12 +26,15 @@ const MAX_BYTES = 15 * 1024 * 1024; // 15MB
 const PHOTO_SELECT =
   "id, image_url, title, description, uploaded_by, created_at, uploader:users!gallery_photos_uploaded_by_fkey(id, name, telegram_username, avatar_url)";
 
-export function GalleryTab({ communityId, currentUserId, isAdmin }: Props) {
+export function GalleryTab({ communityId, communityIds, currentUserId, isAdmin }: Props) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [lightbox, setLightbox] = useState<Photo | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const readIds = communityIds && communityIds.length > 0 ? communityIds : [communityId];
+  const readIdsKey = readIds.join(",");
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +43,7 @@ export function GalleryTab({ communityId, currentUserId, isAdmin }: Props) {
       const { data, error } = await supabase
         .from("gallery_photos")
         .select(PHOTO_SELECT)
-        .eq("community_id", communityId)
+        .in("community_id", readIds)
         .eq("is_visible", true)
         .order("created_at", { ascending: false })
         .limit(500);
@@ -54,7 +58,7 @@ export function GalleryTab({ communityId, currentUserId, isAdmin }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [communityId]);
+  }, [readIdsKey]);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
