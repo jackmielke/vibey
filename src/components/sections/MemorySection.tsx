@@ -375,25 +375,47 @@ export function MemorySection() {
                   </div>
                 ) : (
                   <div className="flex gap-3">
-                    <Avatar className="w-8 h-8 shrink-0 mt-0.5">
-                      {author?.avatar_url ? (
-                        <AvatarImage src={author.avatar_url} alt={displayName} />
-                      ) : null}
-                      <AvatarFallback className="text-[10px] font-mono bg-muted">
-                        {initials(author?.name ?? author?.username)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProfileLookup({
+                          telegramUserId: author?.telegram_user_id ?? null,
+                          telegramUsername: author?.username ?? null,
+                        })
+                      }
+                      className="shrink-0 mt-0.5 cursor-pointer"
+                      title="View profile"
+                    >
+                      <Avatar className="w-8 h-8">
+                        {author?.avatar_url ? (
+                          <AvatarImage src={author.avatar_url} alt={displayName} />
+                        ) : null}
+                        <AvatarFallback className="text-[10px] font-mono bg-muted">
+                          {initials(author?.name ?? author?.username)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </button>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setProfileLookup({
+                                telegramUserId: author?.telegram_user_id ?? null,
+                                telegramUsername: author?.username ?? null,
+                              })
+                            }
+                            className="flex items-baseline gap-2 flex-wrap cursor-pointer hover:underline"
+                            title="View profile"
+                          >
                             <span className="text-xs font-medium">{displayName}</span>
                             {author?.username && author?.name && (
                               <span className="text-[10px] text-muted-foreground font-mono">
                                 @{author.username}
                               </span>
                             )}
-                          </div>
+                          </button>
                           {m.title && (
                             <p className="text-sm font-semibold mt-1 break-words">{m.title}</p>
                           )}
