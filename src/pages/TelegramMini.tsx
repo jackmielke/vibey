@@ -1770,30 +1770,57 @@ export default function TelegramMini() {
         />
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 px-2 py-2 border-b border-border bg-card/40 overflow-x-auto">
-        {TABS.map((t) => {
-          const active = tab === t.id;
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={
-                "flex items-center gap-1.5 px-3 py-1.5 rounded font-mono text-[10px] uppercase tracking-widest transition-colors whitespace-nowrap " +
-                (active
-                  ? "bg-primary/15 text-primary border border-primary/40"
-                  : "text-muted-foreground hover:text-foreground border border-transparent")
-              }
-            >
-              <Icon className="w-3 h-3" />
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* Main area */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        {/* Tabs — mobile only */}
+        <div className="flex md:hidden items-center gap-1 px-2 py-2 border-b border-border bg-card/40 overflow-x-auto shrink-0">
+          {TABS.map((t) => {
+            const active = tab === t.id;
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded font-mono text-[10px] uppercase tracking-widest transition-colors whitespace-nowrap " +
+                  (active
+                    ? "bg-primary/15 text-primary border border-primary/40"
+                    : "text-muted-foreground hover:text-foreground border border-transparent")
+                }
+              >
+                <Icon className="w-3 h-3" />
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
 
-      {/* Body */}
+        {/* Sidebar — desktop only */}
+        <aside className="hidden md:flex flex-col w-56 border-r border-border bg-card/30 overflow-y-auto">
+          <div className="px-3 py-4 space-y-1">
+            {TABS.map((t) => {
+              const active = tab === t.id;
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={
+                    "flex items-center gap-2.5 w-full px-3 py-2.5 rounded font-mono text-[11px] uppercase tracking-widest transition-colors text-left " +
+                    (active
+                      ? "bg-primary/15 text-primary border border-primary/40"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent")
+                  }
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        {/* Body */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-5">
         {/* ===== MEMORIES TAB ===== */}
         {tab === "memories" && (
