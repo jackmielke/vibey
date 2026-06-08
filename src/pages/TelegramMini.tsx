@@ -1710,7 +1710,7 @@ export default function TelegramMini() {
   return (
     <div className="h-screen flex flex-col bg-background text-foreground">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
         <button
           type="button"
           onClick={() => setPortalOpen(true)}
