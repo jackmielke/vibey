@@ -114,6 +114,7 @@ export function MemorySection() {
         (row.avatar_url as string) ??
         (row.profile_picture_url as string) ??
         null,
+      telegram_user_id: (row.telegram_user_id as number) ?? null,
     });
 
     if (userIds.size) {
