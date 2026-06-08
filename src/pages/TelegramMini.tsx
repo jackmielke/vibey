@@ -861,7 +861,7 @@ export default function TelegramMini() {
   const [adminLoading, setAdminLoading] = useState(false);
 
   // Tabs
-  type Tab = "memories" | "profiles" | "preferences" | "events" | "projects" | "workshops" | "soul" | "chats" | "bracket";
+  type Tab = "memories" | "profiles" | "preferences" | "events" | "projects" | "gallery" | "workshops" | "soul" | "chats" | "bracket";
   const [tab, setTab] = useState<Tab>("memories");
 
   // Projects portfolio
