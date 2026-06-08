@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Brain, Loader2, Tag, Plus, Trash2, Pencil, Check, X, Share2 } from "lucide-react";
+import { UserProfileDialog } from "@/components/UserProfileDialog";
 import { formatMemoryForTelegram, buildTelegramShareUrl } from "@/lib/shareMemory";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +37,7 @@ type AuthorInfo = {
   name: string | null;
   username: string | null;
   avatar_url: string | null;
+  telegram_user_id: number | null;
 };
 
 function memorySource(metadata: Record<string, unknown> | null): string | null {
@@ -69,6 +71,9 @@ export function MemorySection() {
   const [editTags, setEditTags] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [profileLookup, setProfileLookup] = useState<
+    { telegramUserId?: number | null; telegramUsername?: string | null } | null
+  >(null);
 
   async function loadMemories() {
     const { data, error } = await supabase
@@ -112,6 +117,7 @@ export function MemorySection() {
         (row.avatar_url as string) ??
         (row.profile_picture_url as string) ??
         null,
+      telegram_user_id: (row.telegram_user_id as number) ?? null,
     });
 
     if (userIds.size) {
@@ -151,7 +157,7 @@ export function MemorySection() {
     if (typeof tuser === "string" && authors[`tguser:${tuser.toLowerCase()}`]) {
       return authors[`tguser:${tuser.toLowerCase()}`];
     }
-    if (typeof tuser === "string") return { name: null, username: tuser, avatar_url: null };
+    if (typeof tuser === "string") return { name: null, username: tuser, avatar_url: null, telegram_user_id: null };
     return null;
   }
 
@@ -369,25 +375,47 @@ export function MemorySection() {
                   </div>
                 ) : (
                   <div className="flex gap-3">
-                    <Avatar className="w-8 h-8 shrink-0 mt-0.5">
-                      {author?.avatar_url ? (
-                        <AvatarImage src={author.avatar_url} alt={displayName} />
-                      ) : null}
-                      <AvatarFallback className="text-[10px] font-mono bg-muted">
-                        {initials(author?.name ?? author?.username)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProfileLookup({
+                          telegramUserId: author?.telegram_user_id ?? null,
+                          telegramUsername: author?.username ?? null,
+                        })
+                      }
+                      className="shrink-0 mt-0.5 cursor-pointer"
+                      title="View profile"
+                    >
+                      <Avatar className="w-8 h-8">
+                        {author?.avatar_url ? (
+                          <AvatarImage src={author.avatar_url} alt={displayName} />
+                        ) : null}
+                        <AvatarFallback className="text-[10px] font-mono bg-muted">
+                          {initials(author?.name ?? author?.username)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </button>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setProfileLookup({
+                                telegramUserId: author?.telegram_user_id ?? null,
+                                telegramUsername: author?.username ?? null,
+                              })
+                            }
+                            className="flex items-baseline gap-2 flex-wrap cursor-pointer hover:underline"
+                            title="View profile"
+                          >
                             <span className="text-xs font-medium">{displayName}</span>
                             {author?.username && author?.name && (
                               <span className="text-[10px] text-muted-foreground font-mono">
                                 @{author.username}
                               </span>
                             )}
-                          </div>
+                          </button>
                           {m.title && (
                             <p className="text-sm font-semibold mt-1 break-words">{m.title}</p>
                           )}
@@ -471,6 +499,12 @@ export function MemorySection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <UserProfileDialog
+        open={!!profileLookup}
+        onOpenChange={(o) => { if (!o) setProfileLookup(null); }}
+        lookup={profileLookup}
+      />
     </div>
   );
 }
