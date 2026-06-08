@@ -2763,6 +2763,7 @@ export default function TelegramMini() {
         {/* ===== BRACKET TAB ===== */}
         {tab === "bracket" && <BracketSection />}
       </div>
+      </div>
 
       {editingMemory && (
         <MemoryEditModal
