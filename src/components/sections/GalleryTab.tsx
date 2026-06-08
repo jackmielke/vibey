@@ -130,8 +130,50 @@ export function GalleryTab({ communityId, communityIds, currentUserId, isAdmin }
     toast.success("Photo removed");
   };
 
+  const canUpload = Boolean(currentUserId);
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!canUpload) return;
+    if (!Array.from(e.dataTransfer.types || []).includes("Files")) return;
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    setIsDragging(true);
+  };
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!canUpload) return;
+    if (!Array.from(e.dataTransfer.types || []).includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!canUpload) return;
+    e.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) setIsDragging(false);
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    if (!canUpload) return;
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const dt = new DataTransfer();
+      Array.from(files)
+        .filter((f) => f.type.startsWith("image/"))
+        .forEach((f) => dt.items.add(f));
+      handleFiles(dt.files);
+    }
+  };
+
   return (
-    <section className="space-y-3">
+    <section
+      className="space-y-3 relative"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
           <ImageIcon className="w-3 h-3" />
