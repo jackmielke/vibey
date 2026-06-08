@@ -16,6 +16,7 @@ type Photo = {
 
 interface Props {
   communityId: string;
+  communityIds?: string[]; // optional: read across multiple communities
   currentUserId: string | null; // public users.id
   isAdmin: boolean;
 }
