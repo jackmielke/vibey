@@ -2372,6 +2372,8 @@ async function executeToolCall(
       return await adminUpsertSkill(supabase, parsed as Parameters<typeof adminUpsertSkill>[1]);
     case "admin_toggle_skill":
       return await adminToggleSkill(supabase, parsed as { name: string; is_enabled: boolean });
+    case "admin_search_chat_history":
+      return await adminSearchChatHistory(supabase, parsed as Parameters<typeof adminSearchChatHistory>[1]);
     case "admin_toggle_tool":
       return await adminToggleTool(supabase, parsed as { name: string; is_enabled: boolean });
     case "github_read_file":
