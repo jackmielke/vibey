@@ -1700,6 +1700,7 @@ export default function TelegramMini() {
     { id: "preferences", label: "you", icon: Heart },
     { id: "events", label: "events", icon: Calendar },
     { id: "projects", label: "projects", icon: Rocket },
+    { id: "gallery", label: "gallery", icon: ImageIcon },
     ...(isAdmin ? [{ id: "workshops" as Tab, label: "workshops", icon: GraduationCap }] : []),
     ...(isAdmin ? [{ id: "chats" as Tab, label: "chats", icon: MessagesSquare }] : []),
     { id: "soul", label: "soul", icon: Sparkles },
