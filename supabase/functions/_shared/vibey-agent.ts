@@ -1568,6 +1568,50 @@ async function adminToggleTool(
   return JSON.stringify({ ok: true, name, is_enabled: args.is_enabled });
 }
 
+async function adminSearchChatHistory(
+  supabase: SupabaseClient,
+  args: {
+    query?: string;
+    since?: string;
+    until?: string;
+    telegram_chat_id?: number;
+    telegram_username?: string;
+    limit?: number;
+  }
+): Promise<string> {
+  const limit = Math.min(Math.max(args.limit ?? 100, 1), 500);
+  let q = supabase
+    .from("agent_chat_logs")
+    .select("id, created_at, telegram_chat_id, telegram_username, user_message, agent_response")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (args.since) q = q.gte("created_at", args.since);
+  if (args.until) q = q.lt("created_at", args.until);
+  if (typeof args.telegram_chat_id === "number") q = q.eq("telegram_chat_id", args.telegram_chat_id);
+  if (args.telegram_username) q = q.ilike("telegram_username", args.telegram_username.replace(/^@/, ""));
+  if (args.query && args.query.trim()) {
+    const pattern = `%${args.query.trim().replace(/[%_]/g, (m) => `\\${m}`)}%`;
+    q = q.or(`user_message.ilike.${pattern},agent_response.ilike.${pattern}`);
+  }
+
+  const { data, error } = await q;
+  if (error) return JSON.stringify({ ok: false, error: error.message });
+
+  const truncate = (s: string | null, n: number) =>
+    !s ? "" : s.length > n ? s.slice(0, n) + "…" : s;
+  const rows = (data ?? []).map((r: any) => ({
+    at: r.created_at,
+    chat_id: r.telegram_chat_id,
+    username: r.telegram_username,
+    user: truncate(r.user_message, 600),
+    vibey: truncate(r.agent_response, 600),
+  }));
+  return JSON.stringify({ ok: true, count: rows.length, limit, rows });
+}
+
+
+
 // ── GitHub self-editing tool implementations ────────────────────────────────
 
 const GITHUB_API = "https://api.github.com";
