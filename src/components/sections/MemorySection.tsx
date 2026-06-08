@@ -71,6 +71,9 @@ export function MemorySection() {
   const [editTags, setEditTags] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [profileLookup, setProfileLookup] = useState<
+    { telegramUserId?: number | null; telegramUsername?: string | null } | null
+  >(null);
 
   async function loadMemories() {
     const { data, error } = await supabase
