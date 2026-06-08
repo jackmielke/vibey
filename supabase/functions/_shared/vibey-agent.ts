@@ -764,7 +764,27 @@ export const ADMIN_TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "admin_search_chat_history",
+      description:
+        "ADMIN ONLY. Search across ALL of Vibey's chat logs (every DM, every group, every user) in the agent_chat_logs table. Use when an admin asks things like 'what were the most interesting conversations in the last 4 days', 'what did people ask about X', 'show me chats from @username', 'summarize recent group chatter'. You can combine filters: free-text `query` (matches user_message OR agent_response, case-insensitive), `since`/`until` ISO timestamps, `telegram_chat_id`, `telegram_username`. Returns up to `limit` (default 100, max 500) rows, newest first, with timestamp, username, chat_id, and truncated message+response text. After fetching, reason over the rows yourself to answer the admin's question — call again with refined filters if you need more.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Free-text substring to match in user message or Vibey's response (case-insensitive). Omit to get everything in the time window." },
+          since: { type: "string", description: "ISO timestamp lower bound (inclusive), e.g. '2026-06-04T00:00:00Z'." },
+          until: { type: "string", description: "ISO timestamp upper bound (exclusive)." },
+          telegram_chat_id: { type: "integer", description: "Restrict to a specific Telegram chat (group or DM) by numeric id." },
+          telegram_username: { type: "string", description: "Restrict to a specific user by Telegram username (without @)." },
+          limit: { type: "integer", description: "Max rows to return (1-500). Default 100.", minimum: 1, maximum: 500 },
+        },
+      },
+    },
+  },
 ];
+
 
 // ── Tool registry (DB-backed enabled/disabled) ──────────────────────────────
 
