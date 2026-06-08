@@ -298,6 +298,24 @@ export function GalleryTab({ communityId, communityIds, currentUserId, isAdmin }
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {isDragging && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="pointer-events-none fixed inset-0 z-40 bg-primary/10 backdrop-blur-sm flex items-center justify-center"
+          >
+            <div className="border-2 border-dashed border-primary rounded-xl px-8 py-10 bg-background/80 flex flex-col items-center gap-3">
+              <Plus className="w-8 h-8 text-primary" />
+              <p className="font-mono text-xs uppercase tracking-widest text-primary">
+                drop to upload
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
