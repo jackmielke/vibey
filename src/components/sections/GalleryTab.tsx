@@ -31,6 +31,8 @@ export function GalleryTab({ communityId, communityIds, currentUserId, isAdmin }
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [lightbox, setLightbox] = useState<Photo | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const readIds = communityIds && communityIds.length > 0 ? communityIds : [communityId];
