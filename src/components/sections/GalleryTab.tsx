@@ -210,6 +210,11 @@ export function GalleryTab({ communityId, communityIds, currentUserId, isAdmin }
             <ImageIcon className="w-6 h-6 text-muted-foreground" />
           </div>
           <p className="text-sm text-muted-foreground">No photos yet. Be the first!</p>
+          {canUpload && (
+            <p className="hidden md:block font-mono text-[10px] uppercase tracking-widest text-muted-foreground/70">
+              drag &amp; drop images anywhere here
+            </p>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-1.5">
