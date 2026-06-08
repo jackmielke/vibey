@@ -2755,7 +2755,7 @@ export default function TelegramMini() {
         {tab === "gallery" && (
           <GalleryTab
             communityId={VIBEY_COMMUNITY_ID}
-            communityIds={DIRECTORY_COMMUNITY_IDS}
+            communityIds={[...DIRECTORY_COMMUNITY_IDS, VIBE_CODE_RESIDENCY_COMMUNITY_ID]}
             currentUserId={myProfile?.id ?? null}
             isAdmin={isAdmin}
           />
