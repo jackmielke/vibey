@@ -37,6 +37,7 @@ type AuthorInfo = {
   name: string | null;
   username: string | null;
   avatar_url: string | null;
+  telegram_user_id: number | null;
 };
 
 function memorySource(metadata: Record<string, unknown> | null): string | null {
