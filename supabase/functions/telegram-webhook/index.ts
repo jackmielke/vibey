@@ -1513,11 +1513,6 @@ Deno.serve(async (req) => {
       text: contextLine,
     });
 
-    await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 800);
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-      chat_id: chatId,
-      text: privacyLine,
-    });
 
     await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 650);
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
