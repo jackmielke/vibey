@@ -2025,6 +2025,87 @@ export type Database = {
         }
         Relationships: []
       }
+      golden_goal_bracket_picks: {
+        Row: {
+          champion: string | null
+          confidence: number | null
+          created_at: string
+          dark_horse: string | null
+          email: string
+          id: string
+          name: string | null
+          note: string | null
+          runner_up: string | null
+          semifinalist_3: string | null
+          semifinalist_4: string | null
+          top_scorer: string | null
+          updated_at: string
+        }
+        Insert: {
+          champion?: string | null
+          confidence?: number | null
+          created_at?: string
+          dark_horse?: string | null
+          email: string
+          id?: string
+          name?: string | null
+          note?: string | null
+          runner_up?: string | null
+          semifinalist_3?: string | null
+          semifinalist_4?: string | null
+          top_scorer?: string | null
+          updated_at?: string
+        }
+        Update: {
+          champion?: string | null
+          confidence?: number | null
+          created_at?: string
+          dark_horse?: string | null
+          email?: string
+          id?: string
+          name?: string | null
+          note?: string | null
+          runner_up?: string | null
+          semifinalist_3?: string | null
+          semifinalist_4?: string | null
+          top_scorer?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      golden_goal_signups: {
+        Row: {
+          champion_pick: string | null
+          created_at: string
+          email: string
+          id: string
+          name: string
+          note: string | null
+          phone: string | null
+          pool_interest: string
+        }
+        Insert: {
+          champion_pick?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          note?: string | null
+          phone?: string | null
+          pool_interest?: string
+        }
+        Update: {
+          champion_pick?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          note?: string | null
+          phone?: string | null
+          pool_interest?: string
+        }
+        Relationships: []
+      }
       heartbeat_runs: {
         Row: {
           automation_id: string | null

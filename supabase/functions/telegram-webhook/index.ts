@@ -1496,10 +1496,8 @@ Deno.serve(async (req) => {
     const greeting = firstName ? `Hey ${firstName}! I'm Vibey 👋` : `Hey! I'm Vibey 👋`;
     const contextLine =
       `I'm the community assistant for the Vibe Residency, here to connect you with the right people, teach, learn, boost vibes, and help you get the most out of your time here.`;
-    const privacyLine =
-      `A quick note on privacy: today, anything shared in group chats I'm part of is public memory, and the Vibe team can see DMs. We're working toward a fully private mode. Until then, share like you would in a group chat.`;
     const actionLine = `Ping me anytime and I'll respond. If you want to be listed as a Vibe Resident, just say so and I'll set you up!`;
-    const welcome = [greeting, contextLine, privacyLine, actionLine].join("\n\n");
+    const welcome = [greeting, contextLine, actionLine].join("\n\n");
 
     await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 700);
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
@@ -1515,11 +1513,6 @@ Deno.serve(async (req) => {
       text: contextLine,
     });
 
-    await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 800);
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-      chat_id: chatId,
-      text: privacyLine,
-    });
 
     await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 650);
     await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
