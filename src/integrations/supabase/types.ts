@@ -2027,48 +2027,51 @@ export type Database = {
       }
       golden_goal_bracket_picks: {
         Row: {
+          auto_filled: boolean
           champion: string | null
-          confidence: number | null
           created_at: string
-          dark_horse: string | null
           email: string
+          group_picks: Json
           id: string
+          knockout_picks: Json
+          locked_at: string | null
           name: string | null
           note: string | null
-          runner_up: string | null
-          semifinalist_3: string | null
-          semifinalist_4: string | null
-          top_scorer: string | null
+          payment_status: string
+          pool_choice: string
+          predicted_standings: Json
           updated_at: string
         }
         Insert: {
+          auto_filled?: boolean
           champion?: string | null
-          confidence?: number | null
           created_at?: string
-          dark_horse?: string | null
           email: string
+          group_picks?: Json
           id?: string
+          knockout_picks?: Json
+          locked_at?: string | null
           name?: string | null
           note?: string | null
-          runner_up?: string | null
-          semifinalist_3?: string | null
-          semifinalist_4?: string | null
-          top_scorer?: string | null
+          payment_status?: string
+          pool_choice?: string
+          predicted_standings?: Json
           updated_at?: string
         }
         Update: {
+          auto_filled?: boolean
           champion?: string | null
-          confidence?: number | null
           created_at?: string
-          dark_horse?: string | null
           email?: string
+          group_picks?: Json
           id?: string
+          knockout_picks?: Json
+          locked_at?: string | null
           name?: string | null
           note?: string | null
-          runner_up?: string | null
-          semifinalist_3?: string | null
-          semifinalist_4?: string | null
-          top_scorer?: string | null
+          payment_status?: string
+          pool_choice?: string
+          predicted_standings?: Json
           updated_at?: string
         }
         Relationships: []
