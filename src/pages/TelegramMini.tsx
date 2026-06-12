@@ -963,7 +963,6 @@ export default function TelegramMini() {
 
       // Deep-link routing: t.me/vibey_ai_bot?startapp=<tab> opens directly to that tab.
       const startParam = tg.initDataUnsafe?.start_param;
-      const validTabs: Tab[] = ["memories", "profiles", "preferences", "events", "projects", "gallery", "workshops", "soul", "chats", "bracket"];
       if (startParam && (validTabs as string[]).includes(startParam)) {
         setTab(startParam as Tab);
       }
