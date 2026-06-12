@@ -1592,7 +1592,7 @@ Deno.serve(async (req) => {
     startTrigger.startsWith(`/start@${BOT_USERNAME.toLowerCase()} `)
   ) {
     const firstName = msg.from?.first_name?.trim();
-    const greeting = firstName ? `Hey ${escapeHtml(firstName)}! I'm Vibey 👋` : `Hey! I'm Vibey 👋`;
+    const greeting = firstName ? `Hey ${escapeHtmlText(firstName)}! I'm Vibey 👋` : `Hey! I'm Vibey 👋`;
 
     // Deep-links into the Vibey Telegram Mini App (Main Mini App, opened via bot's menu button).
     // Format: https://t.me/<bot_username>?startapp=<tab> — TelegramMini.tsx reads `start_param`
