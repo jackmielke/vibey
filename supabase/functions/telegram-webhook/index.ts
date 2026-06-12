@@ -1592,39 +1592,58 @@ Deno.serve(async (req) => {
     startTrigger.startsWith(`/start@${BOT_USERNAME.toLowerCase()} `)
   ) {
     const firstName = msg.from?.first_name?.trim();
-    const greeting = firstName ? `Hey ${firstName}! I'm Vibey 👋` : `Hey! I'm Vibey 👋`;
-    const contextLine =
-      `I'm the community assistant for the Vibe Residency, here to connect you with the right people, teach, learn, boost vibes, and help you get the most out of your time here.`;
-    const actionLine = `Ping me anytime and I'll respond. If you want to be listed as a Vibe Resident, just say so and I'll set you up!`;
-    const welcome = [greeting, contextLine, actionLine].join("\n\n");
+    const greeting = firstName ? `Hey ${escapeHtml(firstName)}! I'm Vibey 👋` : `Hey! I'm Vibey 👋`;
+
+    // Deep-links into the Vibey Telegram Mini App (Main Mini App, opened via bot's menu button).
+    // Format: https://t.me/<bot_username>?startapp=<tab> — TelegramMini.tsx reads `start_param`
+    // from WebApp.initDataUnsafe and routes to the matching tab on load.
+    const miniAppBase = `https://t.me/${BOT_USERNAME}`;
+    const linkMemories = `${miniAppBase}?startapp=memories`;
+    const linkProjects = `${miniAppBase}?startapp=projects`;
+    const linkGallery = `${miniAppBase}?startapp=gallery`;
+    const linkBracket = `${miniAppBase}?startapp=bracket`;
+
+    // World Cup mascot image — hosted via Lovable assets CDN on the published domain.
+    const worldCupPhotoUrl =
+      "https://vibey-in-a.lovable.app/__l5e/assets-v1/9771364d-9d95-4495-93f6-03dc1aae5219/vibey-world-cup.png";
+
+    const caption =
+      `${greeting}\n` +
+      `Your assistant for the <b>Vibe Residency</b> at <b>Edge Esmeralda</b>.\n\n` +
+      `<b>Here's what I can do:</b>\n` +
+      `🧑‍🤝‍🧑 Tell you who's around the residency &amp; who to meet — <i>if you want to be listed as a Vibe Resident, just say so</i> ⚡\n` +
+      `🛠️ Share info on the <a href="${linkMemories}">Buildathon, Local Business AI Series &amp; everything else you teach me</a>\n` +
+      `🚀 Show off <a href="${linkProjects}">community projects</a>\n` +
+      `📸 Save &amp; browse the <a href="${linkGallery}">Vibe photo gallery</a>\n\n` +
+      `🏆 <b><a href="${linkBracket}">Join the World Cup bracket →</a></b>\n\n` +
+      `<i>Just ask me anything.</i>`;
 
     await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 700);
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+    const photoResult = await tg(TELEGRAM_BOT_TOKEN, "sendPhoto", {
       chat_id: chatId,
-      text: greeting,
-      // Clear any previously-shown reply keyboard from past /start sessions.
+      photo: worldCupPhotoUrl,
+      caption,
+      parse_mode: "HTML",
       reply_markup: { remove_keyboard: true },
     });
 
-    await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 900);
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-      chat_id: chatId,
-      text: contextLine,
-    });
-
-
-    await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 650);
-    await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
-      chat_id: chatId,
-      text: actionLine,
-    });
-
+    // Fallback: if sendPhoto fails (e.g. Telegram can't fetch the URL), send as text so /start never breaks.
+    if (!photoResult?.ok) {
+      console.error("/start sendPhoto failed, falling back to text:", photoResult);
+      await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
+        chat_id: chatId,
+        text: caption,
+        parse_mode: "HTML",
+        link_preview_options: { is_disabled: true },
+        reply_markup: { remove_keyboard: true },
+      });
+    }
 
     supabase.from("agent_chat_logs").insert({
       agent_id: VIBEY_AGENT_ID,
       community_id: VIBEY_COMMUNITY_ID,
       user_message: "/start",
-      agent_response: welcome,
+      agent_response: caption,
       session_key: sessionKey,
       telegram_chat_id: chatId,
       telegram_user_id: userId,
