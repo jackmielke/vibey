@@ -1594,14 +1594,20 @@ Deno.serve(async (req) => {
     const firstName = msg.from?.first_name?.trim();
     const greeting = firstName ? `Hey ${escapeHtmlText(firstName)}! I'm Vibey 👋` : `Hey! I'm Vibey 👋`;
 
-    // Deep-links into the Vibey Telegram Mini App (Main Mini App, opened via bot's menu button).
-    // Format: https://t.me/<bot_username>?startapp=<tab> — TelegramMini.tsx reads `start_param`
-    // from WebApp.initDataUnsafe and routes to the matching tab on load.
-    const miniAppBase = `https://t.me/${BOT_USERNAME}`;
-    const linkMemories = `${miniAppBase}?startapp=memories`;
-    const linkProjects = `${miniAppBase}?startapp=projects`;
-    const linkGallery = `${miniAppBase}?startapp=gallery`;
-    const linkBracket = `${miniAppBase}?startapp=bracket`;
+    // Mini App URL: the actual web URL the bot's Mini App is served from. This is what BotFather
+    // points to as the Web App URL. We append ?tab=<x> so TelegramMini.tsx routes to that tab on load.
+    const miniAppWebUrl = "https://vibey-in-a.lovable.app/mini";
+
+    // For caption hyperlinks we VARY the strategy per link so we can see which one Telegram honors
+    // for this bot's specific configuration. (Inline keyboard buttons below are the reliable path.)
+    //   1. memories  → t.me deep-link with startapp param (works if Main Mini App is configured)
+    //   2. projects  → t.me named-mini-app URL (works if a named mini app exists)
+    //   3. gallery   → direct https mini app URL (always opens, in Telegram's in-app browser)
+    //   4. bracket   → direct https mini app URL with ?tab=
+    const linkMemories = `https://t.me/${BOT_USERNAME}?startapp=memories`;
+    const linkProjects = `https://t.me/${BOT_USERNAME}/app?startapp=projects`;
+    const linkGallery = `${miniAppWebUrl}?tab=gallery`;
+    const linkBracket = `${miniAppWebUrl}?tab=bracket`;
 
     // World Cup mascot image — hosted via Lovable assets CDN on the published domain.
     const worldCupPhotoUrl =
@@ -1616,7 +1622,22 @@ Deno.serve(async (req) => {
       `🚀 Show off <a href="${linkProjects}">community projects</a>\n` +
       `📸 Save &amp; browse the <a href="${linkGallery}">Vibe photo gallery</a>\n\n` +
       `🏆 <b><a href="${linkBracket}">Join the World Cup bracket →</a></b>\n\n` +
-      `<i>Just ask me anything.</i>`;
+      `<i>Or just tap a button below 👇</i>`;
+
+    // Inline keyboard with web_app buttons — the OFFICIAL way to launch a Mini App from a message.
+    // These open the Mini App inside Telegram, regardless of bot menu/main-app configuration.
+    const inlineKeyboard = {
+      inline_keyboard: [
+        [
+          { text: "🛠️ Buildathon & memories", web_app: { url: `${miniAppWebUrl}?tab=memories` } },
+          { text: "🚀 Projects", web_app: { url: `${miniAppWebUrl}?tab=projects` } },
+        ],
+        [
+          { text: "📸 Photo gallery", web_app: { url: `${miniAppWebUrl}?tab=gallery` } },
+          { text: "🏆 World Cup bracket", web_app: { url: `${miniAppWebUrl}?tab=bracket` } },
+        ],
+      ],
+    };
 
     await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 700);
     const photoResult = await tg(TELEGRAM_BOT_TOKEN, "sendPhoto", {
@@ -1624,7 +1645,7 @@ Deno.serve(async (req) => {
       photo: worldCupPhotoUrl,
       caption,
       parse_mode: "HTML",
-      reply_markup: { remove_keyboard: true },
+      reply_markup: inlineKeyboard,
     });
 
     // Fallback: if sendPhoto fails (e.g. Telegram can't fetch the URL), send as text so /start never breaks.
@@ -1635,7 +1656,7 @@ Deno.serve(async (req) => {
         text: caption,
         parse_mode: "HTML",
         link_preview_options: { is_disabled: true },
-        reply_markup: { remove_keyboard: true },
+        reply_markup: inlineKeyboard,
       });
     }
 

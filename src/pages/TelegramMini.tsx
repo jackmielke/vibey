@@ -863,7 +863,14 @@ export default function TelegramMini() {
 
   // Tabs
   type Tab = "memories" | "profiles" | "preferences" | "events" | "projects" | "gallery" | "workshops" | "soul" | "chats" | "bracket";
-  const [tab, setTab] = useState<Tab>("memories");
+  const validTabs: Tab[] = ["memories", "profiles", "preferences", "events", "projects", "gallery", "workshops", "soul", "chats", "bracket"];
+  // Read initial tab from URL ?tab=... (used by web_app inline buttons), falling back to "memories".
+  const initialTab: Tab = (() => {
+    if (typeof window === "undefined") return "memories";
+    const param = new URLSearchParams(window.location.search).get("tab");
+    return param && (validTabs as string[]).includes(param) ? (param as Tab) : "memories";
+  })();
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   // Projects portfolio
   const [projects, setProjects] = useState<ProjectRow[]>([]);
@@ -956,7 +963,6 @@ export default function TelegramMini() {
 
       // Deep-link routing: t.me/vibey_ai_bot?startapp=<tab> opens directly to that tab.
       const startParam = tg.initDataUnsafe?.start_param;
-      const validTabs: Tab[] = ["memories", "profiles", "preferences", "events", "projects", "gallery", "workshops", "soul", "chats", "bracket"];
       if (startParam && (validTabs as string[]).includes(startParam)) {
         setTab(startParam as Tab);
       }
