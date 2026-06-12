@@ -1594,15 +1594,23 @@ Deno.serve(async (req) => {
     const firstName = msg.from?.first_name?.trim();
     const greeting = firstName ? `Hey ${escapeHtmlText(firstName)}! I'm Vibey 👋` : `Hey! I'm Vibey 👋`;
 
-    // All four hyperlinks use the SAME Main-Mini-App deep-link pattern that the user confirmed works
-    // for `startapp=memories`. The `start_param` is read in TelegramMini.tsx and switches tabs on load.
-    const deepLink = (tab: string) => `https://t.me/${BOT_USERNAME}?startapp=${tab}`;
-    const linkMemories = deepLink("memories");
-    const linkProjects = deepLink("projects");
-    const linkGallery = deepLink("gallery");
-    const linkBracket = deepLink("bracket");
+    // Four inline buttons → Mini App tabs. World Cup goes to external bracket URL.
+    const miniAppUrl = (tab: string) => `https://vibey-in-a.lovable.app/mini?tab=${tab}`;
+    const worldCupUrl = "https://wc-lines.lovable.app";
 
-    // World Cup mascot image — hosted via Lovable assets CDN on the published domain.
+    const inlineKeyboard = {
+      inline_keyboard: [
+        [
+          { text: "🏆 World Cup", url: worldCupUrl },
+          { text: "📸 Photos", web_app: { url: miniAppUrl("gallery") } },
+        ],
+        [
+          { text: "🚀 Projects", web_app: { url: miniAppUrl("projects") } },
+          { text: "🧑‍🤝‍🧑 People", web_app: { url: miniAppUrl("profiles") } },
+        ],
+      ],
+    };
+
     const worldCupPhotoUrl =
       "https://vibey-in-a.lovable.app/__l5e/assets-v1/9771364d-9d95-4495-93f6-03dc1aae5219/vibey-world-cup.png";
 
@@ -1611,10 +1619,10 @@ Deno.serve(async (req) => {
       `Your assistant for the <b>Vibe Residency</b> at <b>Edge Esmeralda</b>.\n\n` +
       `<b>Here's what I can do:</b>\n` +
       `🧑‍🤝‍🧑 Tell you who's around the residency &amp; who to meet — <i>if you want to be listed as a Vibe Resident, just say so</i> ⚡\n` +
-      `🛠️ Share info on the <a href="${linkMemories}">Buildathon, Local Business AI Series &amp; everything else you teach me</a>\n` +
-      `🚀 Show off <a href="${linkProjects}">community projects</a>\n` +
-      `📸 Save &amp; browse the <a href="${linkGallery}">Vibe photo gallery</a>\n\n` +
-      `🏆 <b><a href="${linkBracket}">Join the World Cup bracket →</a></b>`;
+      `🛠️ Share info on the Buildathon, Local Business AI Series &amp; everything else you teach me\n` +
+      `🚀 Show off community projects\n` +
+      `📸 Save &amp; browse the Vibe photo gallery\n\n` +
+      `🏆 Join the World Cup bracket below 👇`;
 
     await sendTypingThenWait(TELEGRAM_BOT_TOKEN, chatId, 700);
     const photoResult = await tg(TELEGRAM_BOT_TOKEN, "sendPhoto", {
@@ -1622,9 +1630,9 @@ Deno.serve(async (req) => {
       photo: worldCupPhotoUrl,
       caption,
       parse_mode: "HTML",
+      reply_markup: inlineKeyboard,
     });
 
-    // Fallback: if sendPhoto fails (e.g. Telegram can't fetch the URL), send as text so /start never breaks.
     if (!photoResult?.ok) {
       console.error("/start sendPhoto failed, falling back to text:", photoResult);
       await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
@@ -1632,8 +1640,10 @@ Deno.serve(async (req) => {
         text: caption,
         parse_mode: "HTML",
         link_preview_options: { is_disabled: true },
+        reply_markup: inlineKeyboard,
       });
     }
+
 
     supabase.from("agent_chat_logs").insert({
       agent_id: VIBEY_AGENT_ID,
