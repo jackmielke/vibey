@@ -849,6 +849,7 @@ export default function TelegramMini() {
   const [newEventEnd, setNewEventEnd] = useState("");
   const [newEventImageUrl, setNewEventImageUrl] = useState("");
   const [uploadingEventImage, setUploadingEventImage] = useState(false);
+  const [uploadingProjectImage, setUploadingProjectImage] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
 
   // Admin
@@ -1522,6 +1523,38 @@ export default function TelegramMini() {
       setUploadingEventImage(false);
     }
   }
+
+
+
+  async function uploadProjectCover(file: File) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please pick an image file");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image too large", { description: "Max 8 MB." });
+      return;
+    }
+    setUploadingProjectImage(true);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const path = `${VIBEY_COMMUNITY_ID}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("portfolio-images")
+        .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("portfolio-images").getPublicUrl(path);
+      setNewProjectImageUrl(data.publicUrl);
+      toast.success("cover uploaded");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      toast.error("Couldn't upload cover", { description: msg });
+    } finally {
+      setUploadingProjectImage(false);
+    }
+  }
+
 
   async function addEvent() {
     if (!newEventTitle.trim() || !newEventStart.trim()) return;
@@ -2507,12 +2540,70 @@ export default function TelegramMini() {
                   placeholder="tags (comma separated, e.g. ai, agents, telegram)"
                   className="w-full bg-background border border-border rounded-md p-2 text-xs focus:outline-none focus:border-primary/60"
                 />
-                <input
-                  value={newProjectImageUrl}
-                  onChange={(e) => setNewProjectImageUrl(e.target.value)}
-                  placeholder="cover image url (optional)"
-                  className="w-full bg-background border border-border rounded-md p-2 text-xs focus:outline-none focus:border-primary/60"
-                />
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <label className="flex-1 h-9 rounded-md border border-border bg-background hover:border-primary/60 cursor-pointer flex items-center justify-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors">
+                      {uploadingProjectImage ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <ImagePlus className="w-3 h-3" />
+                      )}
+                      {uploadingProjectImage ? "uploading…" : "upload cover"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingProjectImage}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadProjectCover(f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <label className="h-9 px-3 rounded-md border border-border bg-background hover:border-primary/60 cursor-pointer flex items-center justify-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors">
+                      <Camera className="w-3 h-3" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        disabled={uploadingProjectImage}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadProjectCover(f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <input
+                    value={newProjectImageUrl}
+                    onChange={(e) => setNewProjectImageUrl(e.target.value)}
+                    placeholder="or paste image url"
+                    className="w-full bg-background border border-border rounded-md p-2 text-xs focus:outline-none focus:border-primary/60"
+                  />
+                  {newProjectImageUrl.trim() && (
+                    <div className="relative rounded-md overflow-hidden border border-border aspect-[16/9] bg-muted">
+                      <img
+                        src={newProjectImageUrl.trim()}
+                        alt="cover preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setNewProjectImageUrl("")}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-background/80 backdrop-blur border border-border flex items-center justify-center hover:bg-background"
+                        aria-label="Remove cover"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={addProject}
