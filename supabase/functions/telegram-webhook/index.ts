@@ -35,6 +35,31 @@ import {
 
 const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
 
+// In-memory cache of the most recent photo a user sent in a given chat.
+// Lets a follow-up text-only reply ("yes, save it to the gallery") re-attach
+// the photo without requiring an explicit Telegram reply_to_message link.
+// Survives across requests on the same warm edge-function instance (~minutes).
+type RecentPhotoCache = { fileIds: string[]; at: number; messageId: number };
+const recentPhotoCache = new Map<string, RecentPhotoCache>();
+const RECENT_PHOTO_TTL_MS = 10 * 60 * 1000;
+function recentPhotoKey(chatId: number, userId: number): string {
+  return `${chatId}:${userId}`;
+}
+function rememberRecentPhoto(chatId: number, userId: number, fileIds: string[], messageId: number) {
+  if (fileIds.length === 0) return;
+  recentPhotoCache.set(recentPhotoKey(chatId, userId), { fileIds, at: Date.now(), messageId });
+}
+function consumeRecentPhoto(chatId: number, userId: number): RecentPhotoCache | null {
+  const key = recentPhotoKey(chatId, userId);
+  const hit = recentPhotoCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > RECENT_PHOTO_TTL_MS) {
+    recentPhotoCache.delete(key);
+    return null;
+  }
+  return hit;
+}
+
 // Shared HTML escape for any text we drop into parse_mode=HTML payloads.
 function escapeHtmlText(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -1189,9 +1214,11 @@ Deno.serve(async (req) => {
   }
 
   // Process photo / document attachments (images, PDFs).
-  // If the current message has no attachments but is a reply to a message that
-  // does (e.g. user says "save this" replying to a photo), use those instead so
-  // tools like save-to-gallery can act on the referenced photo.
+  // Priority order for finding an attachment source:
+  //   1. current message's own attachments
+  //   2. a message the user is replying to (reply_to_message)
+  //   3. a photo the user sent in this chat within the last 10 min (cached) —
+  //      this handles "yes, save it to the gallery" after Vibey asked.
   const ownHasAttachments = !!(
     msg.photo?.length || msg.document || msg.video || msg.video_note || msg.animation || msg.sticker
   );
@@ -1199,12 +1226,35 @@ Deno.serve(async (req) => {
   const replyHasAttachments = !!(
     replyMsg && (replyMsg.photo?.length || replyMsg.document || replyMsg.video || replyMsg.video_note || replyMsg.animation || replyMsg.sticker)
   );
-  const hasAttachments = ownHasAttachments || replyHasAttachments;
-  const attachmentSourceMsg = ownHasAttachments ? msg : (replyHasAttachments ? replyMsg! : msg);
+
+  // Cache any photo the current message carries so a future text-only follow-up
+  // can re-attach it. Only photos — documents/PDFs aren't part of the gallery flow.
+  if (msg.photo?.length) {
+    const largest = msg.photo.reduce((a, b) =>
+      (a.file_size ?? a.width * a.height) > (b.file_size ?? b.width * b.height) ? a : b
+    );
+    rememberRecentPhoto(chatId, userId, [largest.file_id], msg.message_id);
+  }
+
+  // If no explicit attachment, look for a cached recent photo from this user.
+  let cachedPhoto: RecentPhotoCache | null = null;
+  if (!ownHasAttachments && !replyHasAttachments) {
+    cachedPhoto = consumeRecentPhoto(chatId, userId);
+  }
+
+  const hasAttachments = ownHasAttachments || replyHasAttachments || !!cachedPhoto;
+  const attachmentSourceMsg: TelegramMessage | null = ownHasAttachments
+    ? msg
+    : replyHasAttachments
+    ? replyMsg!
+    : cachedPhoto
+    ? ({ photo: cachedPhoto.fileIds.map((id) => ({ file_id: id, width: 0, height: 0 })) } as TelegramMessage)
+    : null;
   const attachmentFromReply = !ownHasAttachments && replyHasAttachments;
+  const attachmentFromCache = !ownHasAttachments && !replyHasAttachments && !!cachedPhoto;
   let attachmentImages: { url: string }[] = [];
   let attachmentExtraText: string[] = [];
-  if (hasAttachments) {
+  if (hasAttachments && attachmentSourceMsg) {
     await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
     const result = await processAttachments(TELEGRAM_BOT_TOKEN, attachmentSourceMsg);
     if (result.userError) {
@@ -1217,7 +1267,6 @@ Deno.serve(async (req) => {
     }
     attachmentImages = result.images;
     attachmentExtraText = result.extraText;
-    // If user sent only an attachment with no caption, give the model a default prompt.
     if (!userText) {
       if (attachmentImages.length > 0 && attachmentExtraText.length === 0) {
         userText = attachmentFromReply
@@ -1229,8 +1278,9 @@ Deno.serve(async (req) => {
         userText = "(user sent attachments with no caption)";
       }
     } else if (attachmentFromReply && attachmentImages.length > 0) {
-      // Hint to the model that the image came from the replied-to message.
       attachmentExtraText.push("[Note: the attached image came from the user's previously replied-to message, not the current message. Treat it as the image they're referring to.]");
+    } else if (attachmentFromCache && attachmentImages.length > 0) {
+      attachmentExtraText.push("[Note: the attached image is the photo this user sent moments ago in this chat. If their current message is a follow-up like 'yes', 'save it', 'add to the gallery', etc., act on THIS image.]");
     }
   }
 
