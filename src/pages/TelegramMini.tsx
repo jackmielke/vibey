@@ -849,6 +849,7 @@ export default function TelegramMini() {
   const [newEventEnd, setNewEventEnd] = useState("");
   const [newEventImageUrl, setNewEventImageUrl] = useState("");
   const [uploadingEventImage, setUploadingEventImage] = useState(false);
+  const [uploadingProjectImage, setUploadingProjectImage] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
 
   // Admin
