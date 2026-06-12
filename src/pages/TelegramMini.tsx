@@ -1554,7 +1554,7 @@ export default function TelegramMini() {
       setUploadingProjectImage(false);
     }
   }
-  }
+
 
   async function addEvent() {
     if (!newEventTitle.trim() || !newEventStart.trim()) return;
