@@ -35,6 +35,31 @@ import {
 
 const VIBEY_AGENT_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
 
+// In-memory cache of the most recent photo a user sent in a given chat.
+// Lets a follow-up text-only reply ("yes, save it to the gallery") re-attach
+// the photo without requiring an explicit Telegram reply_to_message link.
+// Survives across requests on the same warm edge-function instance (~minutes).
+type RecentPhotoCache = { fileIds: string[]; at: number; messageId: number };
+const recentPhotoCache = new Map<string, RecentPhotoCache>();
+const RECENT_PHOTO_TTL_MS = 10 * 60 * 1000;
+function recentPhotoKey(chatId: number, userId: number): string {
+  return `${chatId}:${userId}`;
+}
+function rememberRecentPhoto(chatId: number, userId: number, fileIds: string[], messageId: number) {
+  if (fileIds.length === 0) return;
+  recentPhotoCache.set(recentPhotoKey(chatId, userId), { fileIds, at: Date.now(), messageId });
+}
+function consumeRecentPhoto(chatId: number, userId: number): RecentPhotoCache | null {
+  const key = recentPhotoKey(chatId, userId);
+  const hit = recentPhotoCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > RECENT_PHOTO_TTL_MS) {
+    recentPhotoCache.delete(key);
+    return null;
+  }
+  return hit;
+}
+
 // Shared HTML escape for any text we drop into parse_mode=HTML payloads.
 function escapeHtmlText(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
