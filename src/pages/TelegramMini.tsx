@@ -1521,7 +1521,10 @@ export default function TelegramMini() {
       toast.error("Couldn't upload cover", { description: msg });
     } finally {
       setUploadingEventImage(false);
+    }
   }
+
+
 
   async function uploadProjectCover(file: File) {
     if (!file) return;
