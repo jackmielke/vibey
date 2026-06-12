@@ -905,9 +905,36 @@ async function loadHistory(
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
+// Constant-time string comparison so the webhook-secret check doesn't leak the
+// secret via response timing. Returns false on any length mismatch.
+function timingSafeEqualStr(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 Deno.serve(async (req) => {
   // Always 200 — Telegram retries on non-200, which causes double replies.
   if (req.method !== "POST") return new Response("ok", { status: 200 });
+
+  // SECURITY: verify the request actually came from Telegram BEFORE trusting
+  // anything in the body — msg.from.id gates admin powers (github/soul tools).
+  // Telegram echoes the secret we registered via setWebhook in this header.
+  //  - If TELEGRAM_WEBHOOK_SECRET is configured: reject any request that does
+  //    not present the matching secret (forged / replayed webhook calls).
+  //  - If it is NOT configured yet: still serve normal chat (so the bot keeps
+  //    working), but treat the caller as UNVERIFIED — which disables every
+  //    admin/github/soul tool below. A spoofed from.id therefore cannot
+  //    escalate to admin. Set the secret to re-enable Telegram admin powers.
+  const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? "";
+  const providedSecret = req.headers.get("X-Telegram-Bot-Api-Secret-Token") ?? "";
+  const secretConfigured = WEBHOOK_SECRET.length > 0;
+  const secretValid = secretConfigured && timingSafeEqualStr(providedSecret, WEBHOOK_SECRET);
+  if (secretConfigured && !secretValid) {
+    // Forged or replayed webhook — drop silently (200 so Telegram won't retry).
+    return new Response("ok", { status: 200 });
+  }
 
   const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
   const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
@@ -990,6 +1017,13 @@ Deno.serve(async (req) => {
   const username = msg.from?.username ?? msg.from?.first_name ?? "unknown";
   const isGroup = chatType === "group" || chatType === "supergroup";
   const fallbackSessionKey = `telegram:${chatId}`;
+
+  // SECURITY: admin powers (github_/admin_ tools, /voice, soul edits, etc.)
+  // require BOTH a known admin telegram id AND a request we verified actually
+  // came from Telegram (secretValid). Until TELEGRAM_WEBHOOK_SECRET is set,
+  // secretValid is false → no one is admin over Telegram (fail safe), so a
+  // forged from.id cannot escalate. All admin checks below use this.
+  const callerIsAdmin = secretValid && isAdminTelegramUser(userId);
 
   // Resolve unified Vibe identity early so slash commands can use the same
   // session as normal Telegram DMs.
@@ -1193,7 +1227,7 @@ Deno.serve(async (req) => {
   // Natural-language voice request: if the user asks for a voice note / voice
   // reply / audio response (and they're an admin in DMs), flip wantsVoice so the
   // normal reply is also sent as TTS audio — no /voice command needed.
-  if (!isGroup && isAdminTelegramUser(userId) && userText) {
+  if (!isGroup && callerIsAdmin && userText) {
     const lower = userText.toLowerCase();
     const voiceIntentPatterns = [
       /\bvoice\s*(note|message|memo|reply|response|answer)\b/,
@@ -1211,7 +1245,7 @@ Deno.serve(async (req) => {
 
 
   // Admin-only — works in DMs and groups. Standard users see no response.
-  if (isAdminTelegramUser(userId)) {
+  if (callerIsAdmin) {
     const voicePrompt = parseVoiceCommand(userText);
     if (voicePrompt !== null) {
       if (voicePrompt.length === 0) {
@@ -1338,7 +1372,7 @@ Deno.serve(async (req) => {
       loadUserPreferences(supabase, { telegram_user_id: userId, telegram_username: msg.from?.username ?? null }),
       loadEnabledSkills(supabase),
     ]);
-    const isAdmin = isAdminTelegramUser(userId);
+    const isAdmin = callerIsAdmin;
     const userContext = buildUserContextBlock(userPrefs, {
       display_name: msg.from?.first_name ?? null,
       telegram_username: msg.from?.username ?? null,
@@ -1556,7 +1590,7 @@ Deno.serve(async (req) => {
   //   2. otherwise: reply if user shares an enabled group with Vibey
   //   3. otherwise: silent — log as passive context but never reply
   if (!isGroup) {
-    const isAdminUser = isAdminTelegramUser(userId);
+    const isAdminUser = callerIsAdmin;
     if (!isAdminUser) {
       const { data: dmSettings } = await supabase
         .from("telegram_dm_settings")
@@ -1638,7 +1672,7 @@ Deno.serve(async (req) => {
     loadUserPreferences(supabase, { telegram_user_id: userId, telegram_username: msg.from?.username ?? null }),
     loadEnabledSkills(supabase),
   ]);
-  const isAdminDm = isAdminTelegramUser(userId);
+  const isAdminDm = callerIsAdmin;
   const userContext = buildUserContextBlock(userPrefs, {
     display_name: msg.from?.first_name ?? null,
     telegram_username: msg.from?.username ?? null,

@@ -212,25 +212,28 @@ Deno.serve(async (req) => {
       authUserId = userData?.user?.id ?? null;
     }
 
-    // Resolve a unified Vibe user id (web auth → telegram identity → null).
-    const tgIdFromCtx =
-      context?.surface === "telegram" && context?.external_id
-        ? Number(context.external_id) || null
-        : null;
-    const tgHandleFromCtx = context?.external_handle ?? null;
+    // SECURITY: identity + admin status come ONLY from the server-verified
+    // Supabase JWT (authUserId above). We deliberately do NOT trust
+    // context.external_id / context.external_handle for identity — they are
+    // attacker-controllable request-body fields. Trusting them previously let
+    // anyone POST {"context":{"surface":"telegram","external_id":"<admin id>"}}
+    // and be treated as admin, unlocking the github_/admin_ tools (remote code
+    // execution). The Telegram surface authenticates separately in
+    // telegram-webhook and does not route through this endpoint.
     const vibeUserId = await resolveVibeUserId(supabase, {
       auth_user_id: authUserId,
-      telegram_user_id: tgIdFromCtx,
-      telegram_username: tgHandleFromCtx,
+      telegram_user_id: null,
+      telegram_username: null,
     });
     const sessionKey = unifiedSessionKey(vibeUserId, buildFallbackSessionKey(context));
 
-    // If we resolved a Vibe profile (e.g. signed-in web user), pull their name
-    // + telegram identity so the agent context block recognizes them by name
-    // and we can look up their saved preferences even without telegram ctx.
+    // Hydrate display name + telegram identity from the authenticated user's
+    // OWN database profile (trusted, JWT-resolved) so the agent recognizes them
+    // by name and can load their saved preferences. Admin status is derived
+    // from this DB-sourced telegram_user_id only — never from the request body.
     let resolvedDisplayName: string | null = null;
-    let resolvedTgUsername: string | null = tgHandleFromCtx;
-    let resolvedTgUserId: number | null = tgIdFromCtx;
+    let resolvedTgUsername: string | null = null;
+    let resolvedTgUserId: number | null = null;
     if (vibeUserId) {
       const { data: profile } = await supabase
         .from("users")
@@ -239,8 +242,8 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (profile) {
         resolvedDisplayName = (profile.name as string) ?? null;
-        resolvedTgUsername = resolvedTgUsername ?? (profile.telegram_username as string | null) ?? null;
-        resolvedTgUserId = resolvedTgUserId ?? (profile.telegram_user_id as number | null) ?? null;
+        resolvedTgUsername = (profile.telegram_username as string | null) ?? null;
+        resolvedTgUserId = (profile.telegram_user_id as number | null) ?? null;
       }
     }
 

@@ -1619,10 +1619,12 @@ const FORBIDDEN_PATH_PATTERNS: RegExp[] = [
   /^\.env(\..*)?$/i,
   /(^|\/)\.env(\..*)?$/i,
   /^supabase\/config\.toml$/i,
+  /^supabase\/migrations\//i, // DB migrations are high blast radius — schema/RLS changes go through Supabase, never the self-edit loop
   /^package\.json$/i,
   /^package-lock\.json$/i,
-  /^bun\.lockb$/i,
+  /^bun\.lock(b)?$/i,
   /^\.github\//i,
+  /^\.claude\//i,             // harness config / hooks — the agent must not rewrite its own guardrails
   /secret/i,
 ];
 
