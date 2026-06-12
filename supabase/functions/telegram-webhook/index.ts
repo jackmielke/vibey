@@ -1189,14 +1189,24 @@ Deno.serve(async (req) => {
   }
 
   // Process photo / document attachments (images, PDFs).
-  const hasAttachments = !!(
+  // If the current message has no attachments but is a reply to a message that
+  // does (e.g. user says "save this" replying to a photo), use those instead so
+  // tools like save-to-gallery can act on the referenced photo.
+  const ownHasAttachments = !!(
     msg.photo?.length || msg.document || msg.video || msg.video_note || msg.animation || msg.sticker
   );
+  const replyMsg = msg.reply_to_message;
+  const replyHasAttachments = !!(
+    replyMsg && (replyMsg.photo?.length || replyMsg.document || replyMsg.video || replyMsg.video_note || replyMsg.animation || replyMsg.sticker)
+  );
+  const hasAttachments = ownHasAttachments || replyHasAttachments;
+  const attachmentSourceMsg = ownHasAttachments ? msg : (replyHasAttachments ? replyMsg! : msg);
+  const attachmentFromReply = !ownHasAttachments && replyHasAttachments;
   let attachmentImages: { url: string }[] = [];
   let attachmentExtraText: string[] = [];
   if (hasAttachments) {
     await tg(TELEGRAM_BOT_TOKEN, "sendChatAction", { chat_id: chatId, action: "typing" });
-    const result = await processAttachments(TELEGRAM_BOT_TOKEN, msg);
+    const result = await processAttachments(TELEGRAM_BOT_TOKEN, attachmentSourceMsg);
     if (result.userError) {
       await tg(TELEGRAM_BOT_TOKEN, "sendMessage", {
         chat_id: chatId,
@@ -1210,12 +1220,17 @@ Deno.serve(async (req) => {
     // If user sent only an attachment with no caption, give the model a default prompt.
     if (!userText) {
       if (attachmentImages.length > 0 && attachmentExtraText.length === 0) {
-        userText = "(user sent an image with no caption — describe or react to it)";
+        userText = attachmentFromReply
+          ? "(user is replying to an earlier image with no new text — react to or act on it)"
+          : "(user sent an image with no caption — describe or react to it)";
       } else if (attachmentExtraText.length > 0 && attachmentImages.length === 0) {
         userText = "(user sent a PDF with no caption — summarize the key points)";
       } else {
         userText = "(user sent attachments with no caption)";
       }
+    } else if (attachmentFromReply && attachmentImages.length > 0) {
+      // Hint to the model that the image came from the replied-to message.
+      attachmentExtraText.push("[Note: the attached image came from the user's previously replied-to message, not the current message. Treat it as the image they're referring to.]");
     }
   }
 
