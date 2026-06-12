@@ -170,7 +170,7 @@ declare global {
     Telegram?: {
       WebApp?: {
         initData: string;
-        initDataUnsafe?: { user?: { id?: number; first_name?: string } };
+        initDataUnsafe?: { user?: { id?: number; first_name?: string }; start_param?: string };
         ready: () => void;
         expand: () => void;
         colorScheme?: "light" | "dark";
@@ -953,6 +953,13 @@ export default function TelegramMini() {
       tg.expand();
       setTgName(tg.initDataUnsafe?.user?.first_name ?? null);
       setTgUserId(tg.initDataUnsafe?.user?.id ?? null);
+
+      // Deep-link routing: t.me/vibey_ai_bot?startapp=<tab> opens directly to that tab.
+      const startParam = tg.initDataUnsafe?.start_param;
+      const validTabs: Tab[] = ["memories", "profiles", "preferences", "events", "projects", "gallery", "workshops", "soul", "chats", "bracket"];
+      if (startParam && (validTabs as string[]).includes(startParam)) {
+        setTab(startParam as Tab);
+      }
     }
 
     const initData = tg?.initData;
