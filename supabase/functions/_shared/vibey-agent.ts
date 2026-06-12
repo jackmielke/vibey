@@ -336,6 +336,48 @@ export const TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "search_content_hub",
+      description:
+        "Search the Vibe content hub — the team's essays, posts, and evolving thoughts (the AI Vibe Check newsletter / content pipeline). Use when someone asks what Vibe Ventures has written or believes about a topic, for the latest posts or newsletter, or the story/positioning behind what we're building. Returns matching entries with title, author(s), status, issue number, and a page_id to pass to read_content_hub_page for the full text. Only PUBLISHED entries are visible to regular members; admins can also see drafts / in-progress pieces.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Optional text to match against entry titles. Omit to list the most recent entries.",
+          },
+          limit: {
+            type: "integer",
+            description: "Max entries to return. Default 10, max 25.",
+            minimum: 1,
+            maximum: 25,
+          },
+          include_unpublished: {
+            type: "boolean",
+            description: "ADMIN ONLY. Also include drafts / in-progress pieces (any status). Ignored for non-admins.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "read_content_hub_page",
+      description:
+        "Read the full text of one content hub entry by its page_id (from search_content_hub). Returns the title, status, author(s), issue number, and the body of the essay/post. Regular members can only read Published entries; unpublished drafts are admin-only.",
+      parameters: {
+        type: "object",
+        properties: {
+          page_id: { type: "string", description: "The Notion page id returned by search_content_hub." },
+        },
+        required: ["page_id"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "notify_jack",
       description:
         "Send Jack a Telegram DM when you're stuck, blocked, want to flag something, or just want to escalate to a human. Use sparingly — only when the situation genuinely benefits from human help. Examples: a tool keeps failing, an admin asked you to edit a file you can't handle, a request is genuinely ambiguous and you'd rather check than guess, or you noticed something Jack would want to know. Don't use for routine confusion you can resolve by re-asking the user. The DM is delivered out-of-band; the current conversation continues normally — tell the user (politely) that you've pinged Jack so they know help is on the way.",
@@ -830,6 +872,13 @@ export async function loadEnabledToolNames(
     Deno.env.get("GRANOLA_API_KEY")
   ) {
     enabled.add("fetch_granola_note");
+  }
+
+  // Content hub (Notion) — enable as soon as the integration token exists,
+  // until an agent_tools row governs it (same pattern as Granola).
+  if (Deno.env.get("NOTION_API_KEY")) {
+    if (!rows.some((r) => r.name === "search_content_hub")) enabled.add("search_content_hub");
+    if (!rows.some((r) => r.name === "read_content_hub_page")) enabled.add("read_content_hub_page");
   }
 
   // search_gallery and save_to_gallery have no secret requirement — auto-enable until rows exist.
@@ -2298,6 +2347,178 @@ async function listWorkshops(
   });
 }
 
+// ── Content hub (Notion) ────────────────────────────────────────────────────
+// Read-only access to the "AI Vibe Check - Content Hub" Notion database (the
+// team's essays/posts pipeline). Scoped to this ONE database — the integration
+// token should be shared with only this content hub. Regular members see only
+// Published entries; admins also see drafts. The published/private boundary is
+// enforced HERE (server-side), never left to the model.
+const NOTION_VERSION = "2022-06-28";
+const NOTION_CONTENT_HUB_DATABASE_ID = "efa833ea-0d0f-4cf1-929a-a21d869cf119";
+// Statuses safe to surface to everyone; anything else is internal / in-progress.
+const CONTENT_HUB_PUBLIC_STATUSES = new Set(["Published", "Ready to Publish"]);
+
+async function notionFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const token = Deno.env.get("NOTION_API_KEY");
+  if (!token) throw new Error("NOTION_API_KEY not configured");
+  const headers = new Headers(init.headers || {});
+  headers.set("Authorization", `Bearer ${token}`);
+  headers.set("Notion-Version", NOTION_VERSION);
+  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  return await fetch(`https://api.notion.com${path}`, { ...init, headers });
+}
+
+// deno-lint-ignore no-explicit-any
+function notionPlainText(rich: any[]): string {
+  if (!Array.isArray(rich)) return "";
+  return rich.map((r) => r?.plain_text ?? "").join("");
+}
+
+// deno-lint-ignore no-explicit-any
+function contentHubRow(page: any): {
+  page_id: string; title: string; status: string | null; authors: string[];
+  issue: number | null; target_date: string | null; url: string;
+} {
+  const props = page?.properties ?? {};
+  const title = notionPlainText(props?.Title?.title ?? props?.Name?.title ?? []);
+  const status = props?.Status?.select?.name ?? null;
+  // deno-lint-ignore no-explicit-any
+  const authors = (props?.Author?.multi_select ?? []).map((o: any) => o?.name).filter(Boolean);
+  const issue = typeof props?.["Issue #"]?.number === "number" ? props["Issue #"].number : null;
+  const target_date = props?.["Target Date"]?.date?.start ?? null;
+  return { page_id: page?.id, title, status, authors, issue, target_date, url: page?.url ?? "" };
+}
+
+async function searchContentHub(
+  args: { query?: string; limit?: number; include_unpublished?: boolean },
+  isAdmin: boolean
+): Promise<string> {
+  if (!Deno.env.get("NOTION_API_KEY")) {
+    return JSON.stringify({ ok: false, error: "content hub not configured (missing NOTION_API_KEY)" });
+  }
+  const limit = Math.min(Math.max(args?.limit ?? 10, 1), 25);
+  const allowUnpublished = isAdmin && args?.include_unpublished === true;
+
+  // deno-lint-ignore no-explicit-any
+  const body: Record<string, any> = {
+    page_size: Math.min(limit * 3, 100), // over-fetch; we post-filter by title
+    sorts: [{ timestamp: "created_time", direction: "descending" }],
+  };
+  if (!allowUnpublished) {
+    // Server-side gate: non-admins only ever see public statuses.
+    body.filter = {
+      or: [...CONTENT_HUB_PUBLIC_STATUSES].map((s) => ({ property: "Status", select: { equals: s } })),
+    };
+  }
+
+  let resp: Response;
+  try {
+    resp = await notionFetch(`/v1/databases/${NOTION_CONTENT_HUB_DATABASE_ID}/query`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => "");
+    return JSON.stringify({ ok: false, error: `Notion ${resp.status}: ${txt.slice(0, 200)}` });
+  }
+  const json = await resp.json();
+  // deno-lint-ignore no-explicit-any
+  let rows = (json?.results ?? []).map((p: any) => contentHubRow(p));
+  const q = (args?.query ?? "").trim().toLowerCase();
+  if (q) rows = rows.filter((r: { title: string }) => r.title.toLowerCase().includes(q));
+  rows = rows.slice(0, limit);
+  return JSON.stringify({
+    ok: true,
+    count: rows.length,
+    note: allowUnpublished
+      ? "Includes drafts / in-progress entries (admin). Items not 'Published' are internal — do not present them as published or quote them to others."
+      : "Only published entries shown.",
+    entries: rows,
+  });
+}
+
+async function readContentHubPage(
+  args: { page_id: string },
+  isAdmin: boolean
+): Promise<string> {
+  if (!Deno.env.get("NOTION_API_KEY")) {
+    return JSON.stringify({ ok: false, error: "content hub not configured (missing NOTION_API_KEY)" });
+  }
+  const pageId = (args?.page_id ?? "").trim();
+  if (!pageId) return JSON.stringify({ ok: false, error: "page_id is required" });
+
+  // 1) Fetch page props — validate it belongs to the content hub + check status.
+  let pageResp: Response;
+  try {
+    pageResp = await notionFetch(`/v1/pages/${pageId}`);
+  } catch (e) {
+    return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+  if (!pageResp.ok) {
+    const txt = await pageResp.text().catch(() => "");
+    return JSON.stringify({ ok: false, error: `Notion ${pageResp.status}: ${txt.slice(0, 200)}` });
+  }
+  const page = await pageResp.json();
+  const parentDb = (page?.parent?.database_id ?? "").replace(/-/g, "");
+  if (parentDb !== NOTION_CONTENT_HUB_DATABASE_ID.replace(/-/g, "")) {
+    return JSON.stringify({ ok: false, error: "that page is not part of the content hub" });
+  }
+  const meta = contentHubRow(page);
+  if (!isAdmin && !CONTENT_HUB_PUBLIC_STATUSES.has(meta.status ?? "")) {
+    return JSON.stringify({ ok: false, error: "that entry isn't published yet — it's internal/in-progress; refuse politely" });
+  }
+
+  // 2) Fetch block children (paginated) and render to readable text.
+  const lines: string[] = [];
+  let cursor: string | undefined = undefined;
+  for (let i = 0; i < 10; i++) {
+    const qp = cursor ? `?start_cursor=${cursor}&page_size=100` : `?page_size=100`;
+    let bResp: Response;
+    try {
+      bResp = await notionFetch(`/v1/blocks/${pageId}/children${qp}`);
+    } catch (e) {
+      return JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) });
+    }
+    if (!bResp.ok) break;
+    const bj = await bResp.json();
+    // deno-lint-ignore no-explicit-any
+    for (const blk of (bj?.results ?? []) as any[]) {
+      const t = blk?.type;
+      const text = notionPlainText(blk?.[t]?.rich_text ?? []);
+      if (!text && t !== "divider") continue;
+      if (t === "heading_1") lines.push(`# ${text}`);
+      else if (t === "heading_2") lines.push(`## ${text}`);
+      else if (t === "heading_3") lines.push(`### ${text}`);
+      else if (t === "bulleted_list_item") lines.push(`- ${text}`);
+      else if (t === "numbered_list_item") lines.push(`1. ${text}`);
+      else if (t === "to_do") lines.push(`- [${blk?.to_do?.checked ? "x" : " "}] ${text}`);
+      else if (t === "quote") lines.push(`> ${text}`);
+      else if (t === "code") lines.push("```\n" + text + "\n```");
+      else if (t === "divider") lines.push("---");
+      else lines.push(text);
+    }
+    if (bj?.has_more && bj?.next_cursor) cursor = bj.next_cursor;
+    else break;
+  }
+
+  const MAX = 12000;
+  let bodyText = lines.join("\n\n").trim();
+  if (bodyText.length > MAX) bodyText = bodyText.slice(0, MAX) + "\n\n…(truncated)";
+
+  return JSON.stringify({
+    ok: true,
+    title: meta.title,
+    status: meta.status,
+    authors: meta.authors,
+    issue: meta.issue,
+    url: meta.url,
+    body: bodyText,
+  });
+}
+
 const ADMIN_TOOL_NAMES = new Set(ADMIN_TOOLS.map((t) => t.function.name));
 
 async function executeToolCall(
@@ -2356,6 +2577,10 @@ async function executeToolCall(
       });
     case "fetch_granola_note":
       return await fetchGranolaNote(parsed as { url_or_id: string });
+    case "search_content_hub":
+      return await searchContentHub(parsed as { query?: string; limit?: number; include_unpublished?: boolean }, isAdmin);
+    case "read_content_hub_page":
+      return await readContentHubPage(parsed as { page_id: string }, isAdmin);
     case "get_vibe_price":
       return await getVibePrice(parsed as { usd?: number; vibe?: number });
     case "notify_jack":
