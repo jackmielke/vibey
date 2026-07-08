@@ -29,6 +29,56 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_bounties: {
+        Row: {
+          agent_id: string
+          claimed_at: string | null
+          claimed_by_kind: string | null
+          claimed_by_ref: string | null
+          created_at: string
+          description: string | null
+          id: string
+          paid_at: string | null
+          reward: number
+          status: string
+          title: string
+        }
+        Insert: {
+          agent_id: string
+          claimed_at?: string | null
+          claimed_by_kind?: string | null
+          claimed_by_ref?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          paid_at?: string | null
+          reward: number
+          status?: string
+          title: string
+        }
+        Update: {
+          agent_id?: string
+          claimed_at?: string | null
+          claimed_by_kind?: string | null
+          claimed_by_ref?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          paid_at?: string | null
+          reward?: number
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_bounties_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "world_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_chat_logs: {
         Row: {
           agent_id: string
@@ -100,6 +150,50 @@ export type Database = {
             columns: ["community_id"]
             isOneToOne: false
             referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_economy: {
+        Row: {
+          agent_id: string
+          asleep: boolean
+          asleep_until: string | null
+          items: Json
+          last_tick: string
+          needs: Json
+          purpose: string
+          services: Json
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          asleep?: boolean
+          asleep_until?: string | null
+          items?: Json
+          last_tick?: string
+          needs?: Json
+          purpose?: string
+          services?: Json
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          asleep?: boolean
+          asleep_until?: string | null
+          items?: Json
+          last_tick?: string
+          needs?: Json
+          purpose?: string
+          services?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_economy_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: true
+            referencedRelation: "world_agents"
             referencedColumns: ["id"]
           },
         ]
@@ -1748,6 +1842,27 @@ export type Database = {
         }
         Relationships: []
       }
+      edm_guestbook: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          name?: string
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -2289,6 +2404,90 @@ export type Database = {
           source?: string
           status?: string
           workshop_weeks?: number[]
+        }
+        Relationships: []
+      }
+      island_dms: {
+        Row: {
+          body: string
+          created_at: string
+          from_kind: string
+          from_name: string
+          from_ref: string
+          id: string
+          thread_key: string
+          to_kind: string
+          to_ref: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          from_kind: string
+          from_name: string
+          from_ref: string
+          id?: string
+          thread_key: string
+          to_kind: string
+          to_ref: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          from_kind?: string
+          from_name?: string
+          from_ref?: string
+          id?: string
+          thread_key?: string
+          to_kind?: string
+          to_ref?: string
+        }
+        Relationships: []
+      }
+      island_spawns: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          kind: string
+          label: string | null
+          model_url: string | null
+          pos_x: number
+          pos_y: number
+          pos_z: number
+          rot_y: number
+          scale: number
+          thumbnail_url: string | null
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          kind: string
+          label?: string | null
+          model_url?: string | null
+          pos_x?: number
+          pos_y?: number
+          pos_z?: number
+          rot_y?: number
+          scale?: number
+          thumbnail_url?: string | null
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          label?: string | null
+          model_url?: string | null
+          pos_x?: number
+          pos_y?: number
+          pos_z?: number
+          rot_y?: number
+          scale?: number
+          thumbnail_url?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -3361,6 +3560,36 @@ export type Database = {
         }
         Relationships: []
       }
+      universe_requests: {
+        Row: {
+          author: string | null
+          created_at: string
+          id: string
+          owner_ref: string | null
+          source: string
+          status: string
+          text: string
+        }
+        Insert: {
+          author?: string | null
+          created_at?: string
+          id?: string
+          owner_ref?: string | null
+          source?: string
+          status?: string
+          text: string
+        }
+        Update: {
+          author?: string | null
+          created_at?: string
+          id?: string
+          owner_ref?: string | null
+          source?: string
+          status?: string
+          text?: string
+        }
+        Relationships: []
+      }
       user_embeddings: {
         Row: {
           bio_embedding: string | null
@@ -3646,6 +3875,104 @@ export type Database = {
           world_id_nullifier_hash?: string | null
           world_id_verified?: boolean | null
           world_id_verified_at?: string | null
+        }
+        Relationships: []
+      }
+      vibe_balances: {
+        Row: {
+          balance: number
+          owner_kind: string
+          owner_ref: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          owner_kind: string
+          owner_ref: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          owner_kind?: string
+          owner_ref?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vibe_inventory: {
+        Row: {
+          acquired_at: string
+          cosmetic_key: string | null
+          id: string
+          item_key: string
+          item_title: string
+          owner_kind: string
+          owner_ref: string
+          source_agent_id: string | null
+        }
+        Insert: {
+          acquired_at?: string
+          cosmetic_key?: string | null
+          id?: string
+          item_key: string
+          item_title: string
+          owner_kind: string
+          owner_ref: string
+          source_agent_id?: string | null
+        }
+        Update: {
+          acquired_at?: string
+          cosmetic_key?: string | null
+          id?: string
+          item_key?: string
+          item_title?: string
+          owner_kind?: string
+          owner_ref?: string
+          source_agent_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vibe_inventory_source_agent_id_fkey"
+            columns: ["source_agent_id"]
+            isOneToOne: false
+            referencedRelation: "world_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vibe_ledger: {
+        Row: {
+          amount: number
+          created_at: string
+          from_kind: string | null
+          from_ref: string | null
+          id: string
+          memo: string | null
+          reason: string
+          to_kind: string | null
+          to_ref: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          from_kind?: string | null
+          from_ref?: string | null
+          id?: string
+          memo?: string | null
+          reason?: string
+          to_kind?: string | null
+          to_ref?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          from_kind?: string | null
+          from_ref?: string | null
+          id?: string
+          memo?: string | null
+          reason?: string
+          to_kind?: string | null
+          to_ref?: string | null
         }
         Relationships: []
       }
@@ -4230,6 +4557,107 @@ export type Database = {
         }
         Relationships: []
       }
+      world_agents: {
+        Row: {
+          agent_key: string
+          color: string
+          created_at: string
+          id: string
+          last_seen_at: string
+          metadata: Json
+          name: string
+          prompt: string | null
+          room_id: string
+          status: string
+          updated_at: string
+          x: number
+          y: number
+        }
+        Insert: {
+          agent_key: string
+          color?: string
+          created_at?: string
+          id?: string
+          last_seen_at?: string
+          metadata?: Json
+          name: string
+          prompt?: string | null
+          room_id: string
+          status?: string
+          updated_at?: string
+          x?: number
+          y?: number
+        }
+        Update: {
+          agent_key?: string
+          color?: string
+          created_at?: string
+          id?: string
+          last_seen_at?: string
+          metadata?: Json
+          name?: string
+          prompt?: string | null
+          room_id?: string
+          status?: string
+          updated_at?: string
+          x?: number
+          y?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "world_agents_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "world_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      world_messages: {
+        Row: {
+          agent_id: string | null
+          body: string
+          created_at: string
+          id: string
+          kind: string
+          room_id: string
+          speaker: string
+        }
+        Insert: {
+          agent_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          kind?: string
+          room_id: string
+          speaker: string
+        }
+        Update: {
+          agent_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          room_id?: string
+          speaker?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "world_messages_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "world_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "world_messages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "world_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       world_objects: {
         Row: {
           community_id: string
@@ -4279,6 +4707,135 @@ export type Database = {
           {
             foreignKeyName: "world_objects_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wc_leaderboard"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      world_rooms: {
+        Row: {
+          created_at: string
+          description: string | null
+          height: number
+          id: string
+          name: string
+          slug: string
+          spawn_x: number
+          spawn_y: number
+          updated_at: string
+          width: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          height?: number
+          id: string
+          name: string
+          slug: string
+          spawn_x?: number
+          spawn_y?: number
+          updated_at?: string
+          width?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          height?: number
+          id?: string
+          name?: string
+          slug?: string
+          spawn_x?: number
+          spawn_y?: number
+          updated_at?: string
+          width?: number
+        }
+        Relationships: []
+      }
+      world_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      worlds: {
+        Row: {
+          blurb: string | null
+          created_at: string
+          creator_id: string | null
+          github_url: string | null
+          hero_model_url: string | null
+          id: string
+          is_featured: boolean
+          name: string
+          play_count: number
+          preview_url: string | null
+          route: string
+          slug: string
+          sort_order: number
+          status: string
+          tags: string[]
+          updated_at: string
+        }
+        Insert: {
+          blurb?: string | null
+          created_at?: string
+          creator_id?: string | null
+          github_url?: string | null
+          hero_model_url?: string | null
+          id?: string
+          is_featured?: boolean
+          name: string
+          play_count?: number
+          preview_url?: string | null
+          route: string
+          slug: string
+          sort_order?: number
+          status?: string
+          tags?: string[]
+          updated_at?: string
+        }
+        Update: {
+          blurb?: string | null
+          created_at?: string
+          creator_id?: string | null
+          github_url?: string | null
+          hero_model_url?: string | null
+          id?: string
+          is_featured?: boolean
+          name?: string
+          play_count?: number
+          preview_url?: string | null
+          route?: string
+          slug?: string
+          sort_order?: number
+          status?: string
+          tags?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worlds_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worlds_creator_id_fkey"
+            columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "wc_leaderboard"
             referencedColumns: ["user_id"]
@@ -4510,6 +5067,7 @@ export type Database = {
         Args: { target_community_id: string }
         Returns: boolean
       }
+      bump_world_play_count: { Args: { _world_id: string }; Returns: undefined }
       can_view_community_user: {
         Args: { target_user_id: string; viewer_auth_id: string }
         Returns: boolean
